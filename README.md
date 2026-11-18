@@ -23,4 +23,4 @@ The raw kernel traces of the ticket tests (pcap captures, ftrace text, softirq a
 Code: MIT (`LICENSE`). Data: CC BY 4.0 (`LICENSE-DATA.md`). Cite the archive (`CITATION.cff`) and the paper.
 
 ## Version history
-- first release: the manuscript as submitted, the data, predictions and analyses listed above.
+- first release: the manuscript as of this release, before submission; the data, predictions and analyses listed above.
