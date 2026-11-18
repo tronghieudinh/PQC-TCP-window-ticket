@@ -1,8 +1,7 @@
 G9, stage D (80 cells): difference of the resumed excess latency between releases on the same machine (X250), run 19 Nov 2026 00:33-04:18 (run_all.sh --with-365)
 4.1.0 against 3.5 cells 80 max |diff| ms 0.040 mean 0.013
 3.6.5 against 3.5 cells 80 max |diff| ms 0.050 mean 0.012
-md5sum of the raw files (the three runs hold different data):
+md5sum of the raw files (the runs hold different data):
 3.5    slack_tls.csv 735110a1e47338fa5f0bb6a0e13e6f20  nst_tls.csv 7ac067c5159a2e6c7c0ab408574df330
 4.1.0  slack_tls.csv 012840f0c3cf1e36c94fa68193b9ac59  nst_tls.csv 672ed57a6e6836f41f12eade32787915
 3.6.5  slack_tls.csv 1f283acd9c7973132cdd20a3b8db677a  nst_tls.csv 3506f6cf254863fea8d06a6b9cdbe6b9
-The raw files are on the X250 under ~/pqc_measurements/scenarios/G9/ and are to be added to this archive.

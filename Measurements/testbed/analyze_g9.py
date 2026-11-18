@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """analyze_g9.py - evaluates the criteria G1-G4 of results/g9_ticket_versions_predictions.md on one or more OpenSSL releases measured with scenario G9.
-    python3 analyze_g9.py --run 3.5.4=DIR --run 4.1.0=DIR [--run 3.6.5=DIR] [--out results/g9_analysis.txt]
-DIR holds slack_tls.csv (stage C) and nst_tls.csv (stage D) of one run. The first --run is the baseline (3.5.4 on the SAME machine).
+    python3 analyze_g9.py                                   # the archived runs: results/g9/3.5, 4.1.0, 3.6.5 (X250, 19 Nov 2026), baseline 3.5
+    python3 analyze_g9.py --run 3.5=DIR --run 4.1.0=DIR [--run 3.6.5=DIR] [--out results/g9_analysis.txt] [--cross-out results/g9_crossversion.txt]
+DIR holds slack_tls.csv (stage C) and nst_tls.csv (stage D) of one run. The first --run is the baseline (3.5 on the SAME machine).
+Also writes the cross-release comparison (md5sum of the raw files, differences of the resumed latency of the 80 stage-D cells against the baseline).
 The predictions are those of results/slack_predictions.csv and results/nst_predictions.csv, unchanged. A cell is 'wrong' when the prediction is off by more than 50 ms (half the RTT).
 Criteria (as approved; thresholds are not adjusted here):
   G1  stage C: the validated rule (slack 0) is wrong on at most 1 of 28 cells
@@ -41,12 +43,34 @@ def evaluate(d, tmp):
     return r
 
 
+def cross(runs, tmp):
+    """md5sum of the raw files and the stage-D differences of every release against the first one"""
+    import hashlib
+    lines = ["G9, stage D (80 cells): difference of the resumed excess latency between releases on the same machine (X250), run 19 Nov 2026 00:33-04:18 (run_all.sh --with-365)"]
+    S = {}
+    for v, d in runs:
+        S[v] = {(r["suite"], int(r["req"]), int(r["resp"])): float(r["resumed_excess"]) for r in summary(os.path.join(d, "nst_tls.csv"), tmp)}
+    vs = list(S)
+    for v in vs[1:]:
+        df = [abs(S[v][k] - S[vs[0]][k]) for k in S[vs[0]] if k in S[v]]
+        lines.append(f"{v} against {vs[0]} cells {len(df)} max |diff| ms {max(df):.3f} mean {sum(df) / len(df):.3f}")
+    lines.append("md5sum of the raw files (the runs hold different data):")
+    for v, d in runs:
+        md = lambda f: hashlib.md5(open(os.path.join(d, f), "rb").read()).hexdigest()
+        lines.append(f"{v:6s} slack_tls.csv {md('slack_tls.csv')}  nst_tls.csv {md('nst_tls.csv')}")
+    return lines
+
+
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--run", action="append", required=True, help="VERSION=DIR"); ap.add_argument("--out", default=os.path.join(RES, "g9_analysis.txt"))
+    ap = argparse.ArgumentParser(); ap.add_argument("--run", action="append", help="VERSION=DIR"); ap.add_argument("--out", default=os.path.join(RES, "g9_analysis.txt"))
+    ap.add_argument("--cross-out", default=os.path.join(RES, "g9_crossversion.txt"))
     a = ap.parse_args(); lines = []; res = []
+    runs = [tuple(spec.split("=", 1)) for spec in a.run] if a.run else [(v, os.path.join(RES, "g9", v)) for v in ("3.5", "4.1.0", "3.6.5")]
+    runs = [(v, os.path.expanduser(d)) for v, d in runs]
     with tempfile.TemporaryDirectory() as tmp:
-        for spec in a.run:
-            v, d = spec.split("=", 1); res.append((v, evaluate(os.path.expanduser(d), tmp)))
+        for v, d in runs:
+            res.append((v, evaluate(d, tmp)))
+        cross_lines = cross(runs, tmp) if len(runs) > 1 else []
     for v, r in res:
         lines.append(f"OpenSSL {v}: stage C {r['nC']} cells (validated rule wrong {r['c0']}, MAE {r['mae0']:.2f} ms; loosened by 2 wrong {r['c2']}); "
                      f"stage D {r['nD']} cells, {r['nDis']} discriminating (early wrong {r['d_early_dis']}, joined wrong {r['d_joined_dis']}); early wrong on {r['d_early']} of {r['nD']}, MAE {r['maeE']:.1f} ms")
@@ -54,6 +78,8 @@ def main():
     base = res[0][1]; ok = all(base[g] for g in ("G1", "G2", "G3", "G4")) and base["complete"]
     lines.append(f"baseline ({res[0][0]}) reproduces the earlier result: {'YES' if ok else 'NO: the other runs are INCONCLUSIVE'}")
     open(a.out, "w").write("\n".join(lines) + "\n"); print("\n".join(lines))
+    if cross_lines:
+        open(a.cross_out, "w").write("\n".join(cross_lines) + "\n"); print("\n".join(cross_lines))
 
 
 if __name__ == "__main__":

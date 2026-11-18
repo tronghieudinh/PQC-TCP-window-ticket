@@ -16,6 +16,9 @@ $PY Simulation/window_from_kernel.py | tee "$tmp/kernel.txt"; grep -q "480 of 48
 cp Measurements/testbed/results/l1_model_comparison.csv "$tmp/cmp.csv"
 $PY Measurements/testbed/analyze_l1_model_comparison.py >/dev/null
 cmp -s "$tmp/cmp.csv" Measurements/testbed/results/l1_model_comparison.csv && echo "model comparison OK" || { echo "model comparison DIFF"; exit 1; }
+# the ticket tests on other OpenSSL releases (G9, X250): the analysis rerun from the archived raw files
+$PY Measurements/testbed/analyze_g9.py --out "$tmp/g9_analysis.txt" --cross-out "$tmp/g9_cross.txt" >/dev/null
+cmp -s "$tmp/g9_analysis.txt" Measurements/testbed/results/g9_analysis.txt && cmp -s "$tmp/g9_cross.txt" Measurements/testbed/results/g9_crossversion.txt && echo "G9 analysis OK" || { echo "G9 analysis DIFF"; exit 1; }
 if command -v latexmk >/dev/null; then
   (cd paper2_short/CCR && latexmk -pdf -interaction=nonstopmode main.tex >/dev/null 2>&1; latexmk -pdf -interaction=nonstopmode main.tex >/dev/null 2>&1) \
     && echo "built paper2_short/CCR/main.pdf ($(pdfinfo paper2_short/CCR/main.pdf 2>/dev/null | awk '/Pages/{print $2}') pages)" || echo "PDF build failed (see paper2_short/CCR/main.log)"
