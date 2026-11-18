@@ -1,0 +1,10 @@
+fixed  window fixed at the initial window            n=144 MAE   2.30 ms  median |e|  0.63 ms  round trip off   4  within 1 ms 140
+slow   textbook slow start                           n=144 MAE   1.42 ms  median |e|  0.63 ms  round trip off   2  within 1 ms 142
+linux  + Linux validation, rule (1)                  n=144 MAE   1.42 ms  median |e|  0.63 ms  round trip off   2  within 1 ms 142
+stack  + OpenSSL write pattern (ticket joined)       n=144 MAE   1.42 ms  median |e|  0.63 ms  round trip off   2  within 1 ms 142
+early  + ticket written on the Finished              n=144 MAE   0.54 ms  median |e|  0.62 ms  round trip off   0  within 1 ms 144
+
+client-window test (pre-registered, 28 cells at 100 ms RTT):
+C_fixed  window fixed at the initial window            n=28 MAE  25.04 ms  round trip off   7
+C_slow   textbook slow start                           n=28 MAE  35.63 ms  round trip off  10
+C_linux  Linux validation, rule (1)                    n=28 MAE   0.30 ms  round trip off   0

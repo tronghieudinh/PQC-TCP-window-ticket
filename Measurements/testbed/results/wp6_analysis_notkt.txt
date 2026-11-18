@@ -1,0 +1,24 @@
+$ python3 analyze_notkt.py results/trace_tkt results/trace_notkt
+cell                                                  A n  A med  A>10 |  B n  B med  B>10
+ECDSA-P256_100_100_1500_19460_16                       12     10    0% |   12     10    0%
+ECDSA-P256_100_100_1500_25220_16                       12     10    0% |   12     10    0%
+ECDSA-P256_30_100_1280_19460_16                        12     10    0% |   12     10    0%
+ECDSA-P256_30_100_1280_25220_16                        12     10    0% |   12     10    0%
+ECDSA-P256_30_100_1500_19460_16                        12     10    0% |   12     10    0%
+ECDSA-P256_30_100_1500_25220_16                        12     10    0% |   12     10    0%
+ML-DSA-44_100_100_1500_19460_16                        11     12  100% |   11     10    0%
+ML-DSA-44_100_100_1500_25220_16                        11     10    0% |   11     10    0%
+ML-DSA-44_30_100_1280_19460_16                         12     12  100% |   12     10    0%
+ML-DSA-44_30_100_1280_25220_16                         11     10    0% |   11     10    0%
+ML-DSA-44_30_100_1500_19460_16                         11     12   91% |   11     10    0%
+ML-DSA-44_30_100_1500_25220_16                         12     10    0% |   12     10    0%
+ML-DSA-65_100_100_1500_19460_16                        12     15  100% |   12     10    0%
+ML-DSA-65_100_100_1500_25220_16                        12     10    0% |   12     10    0%
+ML-DSA-65_30_100_1280_19460_16                         12     16  100% |   12     10    0%
+ML-DSA-65_30_100_1280_25220_16                         11     12  100% |   11     10    0%
+ML-DSA-65_30_100_1500_19460_16                         12     15  100% |   12     10    0%
+ML-DSA-65_30_100_1500_25220_16                         12     10    0% |   12     10    0%
+
+G2a  cells of arm B with burst <= 10 in >= 95% of the transactions: 18 of 18
+G2b  cells where arm A had burst > 10 in >= half of the transactions (the effect to remove): 7; arm B has burst <= 10 in 7 of them
+G2c  cells where the median burst of B is not larger than that of A: 18 of 18

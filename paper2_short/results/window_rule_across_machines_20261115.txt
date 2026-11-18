@@ -1,0 +1,15 @@
+Cua so TCP sau mot flight ngan: quy tac dong w(n) = max(w0, min(w0+n, 2n)) tren 7 diem (may, kernel)  [2026-11-15]
+Du lieu: PQC-data-repo, stage p1-replication, tep *slackA* (run_slack.py, TCP thuan, giai doan A: 4 cau hinh x 10 lan lap, OpenSSL khong lien quan; cung cau hinh nhu Hinh 1 cua L1). Phan tich: analyze_slack.py (tinh bang ban sao, khong ghi vao results/ cua repo).
+Chi so: ti le cac co luong n1 (so doan cua flight dau) ma cua so doc tu TCP_INFO bang dung cong thuc (khop chinh xac), theo tung cau hinh; 1,00 = 100 %.
+
+(may, kernel)                          base   mtu1280  mtu9000  icw20
+X250   Linux 6.8.0-149-generic         1,00   1,00     0,35     1,00
+X250   Linux 6.14.0-37-generic         1,00   1,00     0,40     1,00
+X250   Linux 6.17.0-42-generic         1,00   1,00     0,35     1,00
+X250   Linux 7.0.0-42-generic          1,00   1,00     0,35     1,00
+i9-10900K  Linux 7.0.0-42 (lan 1)      1,00   1,00     0,35     1,00
+i9-10900K  Linux 7.0.0-42 (lan 2)      1,00   1,00     0,35     1,00
+GX10 (Arm Cortex-X925/A725)  6.14.0-1015-nvidia   1,00   1,00     0,40     1,00
+
+Doc: cong thuc khop chinh xac o ba cau hinh (base, MTU 1280, cua so khoi dau 20) tren ca 7 diem, qua 4 kernel x86 (6.8 den 7.0), hai CPU x86 khac nhau va mot CPU Arm; o MTU 9000 chi 35 den 40 % co luong khop tren moi diem (khong phu thuoc may hay kernel). GX10 kernel 7.0.0-1019 dang do (chien dich 15/11), se them mot dong.
+Luu y: day la bang chung "quy tac nay la cua Linux, khong cua mot may"; ngoai MTU 9000 (xem phan G3b trong gx10_6.14_phan_tich_20261114.txt) cac thi nghiem khac cua L1 (the, can thiep, backlog, softirq) moi co o X250 7.0 va GX10 6.14.

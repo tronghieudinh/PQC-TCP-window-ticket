@@ -1,0 +1,5 @@
+WP6 part G1 (pre-registered). Question: are the ACKs of the session ticket that grow the server's window the ones processed from the socket backlog, after the application released the socket?
+ticket_backlog.bt logs SEND (tcp_sendmsg), BKLG (tcp_add_backlog), RELS/RELE (__release_sock) and the Reno events; a ticket ACK is DEFERRED if its Reno event lies between RELS and RELE on the same thread.
+G1a  of the ticket ACKs that arrived on the wire before the response was written and still called tcp_slow_start, >= 90 % were deferred;
+G1b  of the ticket ACKs processed on arrival (not deferred), >= 90 % did not call tcp_slow_start.
+If G1a fails, the deferral is not what lets early ACKs grow the window (the explanation of the Letter is wrong or incomplete). If there are no such early ACKs (G1a empty), the run cannot test it.

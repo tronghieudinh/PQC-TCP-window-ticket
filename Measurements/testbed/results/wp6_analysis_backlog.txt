@@ -1,0 +1,7 @@
+$ python3 analyze_backlog.py --csv results/ticket_backlog.csv
+664 ticket ACKs joined with the trace; deferred (processed in __release_sock): 235 (35.4%)
+  deferred  :  235 ACKs, tcp_slow_start called for 44 (18.7%), median rel_write -0.555 ms
+  on arrival:  429 ACKs, tcp_slow_start called for 181 (42.2%), median rel_write -0.307 ms
+
+G1a  ACKs that arrived before the write and called tcp_slow_start: 191; deferred: 44 (23.0%, criterion 90%)
+G1b  ACKs processed on arrival: 429; without tcp_slow_start: 248 (57.8%, criterion 90%)

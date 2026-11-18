@@ -1,0 +1,8 @@
+WP6 part H (pre-registered). Question: part G1 showed that the ACKs of the session ticket that grow the server's window are mostly processed in softirq context shortly after the application's write
+returned, not from the socket backlog. Where do they wait? ticket_softirq.bt logs, on one clock, the queueing of each segment to a CPU backlog (ENQ), the start of tcp_v6_rcv (RCV), NET_RX softirq
+and the scheduling of the tls_probe threads. Hypothesis: the ACKs are delivered on time (queued before the write returned) and wait inside the server host because the NET_RX softirq cannot run
+on the CPU that the application is using. For the ticket ACKs that are processed after the first write of the response returned and called tcp_slow_start (arm A, server on CPU 1):
+H1a  >= 80 % were queued (ENQ) before the write returned;
+H1b  of those, >= 80 % of the waits (RCV - ENQ) overlap, for at least 80 % of their length, a period in which a thread of the server ran on the CPU of the ENQ.
+If H1a fails the delay is before the server's queue (netem, veth or the clock of the capture); if H1a holds and H1b fails the wait has another cause (bottom halves disabled, ksoftirqd, interrupts).
+Arm B (server on CPU 3) is exploratory: no criterion.

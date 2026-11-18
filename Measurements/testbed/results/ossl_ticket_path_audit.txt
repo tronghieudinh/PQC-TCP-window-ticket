@@ -1,0 +1,69 @@
+statem_srvr.c of the release tags (sha256, first 16 hex): 3.5.4 2dd64353ca3cfd6e, 3.5.9 552079a4b302d249, 3.6.5 ea64d3cf2a11fdab, 4.1.0 c9f4ee8eb3f105dd
+
+== server13 write transition after the client Finished (11 statements in 3.5.4)
+  3.5.4 -> 3.5.9: identical
+  3.5.4 -> 3.6.5: identical
+  3.5.4 -> 4.1.0: 17 changed statements
+      +if (SSL_CONNECTION_IS_DTLS13(s)) {
+      +st->deferred_ack_state = TLS_ST_OK;
+      +st->hand_state = TLS_ST_SW_ACK;
+      +}
+      +else {
+      +}
+      -if (s->num_tickets > s->sent_tickets) st->hand_state = TLS_ST_SW_SESSION_TICKET;
+      -else st->hand_state = TLS_ST_OK;
+      +if (s->num_tickets <= s->sent_tickets || ((s->options & SSL_OP_NO_TICKET) != 0 && (SSL_CONNECTION_GET_CTX(s)->session_cache_mode & SSL_SESS_CACHE_SER
+      +else next_state = TLS_ST_SW_SESSION_TICKET;
+      +if (SSL_CONNECTION_IS_DTLS13(s)) {
+      +st->deferred_ack_state = next_state;
+      +st->hand_state = TLS_ST_SW_ACK;
+      +}
+      +else {
+      +st->hand_state = next_state;
+      +}
+== post work after the ticket is built (flush) (12 statements in 3.5.4)
+  3.5.4 -> 3.5.9: identical
+  3.5.4 -> 3.6.5: identical
+  3.5.4 -> 4.1.0: 6 changed statements
+      -if (SSL_CONNECTION_IS_TLS13(s) && statem_flush(s) != 1) {
+      +if (SSL_CONNECTION_IS_VERSION13(s) && statem_flush(s) != 1) {
+      +ERR_clear_last_mark();
+      -}
+      -return WORK_FINISHED_CONTINUE;
+      -}
+== tls_construct_new_session_ticket (92 statements in 3.5.4)
+  3.5.4 -> 3.5.9: 7 changed statements
+      -static const unsigned char nonce_label[] = "resumption";
+      +static const unsigned char nonce_label[] = {
+      +0x72, 0x65, 0x73, 0x75, 0x6D, 0x70, 0x74, 0x69, 0x6F, 0x6E }
+      +;
+      +SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_SSL_LIB);
+      -if (!tls13_hkdf_expand(s, md, s->resumption_master_secret, nonce_label, sizeof(nonce_label) - 1, tick_nonce, TICKET_NONCE_SIZE, s->session->master_ke
+      +if (!tls13_hkdf_expand(s, md, s->resumption_master_secret, nonce_label, sizeof(nonce_label), tick_nonce, TICKET_NONCE_SIZE, s->session->master_key, h
+  3.5.4 -> 3.6.5: 7 changed statements
+      -static const unsigned char nonce_label[] = "resumption";
+      +static const unsigned char nonce_label[] = {
+      +0x72, 0x65, 0x73, 0x75, 0x6D, 0x70, 0x74, 0x69, 0x6F, 0x6E }
+      +;
+      +SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_SSL_LIB);
+      -if (!tls13_hkdf_expand(s, md, s->resumption_master_secret, nonce_label, sizeof(nonce_label) - 1, tick_nonce, TICKET_NONCE_SIZE, s->session->master_ke
+      +if (!tls13_hkdf_expand(s, md, s->resumption_master_secret, nonce_label, sizeof(nonce_label), tick_nonce, TICKET_NONCE_SIZE, s->session->master_key, h
+  3.5.4 -> 4.1.0: 18 changed statements
+      -if (SSL_CONNECTION_IS_TLS13(s)) {
+      +if (SSL_CONNECTION_IS_VERSION13(s)) {
+      -static const unsigned char nonce_label[] = "resumption";
+      +static const unsigned char nonce_label[] = {
+      +0x72, 0x65, 0x73, 0x75, 0x6D, 0x70, 0x74, 0x69, 0x6F, 0x6E }
+      +;
+      +SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_SSL_LIB);
+      -if (!tls13_hkdf_expand(s, md, s->resumption_master_secret, nonce_label, sizeof(nonce_label) - 1, tick_nonce, TICKET_NONCE_SIZE, s->session->master_ke
+      +if (!tls13_hkdf_expand(s, md, s->resumption_master_secret, nonce_label, sizeof(nonce_label), tick_nonce, TICKET_NONCE_SIZE, s->session->master_key, h
+      +else {
+      +OPENSSL_free(s->session->ext.alpn_selected);
+      +s->session->ext.alpn_selected = NULL;
+      +s->session->ext.alpn_selected_len = 0;
+      +}
+      -if (SSL_CONNECTION_IS_TLS13(s) && ((s->options & SSL_OP_NO_TICKET) != 0 || (s->max_early_data > 0 && (s->options & SSL_OP_NO_ANTI_REPLAY) == 0))) {
+      +if (SSL_CONNECTION_IS_VERSION13(s) && ((s->options & SSL_OP_NO_TICKET) != 0 || (s->max_early_data > 0 && (s->options & SSL_OP_NO_ANTI_REPLAY) == 0)))
+      -if (SSL_CONNECTION_IS_TLS13(s)) {
+      +if (SSL_CONNECTION_IS_VERSION13(s)) {

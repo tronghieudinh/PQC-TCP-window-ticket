@@ -1,0 +1,6 @@
+WP6 part G2 (pre-registered). Intervention: tls_probe --no-resumed-ticket (no new ticket on a resumed connection); arm A (with ticket) and arm B (without) in the same cells and session.
+Hypothesis under test: the window beyond 10 segments (11-15) is produced by the ACKs of the separately written ticket.
+G2a  arm B: burst <= 10 segments in >= 95 % of the transactions of every cell;
+G2b  control: in the cells where arm A has burst > 10 in at least half of the transactions, arm B has burst <= 10 in all of them;
+G2c  the median burst of arm B is not larger than that of arm A in any cell.
+If G2a or G2b fails, something other than the ticket enlarges the window.

@@ -1,0 +1,4 @@
+WP6 part D (pre-registered). Question: which ACKs of the session ticket does the server's Reno count for window growth? Function tracer: tcp_reno_cong_avoid (called for every ACK that advances the window),
+tcp_slow_start (called from it only if tcp_is_cwnd_limited). Prediction: tcp_slow_start is called right after the ACKs of the ticket that arrive more than 0.049 ms after the last request segment, and not after the ones
+that arrive before; at least 90 % of the ticket ACKs are classified correctly by that rule (analyze_ftrace.py). Alternative outcomes: tcp_slow_start never called for the ticket's ACKs (the growth comes from another path,
+e.g. the ACKs of the response), or called regardless of the order (the rule of the confirmatory test is a proxy for another variable).

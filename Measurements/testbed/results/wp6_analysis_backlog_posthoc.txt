@@ -1,0 +1,10 @@
+suite, processed after the return of the response's first write, slow_start -> n
+('ECDSA-P256', False, False) 96
+('ML-DSA-44', False, False) 194
+('ML-DSA-44', False, True) 13
+('ML-DSA-44', True, True) 34
+('ML-DSA-65', False, False) 149
+('ML-DSA-65', False, True) 48
+('ML-DSA-65', True, True) 130
+slow_start iff processed after the response write: 603 of 664 (90.8%)
+(tid==0 i.e. softirq, deferred in release_sock, ss) -> {(True, False, False): 244, (False, False, False): 4, (False, True, False): 191, (False, True, True): 44, (True, False, True): 178, (False, False, True): 3}

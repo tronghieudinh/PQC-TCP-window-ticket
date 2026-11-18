@@ -1,0 +1,18 @@
+288 ticket ACKs; 14 outside the rule 'slow start called iff the ACK arrives more than 0.049 ms after the tail'
+  ML-DSA-44_req19460_k16_rtt rtt  30 ms  conn  1  ack 3/4  rel  0.051 ms  call within 50 us: False  within 500 us: False  rule: called, not seen
+  ML-DSA-44_req19460_k16_rtt rtt  30 ms  conn  1  ack 4/4  rel  0.057 ms  call within 50 us: False  within 500 us: False  rule: called, not seen
+  ML-DSA-44_req19460_k16_rtt rtt  30 ms  conn  3  ack 3/4  rel  0.039 ms  call within 50 us: True   within 500 us: True   rule: not called, seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn  1  ack 1/5  rel  0.071 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn  1  ack 2/5  rel  0.080 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn  3  ack 1/5  rel  0.051 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn  3  ack 2/5  rel  0.059 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn  5  ack 1/5  rel  0.058 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn  5  ack 2/5  rel  0.067 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn 11  ack 2/5  rel  0.058 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn 13  ack 1/5  rel  0.050 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn 13  ack 2/5  rel  0.062 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn 15  ack 1/5  rel  0.053 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+  ML-DSA-65_req19460_k16_rtt rtt  30 ms  conn 15  ack 2/5  rel  0.063 ms  call within 50 us: False  within 500 us: True   rule: called, not seen
+all misses lie between 0.039 and 0.080 ms after the tail, within 0.031 ms of the threshold
+11 of 14 misses are calls that the tracer records later than 50 us but within 500 us after the capture time of the ACK
+ACKs more than 0.1 ms from the threshold: 208 of 208 classified by the rule

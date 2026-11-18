@@ -1,0 +1,63 @@
+Phân tích dữ liệu GX10 (Arm, Cortex-X925, kernel 6.14.0-1015-nvidia, OpenSSL 3.5.4), chiến dịch chính thức 2026-11-14 (09:58-17:21)
+Dữ liệu: PQC-data-repo/gx10/6.14.0-1015-nvidia (commit 586a60f và sau). Các số dưới đây tính lại bằng các analyzer của repo trên bản sao (không ghi vào results/ khác);
+mọi tiêu chí là các tiêu chí đã đặt trước, không đổi sau khi thấy dữ liệu. Tính bằng tay (không analyzer chính thức) được đánh dấu [tay].
+
+V5-Arm (analyze_v5.py; 4 bản OpenSSL x 5 vòng xen kẽ)
+  3.5.9 và 3.6.5 so với 3.5.4: ML-KEM, ML-DSA, ECDSA, RSA, X25519 đổi dưới 2 % (nhiễu 0,2-3,4 %): ĐẠT.
+  4.1.0 so với 3.5.4: ML-KEM -2,1 đến -0,8 %: ĐẠT; ML-DSA-65 ký -63,0 % (nhiễu 3,4 %), xác minh -53,5 %: KHÔNG ĐẠT tiêu chí ±10 % (i9: -70 % và -54 %).
+  ML-DSA ký (us): 44: 350,7 -> 132,9; 65: 571,3 -> 211,5; 87: 658,9 -> 246,9. Bắt tay mTLS đủ (2 chữ ký, 2+d xác minh) nhanh hơn 0,88-1,06 ms (ML-DSA-65, d=1..3).
+
+G1 tái lập 226 cấu hình (analyze_testbed.py, analyze_replication.py)
+  Đủ 7 560 dòng (252 cấu hình x 30), 0 lỗi. Sai số mô hình stack 1,59 ms (<=1500: 1,55 ms), mô hình lý tưởng 5,02 ms (3,2 lần). Trong 1 ms: 78/226; trong 0,1 RTT: 200/226.
+  R1: số đạt (1,55 <= 2,0 và lý tưởng >= 2x stack) nhưng analyzer loại GX10 khỏi R1 vì chưa có phân tích slack của lần chạy slackA.
+  R2 (<= 1 ms trong >= 90 %, trung vị <= 0,5 ms) KHÔNG đạt ở mọi cặp máy; GX10 so với X250 7.0.0-42: trung vị |chênh| 1,03 ms, 49 % trong 1 ms.
+  R5 chỉ áp dụng cho Linux 7.0 (GX10 chạy 6.14: ngoài phạm vi); MAE MTU 9000 của GX10 là 1,74 ms (X250 1,63; i9 1,08; dải tiêu chí 1,67-2,67).
+
+Điều tra R2 và R5 (so sánh excess thô của 7 lần chạy OpenSSL 3.5.4 với X250 7.0.0-42) [tay]
+  X250 trên bốn kernel (6.8, 6.14, 6.17, 7.0): trung vị |chênh| 0,04-0,14 ms, 97-100 % trong 1 ms: kernel KHÔNG phải nguyên nhân.
+  Chênh theo tốc độ (trung vị excess - excess X250 7.0): 10 / 100 / 1000 Mbit/s:
+    i9 lần 1: +1,26 / +0,06 / +0,00;  i9 lần 2: +1,48 / +0,08 / +0,02;  GX10: +1,39 / +0,51 / +0,57.
+  Độ lệch tái lập (hai lần i9 cùng dấu) và tập trung ở 10 Mbit/s (72/226 cấu hình), cỡ thời gian truyền một khung 1500 B ở 10 Mbit/s (1,2 ms). X250 là máy lệch.
+  Nhiễu một lần đo: nửa khoảng tin cậy trung vị 0,18 (X250), 0,28 (i9), 0,41 (GX10) ms; ngưỡng R2 sát nhiễu.
+  Sai số mô hình stack có dấu theo tốc độ (10 / 100 / 1000): X250 -0,72 / +0,54 / +0,67; i9 +0,51 / +0,59 / +0,63; GX10 +0,57 / +0,99 / +1,04.
+  MAE MTU 9000 không tăng so với MTU khác (X250 1,63 so 1,06; i9 1,08 so 0,82; GX10 1,74 so 1,49); do các ô 10 Mbit/s (1,5-2,6 ms); mọi ô nhân bản ở RTT 30 ms.
+  Chưa biết nguyên nhân (giả thuyết: bộ định hình netem hoặc trạng thái offload của veth khác giữa máy; `ethtool -K ... check=False` che lỗi). Phép thử: testbed/shaper_probe.py
+  (UDP qua cùng cặp veth; chưa chạy). Đọc: nếu ba máy khác nhau ở 10 Mbit/s thì lỗi ở bộ định hình, nếu giống nhau thì lỗi ở stack TCP.
+
+G2 cửa sổ kernel (analyze_slack.py; wp6-kernel: tcp-AB 15 000 dòng, TLS 1 680 dòng)
+  Giai đoạn A: công thức max(icw, min(icw+n, 2n)) khớp 100 % ở mọi cấu hình trừ MTU 9000 (40 %; X250 35 %); không có slack hằng số nào khớp (icw 4: slack 1; icw 20: slack 0): kết luận GIỐNG X250.
+  Giai đoạn B: slack 0 tốt nhất ở mọi cấu hình (MAE 0,76-0,98 ms).
+  Giai đoạn C (TLS tiếp tục phiên, 28 ô): slack 0 MAE 0,32 ms, 0/28 ô sai một RTT (X250: 0,30 ms, 0/28); slack 1: 7,40 ms và 2/28; slack 2: 14,46 và 4/28; slack 3: 21,51 và 6/28.
+
+G3b MTU 9000 bắt tay đầy đủ (24 ô x 2 giá trị tcp_rmem; tiêu chí wp6_pred_mtu9000_full.txt) [tay]
+  P1 (rmem nâng cao: mô hình stack trong 2 ms ở >= 80 % ô): 7/24 (29 %), MAE 13,96 ms: KHÔNG ĐẠT.   P2 (rmem mặc định: >= 10 % ô lệch > 0,5 RTT, đều cao hơn mô hình): 3/24 (12 %), cả 3 cao hơn: ĐẠT.
+  Ba ô lệch là cùng một kích thước phản hồi (88 700 B = 10 đoạn theo mô hình) ở ba suite, lệch +95,5 đến +97,2 ms (một RTT), và lệch y hệt ở cả hai giá trị rmem.
+  Nguyên nhân: mô hình đếm k = ceil(resp/MSS) = 10 đoạn, còn dây thực nhận 12 đoạn dữ liệu và 91 130 B (resp + khoảng 2,4 kB: 82 168 - 79 760 = 2 408; 91 130 - 88 700 = 2 430). 10 x MSS 8 940 = 89 400 B:
+  phản hồi vượt 10 đoạn từ resp khoảng 87,0 kB (đo) thay vì 89,4 kB (mô hình): ô 88 700 B nằm trong khoảng giữa. Đây là sai số cộng gộp khoảng 2,4 kB về byte (khung bản ghi, tiêu đề), không phải cửa sổ nhận.
+  Các ô còn lại lệch +2 đến +3,5 ms (cùng chiều; ECDSA +3,2 đến 3,5; ML-DSA +1,9 đến 2,4). P3 (ô lệch là ô có chuyến bay vượt cửa sổ quảng bá): KHÔNG ĐẠT về ý nghĩa: cửa sổ quảng bá lớn 518 528 B (rmem nâng cao)
+  mà ô vẫn lệch; với rmem mặc định cửa sổ quảng bá hay gặp nhất là 62 592 B (cũng gặp 101-109 kB): theo cửa sổ 62 592 B thì 24/24 ô vượt (phản hồi >= 79 760 B), không chỉ 3.
+  Pha TCP thuần (stage A): rmem mặc định khớp công thức ở 8/20 cỡ (X250 7/20); rmem lớn 16/20 (X250 16/20). Kết luận: H_rwnd CHƯA xác nhận (giống X250).
+
+G4 máy chủ cố định xung (srv-capacity, repeat, latency, latency-resumed, srv-perf; chạy lại 14/11)
+  Bước srv-perf lần đầu rỗng (perf_capacity.py nuốt lỗi); sửa (thử cycles, cpu-cycles, cpu-clock, báo lỗi thật), chạy lại: libcrypto 77,9 % (ECDSA-P256 và X25519) và 92,9 % (ML-DSA-65 và ML-KEM-768),
+  kernel 9,2 % và 3,4 %, libc 9,6 % và 2,8 %, libssl 3,2 % và 0,9 %; sự kiện cycles, 15 s.
+  So với dữ liệu cũ 11/11 (chuyển sang ~/pqc_measurements/old_G4_20261111): srv-capacity 60/60 ô trong +-5 % (trung vị +0,1 %, -1,4..+1,6 %); srv-capacity-repeat 4/4 ô (+0,4 %).
+  Chưa so srv-latency và srv-latency-resumed.
+
+G5 HSM mô phỏng, độ trễ giao dịch (analyze_hsm_latency.py; 96 ô)
+  Trong 2 ms của dự đoán overlap ở 96/96 ô (tiêu chí (1) >= 80 %: ĐẠT), sai số lớn nhất 1,9 ms, trung bình 0,31 ms; mô hình cộng: 66/96 (69 %), sai số trung bình 5,83 ms.
+  16 ô mà hai mô hình khác nhau > 5 ms: overlap gần hơn ở 16/16 (tiêu chí (2), đọc từ phần đầu của tiêu chí: ĐẠT).
+
+G6 cơ chế vé phiên trên Arm (các phần F, G1, G2, H; dữ liệu có pcap và vết bpftrace)
+  F (analyze_state.py; 815 ACK của vé): P1 tcp_slow_start được gọi khi và chỉ khi trạng thái là cwnd-limited: 815/815 (100 %; tiêu chí >= 98 %): ĐẠT.
+    P2 cửa sổ cho phản hồi = cwnd lúc ghi - đoạn vé chưa được ACK, trong 1 đoạn: 237/239 (99,2 %; >= 90 %): ĐẠT (X250: 89,8 %).
+    P3 gần ngưỡng 0,1 ms trạng thái khớp quy tắc phần C: 401/505 (79,4 %; >= 90 %): KHÔNG ĐẠT (X250: 68,9 %). P2b (post hoc): 239/239.
+  G1 (analyze_backlog.py; 751 ACK): chỉ 36 (4,8 %) được xử lý trong __release_sock (X250: 35,4 %).
+    G1a (ACK đến trước khi ghi và có slow_start: >= 90 % bị hoãn): 2/62 (3,2 %): KHÔNG ĐẠT (X250: 23 %).  G1b (ACK xử lý khi đến, >= 90 % không gọi slow_start): 655/715 (91,6 %): ĐẠT (X250: 57,8 %).
+  G2 (analyze_notkt.py; hai nhánh có vé và không vé, 18 ô): G2a nhánh B burst <= 10 ở >= 95 % giao dịch: 18/18 ô: ĐẠT; G2b nhánh A có burst > 10 ở >= nửa giao dịch ở 2 ô (X250: 7 ô),
+    cả 2 ô này nhánh B về <= 10: ĐẠT; G2c: 18/18 ô: ĐẠT. Hiệu ứng nhỏ hơn trên Arm (2 ô so với 7).
+  H (analyze_softirq.py; nhánh A CPU 1, nhánh B CPU 3): nhánh A chỉ 5/339 ACK muộn (đều gọi slow_start); H1a 0/5 và H1b 0/1: KHÔNG ĐẠT (X250: 5,1 % và 1,7 %); nhánh B 0/325 ACK muộn: không đánh giá được.
+    ACK sớm chờ ENQ -> RCV trung vị 83-89 us.
+  Kết luận chung: cơ chế vé (ACK của vé làm cửa sổ lớn lên; bỏ vé thì mất hiệu ứng) tái lập trên Arm; mô tả "ACK bị hoãn trong backlog hay softirq chờ CPU" không tái lập (rất hiếm trên Arm).
+
+Việc chưa làm: srv-latency và srv-latency-resumed so với 11/11; shaper_probe.py trên ba máy; M1 trên Arm (3.5.9, 3.6.5, 4.1.0 và 3.5.4 lặp); G6 nhánh F/G1/G2/H n nhỏ (6, 10, 10, 15): các tỷ lệ trên ít giao dịch, đọc kèm cỡ mẫu.

@@ -1,0 +1,2 @@
+wp6-kernel	tcp-AB	plain-tcp_stageA-B	3.5.4	wp6-kernel__tcp-AB__plain-tcp_stageA-B__ossl3.5.4.csv	2026-11-14T05:10:36Z	2026-11-14T06:44:50Z	0.20	1.23	0.20/0.26/0.34	1.23/0.69/0.35	ok	0
+wp6-kernel	tls	rtt100_100M_mtu1500_k9-15_n30	3.5.4	wp6-kernel__tls__rtt100_100M_mtu1500_k9-15_n30__ossl3.5.4.csv	2026-11-14T06:49:09Z	2026-11-14T07:08:11Z	0.37	0.39	0.37/0.63/0.43	0.39/0.54/0.61	waited	0

@@ -1,0 +1,19 @@
+{
+  "kernel": "6.14.0-37-generic",
+  "machine": "x86_64",
+  "cpu": "Intel(R) Core(TM) i7-5600U CPU @ 2.60GHz",
+  "congestion_control": "cubic",
+  "slow_start_after_idle": "1",
+  "initial_window_default": 10,
+  "utc": "2026-11-13T01:53:29Z",
+  "args": {
+    "stage": "A",
+    "configs": "base,mtu1280,mtu9000,icw20",
+    "reps_a": 10,
+    "reps_b": 15,
+    "out": "~/pqc_measurements/x250/6.14.0-37-generic/p1-replication/p1-replication__slackA__base-mtu1280-mtu9000-icw20_reps10__ossl3.5.4.csv",
+    "trace": false,
+    "trace_configs": "base",
+    "dry_run": false
+  }
+}

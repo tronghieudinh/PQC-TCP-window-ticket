@@ -1,0 +1,6 @@
+340
+late n 117 ENQ - write return (us): median 181.2, min -8.8, 10th 25.0, 90th 235.7
+pcap-based rel_write (ms) of the same ACKs: median -0.073
+rel_tail of late ACKs (ms): median 0.313; share > 0.049: 1.00
+early n 223 rel_tail median 0.035; share>0.049 0.31
+pcap says before the write (rel_write<=0) but ENQ after write return: 107

@@ -1,0 +1,42 @@
+#!/usr/bin/env bpftrace
+/*
+ * WP6 part F: state of the server's TCP sender at every acknowledgment that Reno processes, and at every call of tcp_slow_start.
+ *   sudo bpftrace -q ticket_state.bt 4433 > tag.bpf.txt          ($1 = local port of the server)
+ * Lines (fields separated by blanks; tid identifies the CPU thread that runs the softirq):
+ *   RENO ns tid dport ack acked cwnd ssthresh packets_out max_packets_out is_cwnd_limited snd_una snd_nxt   at entry of tcp_reno_cong_avoid(sk, ack, acked)
+ *   SS   ns tid dport acked cwnd ssthresh                                                                 at entry of tcp_slow_start(tp, acked)
+ *   SSR  ns tid cwnd_after                                                                                at return of tcp_slow_start
+ * tcp_is_cwnd_limited() (include/net/tcp.h) is true if tp->is_cwnd_limited, or, in slow start, if snd_cwnd < 2 * max_packets_out;
+ * tcp_reno_cong_avoid returns without calling tcp_slow_start otherwise. nsecs is CLOCK_MONOTONIC; the analysis does not need it to be aligned with the capture
+ * (events are joined with the packets by client port and acknowledgment number).
+ */
+BEGIN { printf("READY\n"); }
+
+kprobe:tcp_reno_cong_avoid
+{
+  $sk = (struct sock *)arg0;
+  if ($sk->__sk_common.skc_num == $1) {
+    $tp = (struct tcp_sock *)arg0;
+    printf("RENO %llu %d %u %u %u %u %u %u %u %u %u %u\n", nsecs, tid, bswap($sk->__sk_common.skc_dport), arg1, arg2,
+           $tp->snd_cwnd, $tp->snd_ssthresh, $tp->packets_out, $tp->max_packets_out, $tp->is_cwnd_limited, $tp->snd_una, $tp->snd_nxt);
+  }
+}
+
+kprobe:tcp_slow_start
+{
+  $tp = (struct tcp_sock *)arg0;
+  if ($tp->inet_conn.icsk_inet.sk.__sk_common.skc_num == $1) {
+    @ss[tid] = (uint64)arg0;
+    printf("SS %llu %d %u %u %u %u\n", nsecs, tid, bswap($tp->inet_conn.icsk_inet.sk.__sk_common.skc_dport), arg1, $tp->snd_cwnd, $tp->snd_ssthresh);
+  }
+}
+
+kretprobe:tcp_slow_start
+/@ss[tid] != 0/
+{
+  $tp = (struct tcp_sock *)@ss[tid];
+  printf("SSR %llu %d %u\n", nsecs, tid, $tp->snd_cwnd);
+  delete(@ss[tid]);
+}
+
+END { clear(@ss); }

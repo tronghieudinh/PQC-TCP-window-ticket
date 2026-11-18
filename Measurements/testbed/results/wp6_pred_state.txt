@@ -1,0 +1,8 @@
+WP6 part F (pre-registered). Question: what in the state of the server's sender decides whether an acknowledgment of the session ticket grows the window, and by how much?
+ticket_state.bt logs, at every ACK processed by the server's Reno (tcp_reno_cong_avoid), snd_cwnd, ssthresh, packets_out, max_packets_out, is_cwnd_limited, and snd_cwnd after tcp_slow_start.
+Events are joined with the server-side capture by client port and acknowledgment number. Criteria (analyze_state.py):
+P1  tcp_slow_start is called iff (is_cwnd_limited or snd_cwnd < 2 * max_packets_out) at entry: >= 98 % of the ticket-ACK events. A lower share means that the logged state is not what the kernel tests.
+P2  The first burst of the response equals (snd_cwnd after the last ticket ACK that arrived before the write) - (ticket segments still unacknowledged at the write), within one segment: >= 90 % of the transactions.
+P3  The ACKs within 0.1 ms of the 0.049 ms threshold of part C (the part D misses, 14 of 288) agree with the state-based prediction for >= 90 % of the events: the threshold rule is a proxy for the state.
+Exploratory (no criterion): whether is_cwnd_limited or max_packets_out is the variable that differs between the ACKs before and after the last request segment.
+If P1 holds and P2 fails, the growth of the window follows another path than slow start at the ticket's ACKs (for instance the ACKs of the response); if P3 fails, the 14 misses are not a clock artefact.

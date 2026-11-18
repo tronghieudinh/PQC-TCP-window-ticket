@@ -1,0 +1,31 @@
+Phân tích từng phần dữ liệu GX10 (Arm, Cortex-X925, kernel 7.0.0-1019-nvidia, OpenSSL 3.5.4), chiến dịch chính thức 2026-11-15 (bắt đầu 06:45), lập lúc 12:40, khi chiến dịch còn đang chạy G3b rồi G4, G6.
+Phạm vi: V5-Arm, G1, G2, G5 (đã xong). CHƯA phân tích: G3b, G4, G6 (đang chạy hoặc chưa chạy). Dùng các analyzer của repo trên bản sao (không ghi vào results/ chính); chạy với nice 19 trên lõi 18-19.
+Tiêu chí là các tiêu chí đã đặt trước, không đổi sau khi thấy dữ liệu.
+
+V5-Arm (analyze_v5.py; 4 bản OpenSSL x 5 vòng): GIỐNG kernel 6.14.
+  3.5.9 và 3.6.5 so với 3.5.4: ML-KEM, ML-DSA-65 đổi dưới 1,4 % (nhiễu 0,2-3,9 %): ĐẠT.
+  4.1.0 so với 3.5.4: ML-KEM -2,1 đến -0,7 %: ĐẠT; ML-DSA-65 ký -62,9 % (6.14: -63,0 %), xác minh -53,5 % (6.14: -53,5 %): KHÔNG ĐẠT tiêu chí ±10 %.
+  Bắt tay mTLS đủ nhanh hơn 0,88-0,99 ms (ML-DSA-65, d=1..3).
+
+G1 tái lập 226 cấu hình (analyze_testbed.py, analyze_replication.py; 7 560 dòng)
+  Sai số MAE (ms): stack 2,35; ideal 5,90; stack MTU<=1500 2,44; ideal MTU<=1500 6,96; stack MTU 9000 2,01.
+  Quy tắc cửa sổ (tỉ lệ khớp công thức đóng, base / MTU1280 / MTU9000 / icw20): 1,00 / 1,00 / 0,35 / 1,00 (X250 và i9 giống hệt).
+  R1 (stack MTU<=1500 <= 2,0 ms và ideal >= 2x stack): KHÔNG ĐẠT (2,44 ms; ideal/stack = 2,85 nên điều kiện thứ hai đạt, điều kiện thứ nhất trượt 0,44 ms). X250 (1,15) và i9 (0,89) đạt.
+  R2 (excess trong 1 ms ở >= 90 % cấu hình, trung vị <= 0,5 ms): KHÔNG ĐẠT ở mọi cặp. GX10 7.0 so X250 lặp 7.0.0-42: trung vị |chênh| 2,12 ms, 11 % trong 1 ms; so i9: 1,83 ms, 23 %; X250 gốc so X250 lặp: 0,36 ms, 81 %.
+  R5 (MAE MTU 9000 trong 0,5 ms của bản gốc 2,17 ms, Linux 7.0): ĐẠT (GX10 7.0: 2,01 ms; X250 lặp 1,63; i9 1,07). Đây là lần đầu R5 được kiểm trên GX10 (6.14 ngoài phạm vi).
+  Độ lệch của excess so với X250 lặp 7.0.0-42, trung vị theo tốc độ 10 / 100 / 1000 Mbit/s:  GX10 7.0: +2,43 / +1,90 / +2,07 ms (lệch gần hằng ở mọi tốc độ, giống GX10 6.14 buổi tối: +2,51 / +1,93 / +2,26);  i9: +1,48 / +0,08 / +0,02.
+  Ba phiên GX10 (6.14 sáng, 6.14 tối, 7.0): stack MAE 1,59 / 2,38 / 2,35 ms; MTU<=1500: 1,55 / 2,47 / 2,44 ms. Hai phiên sau giống nhau, phiên sáng khác: độ lệch theo phiên, không theo kernel.
+
+G2 cửa sổ kernel (analyze_slack.py; wp6-kernel: tcp-AB 15 000 dòng, TLS 1 680 dòng): GIỐNG 6.14 và X250.
+  Giai đoạn A: công thức max(icw, min(icw+n, 2n)) khớp 100 % ở base, rtt5, rtt30, rate10, rate1000, MTU1280, icw4, icw20, delack, cubic, ts, offload; MTU 9000: 35 % (J1: 35 %); không có slack hằng nào khớp.
+  Giai đoạn B: slack 0 tốt nhất ở mọi cấu hình (MAE 0,88-1,13 ms với cửa sổ thật của kernel).
+  Giai đoạn C (TLS tiếp tục phiên, 28 ô): slack 0 MAE 2,35 ms, 0/28 ô sai một RTT (6.14: 0,32 ms; X250: 0,30 ms); slack 1: 9,44 ms và 2/28; slack 2: 16,50 ms và 4/28; slack 3: 23,55 ms và 6/28.
+  Lưu ý: MAE của slack 0 (2,35 ms) cao hơn 6.14 (0,32 ms) vì độ lệch theo phiên (+2 ms cho mọi ô, xem G1); số ô sai một RTT vẫn là 0/28 và 2, 4, 6 ở các slack lớn hơn: kết luận giữ nguyên, nhưng KHÔNG nên ghi "MAE 0,30 ms" như đặc trưng chung cho mọi máy.
+
+G5 HSM mô phỏng, độ trễ giao dịch (analyze_hsm_latency.py; 96 ô)
+  Trong 2 ms của dự đoán overlap ở 96/96 ô (100 %; tiêu chí >= 80 %: ĐẠT); mô hình cộng: 68/96 (71 %). 16 ô mà hai mô hình khác nhau > 5 ms: overlap gần hơn ở 16/16: ĐẠT. Giống 6.14 (96/96; cộng 66/96).
+
+Hệ quả:
+  - R5 đạt trên Linux 7.0 (GX10), nên có thể bỏ giới hạn "R5 ngoài phạm vi" trong P1/L1 cho GX10.
+  - R1 trượt do độ lệch phiên +2 ms, trùng với độ vượt RTT danh định của bộ định hình netem (xem gx10_rep2_R2_20261115.txt); quy tắc cửa sổ và cấu trúc các RTT nguyên tái lập hoàn toàn.
+  - Bảng 3 của P1 và bảng tái lập của L1 cần thêm hàng "Arm (GX10), Linux 7.0": stack 2,35 / ideal 5,90 / <=1500 2,44 / MTU 9000 2,01.

@@ -1,0 +1,17 @@
+$ python3 analyze_softirq.py results/trace_softirq
+331 ticket ACKs joined (ENQ, RCV, RENO) in results/trace_softirq
+processed after the first write of the response returned: 117; before: 214
+  late : tcp_slow_start called for 117 of 117; wait ENQ->RCV median 13.7 us, 90th 19.0 us, ENQ cpu = RCV cpu 117
+  early: tcp_slow_start called for 19 of 214; wait ENQ->RCV median 9.9 us, 90th 16.4 us, ENQ cpu = RCV cpu 214
+
+H1a  late ACKs with tcp_slow_start queued before the write returned: 6 of 117 (5.1%, criterion 80%)
+H1b  of those, waits that overlap >= 80% with the server running on the ENQ cpu: 0 of 6 (0.0%, criterion 80%)
+
+$ python3 analyze_softirq.py results/trace_softirq_cpu3 (arm B, exploratory)
+319 ticket ACKs joined (ENQ, RCV, RENO) in results/trace_softirq_cpu3
+processed after the first write of the response returned: 118; before: 201
+  late : tcp_slow_start called for 118 of 118; wait ENQ->RCV median 12.5 us, 90th 19.1 us, ENQ cpu = RCV cpu 118
+  early: tcp_slow_start called for 26 of 201; wait ENQ->RCV median 3.9 us, 90th 9.9 us, ENQ cpu = RCV cpu 201
+
+H1a  late ACKs with tcp_slow_start queued before the write returned: 2 of 118 (1.7%, criterion 80%)
+H1b  of those, waits that overlap >= 80% with the server running on the ENQ cpu: 0 of 2 (0.0%, criterion 80%)

@@ -1,0 +1,20 @@
+$ python3 analyze_state.py results/trace_state/*_srv.pcap --csv results/ticket_state.csv
+799 ticket ACKs joined with an event of the server's Reno
+  ACK before the last request segment: n=570  tcp_slow_start called 2%  is_cwnd_limited set 0%  median cwnd 10  median max_packets_out 4  median packets_out 1
+  ACK 0 to 0.049 ms after it: n=25  tcp_slow_start called 4%  is_cwnd_limited set 0%  median cwnd 10  median max_packets_out 1  median packets_out 0
+  ACK more than 0.049 ms after it: n=204  tcp_slow_start called 89%  is_cwnd_limited set 88%  median cwnd 11  median max_packets_out 11  median packets_out 10
+P1  tcp_slow_start called iff the state says limited: 799 of 799 (100.0%)   [criterion >= 98%]
+P2  burst of the response = cwnd at the write - unacknowledged ticket segments, within 1 segment: 212 of 236 (89.8%), exact 212   [criterion >= 90%]
+    cwnd at the write -> transactions (mean burst - prediction): 10: 184 (+0.0); 11: 15 (+8.4); 12: 25 (+1.4); 13: 6 (+2.0); 14: 3 (+0.0); 15: 1 (+0.0); 16: 2 (+0.0)
+P3  ACKs within 0.1 ms of the threshold: the state agrees with the rule of part C for 51 of 74 (68.9%); the state agrees with tcp_slow_start for 74 of 74   [criterion >= 90%]
+  exploratory: is_cwnd_limited true for 0% of the ACKs before the tail and 88% of those more than 0.049 ms after it
+  exploratory: cwnd < 2 * max_packets_out true for 2% of the ACKs before the tail and 89% of those more than 0.049 ms after it
+Post hoc (after the registered criteria were scored):
+  P2b  burst of the response = snd_cwnd after the last ticket ACK processed before the first ACK of the response: 236 of 236 within 1 segment (100.0%), exact 229
+  ACKs captured before the response write, rel_tail <= 0: 0 of 570 are processed with packets_out above the ticket size + 1 (the response is already in flight)
+  ACKs captured before the response write, 0 < rel_tail <= 0.049: 0 of 25 are processed with packets_out above the ticket size + 1 (the response is already in flight)
+  ACKs captured before the response write, rel_tail > 0.049: 71 of 96 are processed with packets_out above the ticket size + 1 (the response is already in flight)
+  ACKs more than 0.049 ms after the tail: 204; processed with the response in flight: 179; limited: 182
+  all ACKs processed with the response in flight: 179, limited: 179
+  ACKs at most 0.049 ms after the tail: 595, limited: 13 (all with max_packets_out 6, snd_cwnd 10, 11)
+  rule of part C against the state, all ACKs: 764 of 799

@@ -1,0 +1,24 @@
+# pqcm-header 1
+# machine: gx10
+# kernel: 6.14.0-1015-nvidia
+# arch: aarch64
+# cpu: Cortex-X925
+# openssl: 3.5.4
+# campaign: paper2
+# stage: wp6-F
+# measure: state
+# config: 5nets_req19460-25220_k16_n6
+# pqcbench: 1
+# code: e998335
+# tuned: 1
+# quiet: 1
+# command: env PQC_OUTDIR=~/pqc_measurements/gx10/6.14.0-1015-nvidia/wp6-F/wp6-F__state__5nets_req19460-25220_k16_n6__ossl3.5.4 PQC_BPF=~/PQC-bank-2/Measurements/testbed/ticket_state.bt PQC_NO_TCPPROBE=1 python3 trace_run.py race --suites ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768 --reqs 19460,25220 --nets 30:100:1500,5:100:1500,100:100:1500,30:10:1500,30:
+# run[1]: t_start=2026-11-14T08:25:28Z, t_end=2026-11-14T08:28:50Z, load_before=0.13, load_after=0.14, load_1_5_15_before=0.13/0.11/0.17, load_1_5_15_after=0.14/0.16/0.18, rc=0
+# pqcm-header-end
+i,t_tcp_ms,t_hs_ms,t_total_ms,bytes_w,bytes_r,snd_mss,snd_cwnd0,retrans,rtt_us,data_segs_out,data_segs_in,err,reused,prime_ms
+0,31.588,63.353,157.974,26856,23904,1440,10,0,31408,21,18,,1,157.026
+1,31.009,62.757,157.236,26856,23904,1440,10,0,31493,21,18,,1,158.307
+2,30.971,62.344,156.861,26856,23904,1440,10,0,31488,21,18,,1,157.427
+3,31.326,63.041,157.287,26856,23904,1440,10,0,31459,21,18,,1,158.626
+4,31.665,63.032,157.228,26856,23904,1440,10,0,31593,21,18,,1,158.433
+5,30.898,62.262,155.597,26856,23904,1440,10,0,31349,21,18,,1,158.914

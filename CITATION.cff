@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software or data, please cite it as below."
+title: "Code, data and predictions for: How Linux grows the TCP window after a short flight, and what it costs post-quantum TLS"
+type: software
+authors:
+  - family-names: "Dinh"
+    given-names: "Trong-Hieu"
+    email: "hieudt@hvnh.edu.vn"
+    orcid: "https://orcid.org/0009-0005-0601-3229"
+    affiliation: "Banking Academy of Vietnam, Hanoi, Vietnam"
+  - family-names: "Hoang"
+    given-names: "Trong-Minh"
+    email: "hoangtrongminh@ptit.edu.vn"
+    orcid: "https://orcid.org/0000-0001-8486-2940"
+    affiliation: "Posts and Telecommunications Institute of Technology, Hanoi, Vietnam"
+license: MIT
+keywords: [TLS 1.3, post-quantum cryptography, TCP congestion window, session ticket, measurement, Linux]
+# After the first Zenodo release add: doi: "10.5281/zenodo.<number>" (concept DOI) and version: "<tag>" (hand-edited, once).
+# Related archive: pqc-financial-transport (the study of the transport model of post-quantum authentication), Zenodo concept DOI 10.5281/zenodo.23839449.

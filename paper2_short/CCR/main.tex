@@ -1,0 +1,218 @@
+% ACM SIGCOMM Computer Communication Review (CCR), short technical paper. Rules read on 2 Nov 2026 (ccronline.sigcomm.org/instructions-for-submission):
+% 6 two-column pages excluding references; SIG Alternate / acmart sigconf, 9 pt, US Letter, no copyright block (nonacm); NOT anonymous (names, affiliations, e-mails on the first page);
+% abstract about 100 words; PDF at most 4 MB; no simultaneous submission elsewhere; submission via sigcomm-ccr.hotcrp.com. Implicit deadlines 1 Mar / 1 Jun / 1 Sep / 1 Dec.
+\documentclass[sigconf,9pt,nonacm]{acmart}
+\settopmatter{printfolios=true}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\setcopyright{none}
+\pagestyle{plain}
+\usepackage{booktabs,array}
+\usepackage{xcolor}
+\usepackage{xspace}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+\newcommand{\clienticon}[2]{\begin{scope}[shift={(#1,#2)},x=1mm,y=1mm]
+\draw[rounded corners=0.4pt,fill=blue!8,draw=blue!60!black,line width=0.5pt] (-3,-1.6) rectangle (3,2.4);
+\fill[blue!25] (-2.4,-1.1) rectangle (2.4,1.9);
+\draw[blue!60!black,line width=0.5pt] (0,-1.6) -- (0,-2.6) (-1.6,-2.6) -- (1.6,-2.6);
+\end{scope}}
+\newcommand{\servericon}[2]{\begin{scope}[shift={(#1,#2)},x=1mm,y=1mm]
+\foreach \dy in {-2.2,0,2.2}{\draw[rounded corners=0.4pt,fill=orange!10,draw=orange!60!black,line width=0.5pt] (-2.6,\dy-0.9) rectangle (2.6,\dy+0.9);
+\fill[orange!70!black] (-1.8,\dy) circle (0.3); \draw[orange!70!black,line width=0.4pt] (0.2,\dy) -- (2,\dy);}
+\end{scope}}
+
+\input{../Latex/numbers_short}
+\newcommand{\pending}[1]{{\color{red}\textit{[pending: #1]}}}
+\newcommand{\ms}{\,ms\xspace}
+\newcommand{\citeone}{\cite{paperone}}
+\graphicspath{{../Latex/figures/}}
+\hyphenation{OpenSSL}
+
+\begin{document}
+\title{How Linux Grows the TCP Window After a Short Flight, and What It Costs Post-Quantum TLS}
+\author{Trong-Hieu Dinh}
+\affiliation{\institution{Banking Academy of Vietnam}\city{Hanoi}\country{Vietnam}}
+\email{hieudt@hvnh.edu.vn}
+\author{Trong-Minh Hoang}
+\authornote{Corresponding author.}
+\affiliation{\institution{Posts and Telecommunications Institute of Technology}\city{Hanoi}\country{Vietnam}}
+\email{hoangtrongminh@ptit.edu.vn}
+\begin{abstract}
+Post-quantum signatures push TLS flights past the initial TCP window, so a flight's cost depends on how Linux grows the window after the previous one. On plain TCP the window after a short flight follows a simple rule in \NExact\ of \NCfg\ configurations, on four kernels, two x86 CPUs and an Arm CPU; with the initial window of ten, a five-segment ClientHello does not enlarge it. Predictions fixed in advance refute the larger-window explanation of a model error, and an intervention shows that the session ticket, a write of its own, causes the server's larger window through acknowledgments that the kernel processes while the sender is window-limited. Five recommendations follow.
+\end{abstract}
+\keywords{TLS 1.3, post-quantum cryptography, TCP congestion window, measurement, design guidance}
+\maketitle
+
+\section{Introduction}
+Post-quantum signatures are an order of magnitude larger than elliptic-curve ones (3\,309 bytes for ML-DSA-65 against 64 for ECDSA-P256, about fifty times), so a TLS flight with a certificate chain can exceed the 10-segment initial window of Linux~\cite{rfc6928}, which Dukkipati et al.\ argued for from web latency~\cite{dukkipati2010} and R\"uth et al.\ measured across the IPv4 address space~\cite{rueth2017}; both concern the window a connection starts with, not how it grows after a short flight. Whether a flight crosses the window depends on the window the kernel has grown after the previous flight in the same direction (a ClientHello that carries a session ticket, for example) and on how the TLS library splits a flight into writes. Handshake costs of post-quantum TLS have been measured on testbeds~\cite{paquin2020,sikeridis2020,sosnowski2023,kampanakis2024}; Henrich et al.\ vary the initial window on real servers and report that data beyond the window adds a round trip and a larger window removes it~\cite{henrich2025}. Chou and Cao see the time to first byte rise in steps when certificate chains cross the initial window, and approximate the later windows by doubling it; their resumed times are dominated by process start-up~\cite{chou2026}. Anastasova and Kampanakis measure mutual TLS and attribute a rise of 51\ms (33\%) at 50\ms RTT to a client certificate chain that exceeds the client's initial window; they treat the window as a setting (10 or 24 segments), not as one that the kernel grows between flights, and do not resume~\cite{anastasova2025}. We found no direct measurement of the window after short flights in this context. The most recent systems study counts the server's TCP segments of full handshakes and the loss tail of OpenSSL~3.5~\cite{dubetskyy2026}; it follows neither the window the kernel grows between flights nor resumed connections.
+
+The rule is subtle: RFC~5681 and RFC~7661 describe slow start and window validation~\cite{rfc5681,rfc7661}, and Linux lets the window grow to twice the largest number of packets in flight~\cite{linuxcwnd}. Whether a five-segment flight passes the boundary $2\times5=10$ is one inequality, and it decides a round trip. A per-segment transport model validated against OpenSSL~3.5 transactions~\citeone\ mispredicted resumed ML-DSA-44 transactions with a large request by a whole round trip in two configurations (by 99\ms at 100\ms RTT and 29\ms at 30\ms; the other \RJoinedRest\ of \RN\ configurations were within 1\ms\ (exact 95\% interval \CiJoinedLo--\CiJoinedHi\%), the largest by \RJoinedRestMax\ms). A flight's cost cannot be predicted from its size alone. We ask how Linux grows the window after a short flight, and why that transaction paid a round trip less than the model charged. Our contributions are (1)~a closed-form window rule for plain TCP, tested in \NCfg\ configurations; (2)~tests with predictions fixed in advance showing that the session ticket, as a separate write, grows the server's window through acknowledgments whose effect depends on when the kernel processes them; (3)~five recommendations for budgeting flights. These are findings on Linux TCP and OpenSSL, not a new congestion-control algorithm. Against Dubetskyy and Cano, whose segment counts are descriptive and come from full handshakes with one run per condition, we give a window rule tested on eight machine-kernel points and tests with predictions fixed in advance of how a resumption ticket changes the server's window.
+
+\section{Method}
+The testbed is two network namespaces joined by a virtual link and shaped with \texttt{tc netem}. The main platform is an Intel i7-5600U under Linux 7.0.0-42 with OpenSSL~3.5; Section~\ref{sec:repl} repeats the tests on other kernels and CPUs. TCP runs over IPv6 without timestamps (MSS = MTU$-60$) with Reno, and with acknowledgments sent at once (\texttt{quickack} routes) unless stated.
+
+\emph{Plain TCP.} A fresh connection writes $n_1$ full segments, waits for a 100-byte reply (which acknowledges all of them), reads the window from \texttt{TCP\_INFO}, then times a second flight of $n_2$ segments (preceded by an 80-byte write, like a TLS Finished). Stage~A reads the window after $n_1=1\ldots16,20,24,31,40$ in \NCfg\ configurations changing one factor at a time: RTT 5--100\ms; 10\,Mbit/s--1\,Gbit/s; MTU 1\,280, 1\,500, 9\,000; initial window 4, 10, 20; delayed ACK; Cubic; timestamps; offload (\NStageA\ connections). Stage~B times second flights in six configurations (\NStageB\ connections).
+
+\emph{TLS with fixed predictions.} Resumed TLS~1.3 with mutual authentication, four suites (ECDSA-P256, ML-DSA-44, -65, -87; ClientHello of 2, 5, 6, 8 segments, because it carries the ticket and with it the client certificate), RTT 100\ms, 30 transactions per cell. The model's prediction for every cell under every rule compared was committed before the measurement. The commit times of the predictions and of the first results, with checksums of the prediction files, are listed in the archive (\texttt{PREREGISTRATION\_L1.md}); they are git's own times, not an independent timestamp, and for the kernel and state traces only the analysis scripts with their thresholds preceded the run.
+
+\section{The Window After a Short Flight}
+The window after an $n$-segment flight is
+\begin{equation}
+w(n)=\max\bigl(w_0,\;\min(w_0+n,\;2n)\bigr),
+\end{equation}
+exactly in \NExact\ of \NCfg\ configurations (exact 95\% interval \CiWinLo--\CiWinHi\%; Fig.~\ref{fig:window}); the configurations change one factor at a time and are not independent samples, so the interval is descriptive: nothing grows below $n=w_0/2$, the window is $2n$ for $w_0/2\le n\le w_0$, and every acknowledged segment adds one beyond $w_0$. It follows from three kernel functions (mainline, checked 18 November 2026). With one acknowledgment per segment, \texttt{tcp\_\allowbreak reno\_\allowbreak cong\_\allowbreak avoid} returns at once unless \texttt{tcp\_\allowbreak is\_\allowbreak cwnd\_\allowbreak limited} holds, and then \texttt{tcp\_\allowbreak slow\_\allowbreak start} adds the segments acknowledged. The test holds if the sender was window-limited when it sent (\texttt{is\_\allowbreak cwnd\_\allowbreak limited}, set by \texttt{tcp\_\allowbreak cwnd\_\allowbreak validate} when the flight fills the window) or while $\texttt{snd\_\allowbreak cwnd}<2\,\texttt{max\_\allowbreak packets\_\allowbreak out}$, twice the segments in flight, not twice the window. A flight of $n\ge w_0$ segments fills the window, so each of its $n$ acknowledgments adds one: $w_0+n$. A shorter flight leaves it unfilled with $n$ in flight, so the window grows by one until it reaches $2n$, and not at all if $w_0\ge 2n$. A short program that applies this logic reproduces (1) for all 480 pairs of $w_0\in\{2,4,10,16,20,32\}$ and $n\le 80$ and the measured window at every point of the window scan except at MTU 9\,000 (\texttt{Simulation/window\_\allowbreak from\_\allowbreak kernel.py}). It holds for every tested RTT, rate, MTU 1\,280/1\,500, initial window ($w_0$ in (1)), delayed ACK, Cubic, timestamps and offload, and on every platform of Table~\ref{tab:repl}; at MTU~9\,000 it is lower (\NineShare\% of flights match) because the default receive buffer limits the sender to about seven segments (with \texttt{tcp\_rmem} raised to 1\,MiB, \NineRwndLargeOk\ of \NineRwndLargeTot\ flight sizes follow (1), against \NineRwndDefOk\ by default). With $w_0=10$, $w(5)=10$ and $w(6)=12$: a five-segment ClientHello does not grow the window, a six-segment one does. The window rule of the model differs from (1) by one segment at odd $n>w_0$; none of the 238 full-handshake configurations of the companion paper (its 226 and 12 with larger requests) is affected. Second flights in stage~B are predicted to 0.2--0.4\ms with the window the kernel really had.
+
+\begin{figure}[t]
+\centering\includegraphics[width=\columnwidth]{fig_window}
+\caption{Window after an $n$-segment flight on plain TCP (medians of 20 connections; solid lines: (1); dotted: its two limits, $2n$ and $w_0+n$, for $w_0=10$).}
+\label{fig:window}
+\end{figure}
+
+\section{A Refuted Explanation, and the Ticket}
+\emph{Larger window.} Take ML-DSA-44 with a 14\,500-byte request. The ClientHello is five segments, so the window stays at 10 and the twelve-segment request flight costs a round trip. The model also puts the ticket (4\,940 bytes) in the response flight, which then has twelve segments and costs a second round trip. Measured, the transaction pays only one (402\ms against 501\ms at 100\ms RTT). One explanation is a larger window after the ClientHello: loosening the rule by two segments lets the request flight pass without a round trip and removes the error (to a mean error of about 0.5\ms over \RN\ configurations), but we chose that after seeing the data. A test with predictions fixed in advance (222-byte response, so only the client's flight can cost a round trip; request flights of 9--15 segments; \CN\ cells) refutes it (Table~\ref{tab:tests}, Fig.~\ref{fig:stagec}): the validated rule is right on all cells (mean error \CMaeZero\ms), the loosened rule wrong by a round trip on \CWrongTwo. Table~\ref{tab:ablation} puts the rule in context: a window fixed at $w_0$ is wrong by a round trip on \AblCFixedOff\ of the \AblCFixedN\ cells and textbook slow start on \AblCSlowOff, so the validation test is what the predictions need, whereas the \AblFixedN\ resumed configurations, whose flights are small, cannot tell the first three models apart (\AblFixedOff, \AblSlowOff\ and \AblLinuxOff\ wrong) and are fixed only by the ticket timing (\AblEarlyOff).
+
+\begin{table}[t]
+\caption{What each part of the model adds. Mean absolute error (MAE, ms) and cells wrong by a round trip ($>$0.5 RTT) of five models, each adding one element to the one above, on the \AblFixedN\ resumed configurations and on the \AblCFixedN-cell client-window test of Table~\ref{tab:tests} (the second set separates only the window rules). Same cells, same measurements; \texttt{analyze\_l1\_model\_comparison.py}.}
+\label{tab:ablation}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{\AblFixedN\ resumed} & \multicolumn{2}{c}{\AblCFixedN\ client window}\\
+Model & MAE & wrong & MAE & wrong\\
+\midrule
+Window fixed at $w_0$ & \AblFixedMae & \AblFixedOff & \AblCFixedMae & \AblCFixedOff\\
+Textbook slow start & \AblSlowMae & \AblSlowOff & \AblCSlowMae & \AblCSlowOff\\
++ Linux validation, rule (1) & \AblLinuxMae & \AblLinuxOff & \AblCLinuxMae & \AblCLinuxOff\\
++ OpenSSL write pattern, ticket joined & \AblJoinedMae & \AblJoinedOff & --- & ---\\
++ ticket written on the Finished & \AblEarlyMae & \AblEarlyOff & --- & ---\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering\includegraphics[width=\columnwidth]{fig_stagec}
+\caption{Pre-registered test: latency of a resumed transaction against the segments of the request flight, measured (circles) and predicted by the validated window rule (solid) and by a rule loosened by two segments (dashed). The step is the extra round trip; it moves with the size of the ClientHello (2, 5, 6 and 8 segments), which sets the window of the request flight.}
+\label{fig:stagec}
+\end{figure}
+
+\emph{Ticket.} The error is then on the server's side. The ticket embeds the client certificate (4 to 6 segments for ML-DSA-44, -65 and -87) and the model had put it in the response flight. We hypothesise that OpenSSL writes it separately as soon as the Finished arrives (Fig.~\ref{fig:ticket}). If the request flight needs an extra round trip, as for ML-DSA-44, the ticket is acknowledged when the response leaves and no longer occupies the window; if not, as for ML-DSA-65, they share it. Segment counts that others captured on full handshakes point the same way: the 15 server counts of Dubetskyy and Cano~\cite{dubetskyy2026} are reproduced only if the two NewSessionTicket messages and the close\_notify alert each leave as a segment of their own (5 of 5 combinations with three segments, none with 0, 1, 2 or 4; calculated after their numbers were published, \texttt{analyze\_dubetskyy\_segments.py}), although those connections did not resume. Removing the ticket altogether fixes ML-DSA-44 but predicts ML-DSA-65 a round trip too fast (303 against 402\ms), so timing matters, not presence. This model reproduces all \RN\ resumed configurations with a mean error of \REarlyMae\ms. A second test with predictions fixed in advance (\DN\ cells; request of 302 and 19\,460 bytes; responses of 3--12 segments) has \DDiff\ cells where the two models differ by a round trip: the early ticket is right on all of them, the joined ticket wrong on all of them (exact sign test $p=\SignDP$; Table~\ref{tab:tests}).
+
+\emph{The server's window.} Both models are wrong on the same \DBothWrong\ cells (ML-DSA-44/-65, request needing an extra round trip, responses of 11--12 segments): the server's window exceeded ten segments after the ticket was acknowledged, which (1) does not predict. A third test (\EN\ cells, responses of 10--18 segments) maps it: the largest response without an extra round trip is \EFitEcdsa, \EFitMlFourFour\ and \EFitMlSixFive\ segments for tickets of 1, 4 and 5 segments (ECDSA-P256, ML-DSA-44, -65). With different server and client algorithms it follows the client's certificate, that is the ticket, in \MixRight\ of \MixN\ pairs, a small sample (exception: server ECDSA-P256, client ML-DSA-65, \MixFitExc\ against \MixPredExc). The window is not a property of the stack alone: in a \GenCells-cell scan (RTT \GenRttLo--\GenRttHi\ms, \GenRateLo--\GenRateHi\,Mbit/s, MTU \GenMtuLo--\GenMtuHi) the largest response without an extra round trip is \GenWMFourFourRttThirty\ and \GenWMSixFiveRttThirty\ segments for ML-DSA-44 and -65 at 30\ms, and \GenWMFourFourMtuLow\ for ML-DSA-44 at MTU~\GenMtuLo\ (ML-DSA-65 shows no step up to the largest response tested, \GenRespMax\ segments), whereas at 5\ms and at \GenRateLo\,Mbit/s every suite stays at \GenWEcRttFive. With server authentication only, where the ticket has one segment, the limit is \ServWindow\ for all three suites and the early-ticket rule with a window of ten is wrong by a round trip in \ServWrong\ of \ServCells\ cells, as predicted before the measurement.
+
+\emph{When the acknowledgment counts.} The order of the ticket's acknowledgment and the response does not decide the window. Captures on the server's link (\RaceN\ resumed transactions, ten networks) show at least one segment of the ticket acknowledged before the response is written in \RaceBeforePct\% of them, including those in which the window stayed at ten. What separates the two outcomes, found afterwards, is when the last acknowledgment of the ticket arrives: the window exceeds ten segments when it comes more than \RaceThr\ms after the last request segment (\RaceRight\ of \RaceMlN\ ML-DSA transactions; exact 95\% interval \CiRaceLo--\CiRaceHi\%).
+
+\emph{Test of the rule.} A request-size sweep with predictions committed in advance confirmed it. Outside a borderline band (cells whose median lies within 0.06\ms of the threshold), \RaceTwoRight\ of \RaceTwoScored\ cells had the predicted class (95\% Wilson interval [90, 100]\%), and the rule classified \RaceTwoOosRight\ of \RaceTwoOosN\ transactions ([97, 99.5]\%); it gives the direction of the effect, not the size of the window. The controls with a small request are all right (\ECtlWrong\ of \ECtlN\ cells wrong). The threshold is a local ordering at the server, in microseconds and unrelated to the RTT, and the rule is insensitive to it (Table~\ref{tab:thr}: 97--99\% of the transactions from 0.04 to 0.10\ms, 94.5\% at 0.02\ms).
+
+\emph{What the kernel does.} A function trace of the server's kernel (prediction fixed in advance; \KerN\ acknowledgments of the ticket) shows that Reno examines every one of them but calls \texttt{tcp\_slow\_start} for none of the \KerBeforeN\ that arrive before the last request segment and for \KerAfterSS\% of the \KerAfterN\ that arrive after it. The rule classifies \KerRight\ of \KerN\ (\KerPct\%; exact interval \CiKerLo--\CiKerHi\%); the \KerWrong\ misses lie within \KerMissNear\ms of the threshold, at the resolution of the alignment of the two clocks. A second run reads the state of the sender at each acknowledgment (bpftrace probes on both functions; \StN\ acknowledgments, joined with the capture by port and acknowledgment number, so that no clock alignment is needed). \texttt{tcp\_slow\_start} is called iff the kernel's own test holds, \texttt{is\_cwnd\_limited} or \texttt{snd\_cwnd} $<2\,$\texttt{max\_packets\_out} (\StPOneRight\ of \StPOneN, as registered). Two other criteria registered with it were not met: the burst of the response equals the window at the write minus the ticket segments still unacknowledged in \StPTwoPct\% of the transactions (criterion 90\%), and the 0.049\ms rule agrees with the state for \StPThreeRight\ of \StPThreeN\ acknowledgments near the threshold (\StPThreePct\%), so the rule is a proxy.
+
+Looking at the data afterwards (post hoc), \StLateInflight\ of the \StLate\ acknowledgments that come more than 0.049\ms after the last request segment are processed with the response already in flight (median \texttt{packets\_out} \StAfterPk, against \StBeforePk\ for the others), where the test holds. Of the \StEarly\ acknowledgments up to 0.049\ms after it, \StEarlyLimited\ are limited, all of ML-DSA-65, where \texttt{max\_packets\_out} reaches six, so that $10<2\times6$. Of the \StDeferredN\ acknowledgments that the capture shows before the write but more than 0.049\ms after the last request segment, \StDeferred\ are processed after the write. The window follows from the last of them: the burst of the response equals the window after the last acknowledgment of the ticket (\StPTwoBRight\ of \StPTwoBN\ within one segment).
+
+\emph{Why the acknowledgments are late, and the intervention.} A third run (probes on the socket backlog; \BkN\ ticket acknowledgments) tested whether socket ownership explains the delay: only \BkDef\ were processed from the backlog and both registered criteria failed (\BkAPct\% and \BkBPct\% against 90\%). Afterwards we found that \texttt{tcp\_slow\_start} was called for all \PhAfterSS\ acknowledgments processed after the first write of the response returned, and for \PhBeforeSS\ of the \PhBefore\ processed before it (post hoc), most of them in softirq context. A fourth run (probes on the queueing to the CPU backlog, on the receive path and on the softirq; \HN\ ticket acknowledgments) tested whether they wait in the softirq queue and failed its registered criteria: only \HAOne\ of the \HALate\ late acknowledgments (\HAPct\%) had been queued before the write returned (criterion 80\%), and the wait from queueing to processing was short (median \HWaitMed\,\textmu s, on the same CPU). Post hoc, they were queued a median \HEnqMed\,\textmu s after the write returned, although the capture shows them on the link 0.07\ms before it; why they are queued late is not established. An intervention settles the role of the ticket: when the server issues no ticket on resumed connections (prediction fixed in advance), the response burst is at most ten segments in all \NtkCells\ cells, including the \NtkEffect\ in which it exceeds ten with the ticket (exact sign test on those pairs $p=\SignNtkP$; with seven pairs no result can be smaller).
+
+\begin{table}[t]
+\caption{Robustness of the ticket-timing rule to its threshold $T$: share of observations in which ``the ACK arrives more than $T$ after the last request segment'' agrees with the outcome (post hoc; $T=0.049$\ms was chosen on the first run).}
+\label{tab:thr}
+\centering\small
+\begin{tabular}{@{}p{0.30\columnwidth}rrrrrr@{}}
+\toprule
+$T$ (ms) & 0.02 & 0.04 & 0.049 & 0.06 & 0.08 & 0.10\\
+\midrule
+Burst $>10$, 399 transactions (\%) & 94.5 & 97.0 & 98.7 & 98.7 & 97.2 & 97.2\\
+\texttt{tcp\_slow\_start} called, 799 ACKs (\%) & 93.4 & 94.1 & 95.6 & 96.5 & 96.7 & 96.5\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[x=1.95mm,y=0.9mm,font=\normalsize,>=Stealth,lab/.style={font=\small,fill=white,inner sep=0.8pt}]
+\useasboundingbox (0,-8) rectangle (91.2,58); % the width of the text: the panels are centred on the two columns (column centres at 21.7 and 69.5)
+\begin{scope}[shift={(7.7,0)}]
+% panel (a)
+\clienticon{3}{52}\servericon{25}{52}\node at (3,43.5) {client}; \node at (25,43.5) {server};
+\draw[gray] (3,0) -- (3,41); \draw[gray] (25,0) -- (25,41);
+\draw[->] (3,39) -- (25,36); \node[lab] at (14,38.4) {Finished + 10 seg};
+\draw[->] (25,34) -- (3,30); \node[lab] at (14,32.6) {ticket (4--5 seg)};
+\draw[->] (3,24) -- (25,22); \node[lab] at (14,23.4) {5 seg, after ACKs};
+\draw[->] (25,14) -- (3,10); \node[lab] at (14,12.6) {response};
+\node[lab] at (14,5) {ticket acknowledged by now};
+\node at (14,-5) {(a) extra round trip};
+\end{scope}
+\begin{scope}[shift={(21.5,0)}]
+% panel (b)
+\clienticon{37}{52}\servericon{59}{52}\node at (37,43.5) {client}; \node at (59,43.5) {server};
+\draw[gray] (37,0) -- (37,41); \draw[gray] (59,0) -- (59,41);
+\draw[->] (37,39) -- (59,36); \node[lab] at (48,38.4) {Finished + request};
+\draw[->] (59,34) -- (37,30); \node[lab] at (48,32.6) {ticket (4--5 seg)};
+\draw[->] (59,28) -- (37,24); \node[lab] at (48,26.6) {response};
+\node[lab] at (48,16) {ticket and response};
+\node[lab] at (48,12.5) {share the window};
+\node at (48,-5) {(b) request fits};
+\end{scope}
+\end{tikzpicture}
+\caption{Ticket timing: the server writes the ticket when the Finished arrives. (a) The request flight needs an extra round trip, so the ticket is acknowledged before the response leaves. (b) It does not, and ticket and response share the window.}
+\label{fig:ticket}
+\end{figure*}
+
+\begin{table}[t]
+\caption{Pre-registered tests and outcomes (criteria and predictions fixed before each run). Rows 1--5: cells wrong by a round trip ($>$50\ms at 100\ms RTT) out of the cells tested. Rows 6--13: share or count against the registered criterion.}
+\label{tab:tests}
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}r>{\raggedright\arraybackslash}p{0.43\columnwidth}>{\raggedright\arraybackslash}p{0.21\columnwidth}>{\raggedright\arraybackslash}p{0.22\columnwidth}@{}}
+\toprule
+ & Test and rule & Criterion & Result\\
+\midrule
+1 & Client window: validated rule & none wrong & \CWrongZero\ of \CN\ (met)\\
+2 & Client window: loosened by 2 segments & none wrong & \CWrongTwo\ of \CN\ (refuted)\\
+3 & Ticket joined with response, discriminating cells & none wrong & \DJoinedWrongDiff\ of \DDiff\ (refuted)\\
+4 & Ticket written on Finished, discriminating cells & none wrong & \DEarlyWrongDiff\ of \DDiff\ (met)\\
+5 & Ticket written on Finished, all cells & none wrong & \DEarlyWrong\ of \DN\\
+6 & Request-size sweep, ticket-timing rule, cells outside the borderline band & predicted class & \RaceTwoRight\ of \RaceTwoScored\ (met)\\
+7 & Kernel trace, acknowledgments of the ticket & rule classifies & \KerRight\ of \KerN\ (\KerPct\%)\\
+8 & State trace: \texttt{tcp\_slow\_start} iff the kernel's test holds & as registered & \StPOneRight\ of \StPOneN\ (met)\\
+9 & State trace: response burst equals the window at the write minus unacknowledged ticket segments & 90\% of transactions & \StPTwoPct\% (not met)\\
+10 & Socket backlog explains the delay & 90\% & \BkAPct\% and \BkBPct\% (not met)\\
+11 & Softirq queue explains the delay & 80\% of late acknowledgments & \HAPct\% (not met)\\
+12 & No ticket issued: response burst $\le10$ segments & all cells & \NtkCells\ of \NtkCells\ (met)\\
+13 & Rows 1--5 repeated on OpenSSL 4.1.0 and 3.6.5, same machine, 3.5 as baseline (criteria G1--G4) & all four met & \GxFourMet\ (4.1.0) and \GxThreeMet\ (3.6.5) of 4 (met)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Does It Replicate?}\label{sec:repl}
+We repeated the plain-TCP test (stage~A, four configurations, ten repetitions) on four kernels of the i7-5600U (6.8, 6.14, 6.17, 7.0), on an i9-10900K (7.0.0-42, two runs) and on an Arm machine (ASUS Ascent GX10 with an NVIDIA GB10: Cortex-X925 and A725, 6.14 and 7.0). Rule~(1) is exact in the base, MTU 1\,280 and $w_0=20$ configurations on all eight points; at MTU~9\,000 only 35--40\% of the flight sizes match on every one, so that deviation belongs to the jumbo-frame path and not to a kernel or a CPU.
+
+The ticket tests ran on the i7-5600U (7.0) and on the Arm machine (6.14 and 7.0). The state test and the intervention carry over: \texttt{tcp\_slow\_start} is called iff the kernel's test holds for 815 of 815 (6.14) and 817 of 817 (7.0) acknowledgments, and when the server issues no ticket the response burst is at most ten segments in all 18 cells (the ticket changes two of them on Arm on both kernels, seven on the i7). The two queue explanations fail again: only 4.8\% (6.14) and 5.0\% (7.0) of the ticket acknowledgments are processed from the socket backlog (35.4\% on the i7), and only 5 of 339 and 14 of 337 are processed after the write returned (117 of 331 on the i7). The registered burst criterion is met on Arm (99.2\% and 98.7\%, against 89.8\% on the i7) and the threshold criterion is not (79.4\% and 77.9\%, against 68.9\%): the 0.049\ms rule stays a proxy. Whatever delays the acknowledgments, it is not a property of these queues.
+
+\begin{table}[t]
+\caption{Replication. Window rule (1): share of flight sizes with the exact window (base / MTU 1\,280 / $w_0=20$ all 100\%; MTU 9\,000 shown). State test: \texttt{tcp\_slow\_start} iff limited. No ticket: cells with burst $\le10$. Backlog: share of ticket acknowledgments processed from the socket backlog. ``--'': not run.}
+\label{tab:repl}
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Platform, kernel & MTU 9\,000 & state & no ticket & backlog\\
+\midrule
+i7-5600U, 6.8 / 6.14 / 6.17 & 35 / 40 / 35\% & -- & -- & --\\
+i7-5600U, 7.0 & 35\% & 799/799 & 18/18 & 35.4\%\\
+i9-10900K, 7.0 (2 runs) & 35\% & -- & -- & --\\
+Arm GX10, 6.14 & 40\% & 815/815 & 18/18 & 4.8\%\\
+Arm GX10, 7.0 & 35\% & 817/817 & 18/18 & 5.0\%\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Recommendations and Limits}
+Five recommendations follow from the measurements. They hold for the tested stack (Linux 7.0, Reno, OpenSSL~3.5); the first, second and fifth rest on (1), the third and fourth on the ticket tests.
+\begin{enumerate}
+\item \emph{Budget each direction and each write in segments of the actual MSS.} A flight costs a round trip when it exceeds the window that the previous flight in the same direction left. Compute that window with (1), not with $w_0$, and count tickets and every other separate write.
+\item \emph{Treat the size of the ClientHello as a threshold.} With $w_0=10$, five segments leave the window at 10 and six raise it to 12, so a few bytes (a ticket, a larger key share) can lift the next client flight across the window and save a round trip (a larger key share would act the same way by this arithmetic, but we did not measure it). Compute the segment count; a larger ClientHello is not necessarily a costlier one.
+\item \emph{After a ticket, budget the response flight at ten segments.} Ticket and response share the window if the request fits; if it needs an extra round trip, the ticket's acknowledgment can enlarge the server's window to 11--15 segments. Ten was pessimistic in the \DBothWrong\ cells where it was wrong, and a response above ten is then a candidate for a measurement, not a budget.
+\item \emph{Measure the server's window on the actual path.} After a ticket it is the window after every acknowledgment of the ticket that the kernel processes while the sender is limited, which depends on RTT, rate, MTU and on when the server's acknowledgments are processed; no rule here predicts it from the network.
+\item \emph{Repeat the plain-TCP test on each kernel and TLS library before relying on (1).} Use jumbo frames only after checking the receive buffer and the 16-KB record writes of OpenSSL, which explain part of the deviations at MTU~9\,000.
+\end{enumerate}
+
+\emph{Limits.} The window rule was tested on eight machine-kernel points and the ticket tests on two machines (three runs), with one TLS library. At MTU~9\,000 the plain-TCP window is limited in part by the receive window (a larger buffer restores most flight sizes), and the TLS cells deviate in part because OpenSSL sends application data record by record: a model option added afterwards, without a fitted parameter, removes the error on resumed transactions (\NineN\ cells, about one millisecond). For full handshakes the pre-registered test failed, with one flight size (88\,700\,B) a round trip off; the same option removes it when applied afterwards, but a later pre-registered test at MTU~1\,500 confirmed it in one band of response sizes and not in another, so the explanation is partial. The window rule and the processing of acknowledgments are Linux's; writing the ticket when the Finished arrives and cutting data into 16-KB record writes are OpenSSL's, so another library may place the ticket differently. Across the OpenSSL releases we measured the path is the same: the server's transition after the client's Finished, the flush after the ticket is built and the construction of the ticket are textually identical in 3.5.4, 3.5.9 and 3.6.5 apart from lines unrelated to when the ticket is written, and in 4.1.0 the order is unchanged (it adds DTLS~1.3 acknowledgments and moves the test of whether to send a ticket into the transition; \texttt{audit\_ossl\_ticket\_path.py}); the data segments of full handshakes equal those of 3.5.4 in \OvTwoSame, \OvThreeSame\ and \OvFourSame\ of \OvTwoAll\ configurations for 3.5.9, 3.6.5 and 4.1.0, the others differing by at most one segment. The path is also what the measurements show: we repeated the two tests that decide it (the \CN\ client-window cells and the \DN\ ticket-timing cells) on 3.6.5 and 4.1.0, and on 3.5 as a baseline on the same machine, with the predictions of the original tests and criteria fixed before the run (row 13 of Table~\ref{tab:tests}). All four criteria were met on both releases: the validated rule is wrong on \GxFourCWrong\ (4.1.0) and \GxThreeCWrong\ (3.6.5) cells, the rule loosened by two segments on \GxFourCLoose\ and \GxThreeCLoose, the early-ticket model on \GxFourDisEarly\ and \GxThreeDisEarly\ of the discriminating cells and the joined-ticket model on \GxFourDisJoined\ and \GxThreeDisJoined, and the resumed latencies of the \DN\ cells differ from those of 3.5 by at most \GxMaxDiff\ms. We used one TLS library (three releases in the ticket tests), mutual authentication and 30 transactions per cell, too few for tails. Reno and Cubic give the same window at these sizes; other controllers and pacing were not tested. The ticket hypothesis rests on \DDiff\ discriminating cells (95\% Wilson interval of the success rate [72, 100]\%), and the server's window after the ticket varies with RTT, rate and MTU. The state trace explains the growth (the window after the acknowledgments that find the sender limited) and removing the ticket removes it, but why those acknowledgments are processed late is not established (neither the socket backlog nor a wait in the softirq queue explains it).\par\emph{Acknowledgments.} This work was supported by the Intelligently Connected Networks LABoratory (PTIT) and the Banking Academy of Vietnam.\par\emph{Availability.} Scripts, raw data, the per-acknowledgment tables derived from the kernel traces and the pre-registered predictions with commit times: Zenodo, \pending{DOI of the archive of this paper}.
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{refs}
+\end{document}

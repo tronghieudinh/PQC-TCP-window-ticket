@@ -1,0 +1,20 @@
+{
+  "kernel": "7.0.0-1019-nvidia",
+  "machine": "aarch64",
+  "cpu": "",
+  "congestion_control": "cubic",
+  "slow_start_after_idle": "1",
+  "initial_window_default": 10,
+  "utc": "2026-11-15T02:09:28Z",
+  "args": {
+    "stage": "A",
+    "n1_a": "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,24,31,40",
+    "configs": "base,mtu1280,mtu9000,icw20",
+    "reps_a": 10,
+    "reps_b": 15,
+    "out": "~/pqc_measurements/gx10/7.0.0-1019-nvidia/p1-replication/p1-replication__slackA__base-mtu1280-mtu9000-icw20_reps10__ossl3.5.4.csv",
+    "trace": false,
+    "trace_configs": "base",
+    "dry_run": false
+  }
+}

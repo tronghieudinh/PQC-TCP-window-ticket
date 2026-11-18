@@ -1,0 +1,33 @@
+baseline 3.5.4: 252 configurations; runs: 3.5.9, 3.6.5, 4.1.0; NO noise run
+
+Noise floor: no second baseline run given: V3 is INCONCLUSIVE until one exists
+
+=== 3.5.9 vs 3.5.4 ===
+configurations in common: 252 of 252
+V1(a) server bytes: max |diff| 0 B, 0 configurations above 0 B -> MET
+V1(b) client bytes: max |diff| 1 B -> NOT MET
+V2 segments: identical in 247 of 252 configurations (98.0 %, need >= 99 %) -> NOT MET
+      a version that differs is a FINDING about that version: list the configurations; do not adjust the model silently
+V3 excess latency: median |diff| 0.12 ms, within 1 ms 99 % of 226 (need <= 0.5 ms and >= 90 %) -> INCONCLUSIVE (noise floor missing or not met)   [thresholds met on their own]
+V4 model accuracy (MTU <= 1500, 178 configurations): stack MAE 0.93 ms (<= 2.0), idealized MAE 5.24 ms (>= 2x stack = 1.86) -> MET   [precondition: V1 or V2 did not hold]
+
+=== 3.6.5 vs 3.5.4 ===
+configurations in common: 252 of 252
+V1(a) server bytes: max |diff| 1 B, 1 configurations above 0 B -> NOT MET
+      note: ECDSA/RSA signatures have variable DER length (0 to 2 B jitter within a run, wire_probe 2026-11-12): a diff of 1-2 B on those suites can be jitter, not a version effect; inspect the configurations before concluding
+V1(b) client bytes: max |diff| 2 B -> NOT MET
+V2 segments: identical in 247 of 252 configurations (98.0 %, need >= 99 %) -> NOT MET
+      a version that differs is a FINDING about that version: list the configurations; do not adjust the model silently
+V3 excess latency: median |diff| 0.09 ms, within 1 ms 100 % of 226 (need <= 0.5 ms and >= 90 %) -> INCONCLUSIVE (noise floor missing or not met)   [thresholds met on their own]
+V4 model accuracy (MTU <= 1500, 178 configurations): stack MAE 0.90 ms (<= 2.0), idealized MAE 5.23 ms (>= 2x stack = 1.80) -> MET   [precondition: V1 or V2 did not hold]
+
+=== 4.1.0 vs 3.5.4 ===
+configurations in common: 252 of 252
+V1(a) server bytes: max |diff| 26 B, 252 configurations above 2 B -> NOT MET
+V1(c) client bytes: median offset +26 B (expected +26), range +17..+26 -> NOT MET
+V2 segments: identical in 236 of 252 configurations (93.7 %, need >= 99 %) -> NOT MET
+      a version that differs is a FINDING about that version: list the configurations; do not adjust the model silently
+V3 excess latency: median |diff| 0.25 ms, within 1 ms 70 % of 226 (need <= 0.5 ms and >= 90 %) -> INCONCLUSIVE (noise floor missing or not met)   [thresholds not met on their own]
+V4 model accuracy (MTU <= 1500, 178 configurations): stack MAE 0.90 ms (<= 2.0), idealized MAE 5.43 ms (>= 2x stack = 1.80) -> MET   [precondition: V1 or V2 did not hold]
+
+V5 (CPU cost) is evaluated from the cpu-primitives stage, not here. Report each machine separately; never pool machines to pass a criterion.

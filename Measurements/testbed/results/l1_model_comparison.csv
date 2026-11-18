@@ -1,0 +1,9 @@
+model,description,n,mae_ms,median_abs_ms,rtt_off,within_1ms
+fixed,window fixed at the initial window,144,2.30,0.63,4,140
+slow,textbook slow start,144,1.42,0.63,2,142
+linux,"+ Linux validation, rule (1)",144,1.42,0.63,2,142
+stack,+ OpenSSL write pattern (ticket joined),144,1.42,0.63,2,142
+early,+ ticket written on the Finished,144,0.54,0.62,0,144
+C_fixed,window fixed at the initial window,28,25.04,0.33,7,21
+C_slow,textbook slow start,28,35.63,0.48,10,18
+C_linux,"Linux validation, rule (1)",28,0.30,0.29,0,28

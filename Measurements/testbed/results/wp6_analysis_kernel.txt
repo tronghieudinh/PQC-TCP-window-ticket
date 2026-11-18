@@ -1,0 +1,5 @@
+$ python3 analyze_ftrace.py results/trace_kernel/*.trace.txt
+288 ticket ACKs of resumed transactions
+  ACK before the last request segment: n=216  tcp_reno_cong_avoid called 100%  tcp_slow_start called 0%
+  ACK after the last request segment: n=72  tcp_reno_cong_avoid called 100%  tcp_slow_start called 47%
+  slow start called iff the ACK arrives more than 0.049 ms after the tail: 274 of 288 (95.1%)

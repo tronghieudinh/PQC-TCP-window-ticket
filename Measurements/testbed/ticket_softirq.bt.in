@@ -1,0 +1,81 @@
+#!/usr/bin/env bpftrace
+/*
+ * WP6 part H: where do the ACKs of the session ticket wait before TCP processes them?  (template: run_wp6h.sh fills @ENQ@ with the variant that attaches on this kernel)
+ *   sudo bpftrace -q ticket_softirq.bt 4433 > tag.bpf.txt          ($1 = local port of the server)
+ * Everything is on ONE clock (nsecs), so no alignment with the capture is needed; ticket ACKs are found by (client port, acknowledgment number) as in part F/G.
+ *   ENQ ns cpu sport ack          the segment for the server's port is queued to a CPU's input backlog (netif_rx: where the veth delivers it)
+ *   RCV ns cpu tid sport ack      tcp_v6_rcv() starts on it (cpu/tid of the softirq or process context that runs it)
+ *   SIRQE ns cpu / SIRQX ns cpu   NET_RX softirq starts / ends on a CPU
+ *   SW ns cpu prev_pid next_pid   a thread named tls_probe (server or client) is switched in or out on a CPU
+ *   SEND, RELS, RELE, RENO, SS    as in ticket_backlog.bt (write of the server, __release_sock, Reno, tcp_slow_start)
+ */
+BEGIN { printf("READY\n"); }
+
+@ENQ@
+{
+  $d = (uint8 *)$skb->data;
+  if ((*$d >> 4) == 6 && *($d + 6) == 6) {
+    $dp = ((uint16)*($d + 42) << 8) | (uint16)*($d + 43);
+    if ($dp == $1) {
+      $sp = ((uint16)*($d + 40) << 8) | (uint16)*($d + 41);
+      $ack = ((uint32)*($d + 48) << 24) | ((uint32)*($d + 49) << 16) | ((uint32)*($d + 50) << 8) | (uint32)*($d + 51);
+      printf("ENQ %llu %d %u %u\n", nsecs, cpu, $sp, $ack);
+    }
+  }
+}
+
+kprobe:tcp_v6_rcv
+{
+  $skb = (struct sk_buff *)arg0;
+  $t = (uint8 *)$skb->data;
+  $dp = ((uint16)*($t + 2) << 8) | (uint16)*($t + 3);
+  if ($dp == $1) {
+    $sp = ((uint16)*$t << 8) | (uint16)*($t + 1);
+    $ack = ((uint32)*($t + 8) << 24) | ((uint32)*($t + 9) << 16) | ((uint32)*($t + 10) << 8) | (uint32)*($t + 11);
+    printf("RCV %llu %d %d %u %u\n", nsecs, cpu, tid, $sp, $ack);
+  }
+}
+
+tracepoint:irq:softirq_entry /args->vec == 3/ { printf("SIRQE %llu %d\n", nsecs, cpu); }
+tracepoint:irq:softirq_exit /args->vec == 3/ { printf("SIRQX %llu %d\n", nsecs, cpu); }
+tracepoint:sched:sched_switch /args->prev_comm == "tls_probe" || args->next_comm == "tls_probe"/ { printf("SW %llu %d %d %d\n", nsecs, cpu, args->prev_pid, args->next_pid); }
+
+kprobe:tcp_sendmsg
+{
+  $sk = (struct sock *)arg0;
+  if ($sk->__sk_common.skc_num == $1) { $tp = (struct tcp_sock *)arg0; @ssk[tid] = arg0; @sws[tid] = $tp->write_seq; }
+}
+kretprobe:tcp_sendmsg
+/@ssk[tid] != 0/
+{
+  $sk = (struct sock *)@ssk[tid]; $tp = (struct tcp_sock *)@ssk[tid];
+  printf("SEND %llu %d %u %u %u\n", nsecs, tid, bswap($sk->__sk_common.skc_dport), @sws[tid], $tp->write_seq);
+  delete(@ssk[tid]); delete(@sws[tid]);
+}
+kprobe:__release_sock
+{
+  $sk = (struct sock *)arg0;
+  if ($sk->__sk_common.skc_num == $1) { printf("RELS %llu %d %u\n", nsecs, tid, bswap($sk->__sk_common.skc_dport)); @rel[tid] = 1; }
+}
+kretprobe:__release_sock
+/@rel[tid] != 0/
+{
+  printf("RELE %llu %d\n", nsecs, tid); delete(@rel[tid]);
+}
+kprobe:tcp_reno_cong_avoid
+{
+  $sk = (struct sock *)arg0;
+  if ($sk->__sk_common.skc_num == $1) {
+    $tp = (struct tcp_sock *)arg0;
+    printf("RENO %llu %d %u %u %u %u %u %u %u %u\n", nsecs, tid, bswap($sk->__sk_common.skc_dport), arg1, arg2,
+           $tp->snd_cwnd, $tp->snd_ssthresh, $tp->packets_out, $tp->max_packets_out, $tp->is_cwnd_limited);
+  }
+}
+kprobe:tcp_slow_start
+{
+  $tp = (struct tcp_sock *)arg0;
+  if ($tp->inet_conn.icsk_inet.sk.__sk_common.skc_num == $1) {
+    printf("SS %llu %d %u %u %u %u\n", nsecs, tid, bswap($tp->inet_conn.icsk_inet.sk.__sk_common.skc_dport), arg1, $tp->snd_cwnd, $tp->snd_ssthresh);
+  }
+}
+END { clear(@ssk); clear(@sws); clear(@rel); }

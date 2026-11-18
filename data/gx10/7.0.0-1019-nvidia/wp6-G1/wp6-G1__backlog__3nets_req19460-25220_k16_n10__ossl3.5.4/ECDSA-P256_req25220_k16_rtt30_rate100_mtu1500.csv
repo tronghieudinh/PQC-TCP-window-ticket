@@ -1,0 +1,28 @@
+# pqcm-header 1
+# machine: gx10
+# kernel: 7.0.0-1019-nvidia
+# arch: aarch64
+# cpu: Cortex-X925
+# openssl: 3.5.4
+# campaign: paper2
+# stage: wp6-G1
+# measure: backlog
+# config: 3nets_req19460-25220_k16_n10
+# pqcbench: 1
+# code: 5c0c3ac
+# tuned: 1
+# quiet: 1
+# command: env PQC_OUTDIR=~/pqc_measurements/gx10/7.0.0-1019-nvidia/wp6-G1/wp6-G1__backlog__3nets_req19460-25220_k16_n10__ossl3.5.4 PQC_BPF=~/PQC-bank-2/Measurements/testbed/ticket_backlog.bt PQC_NO_TCPPROBE=1 python3 trace_run.py race --suites ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768 --reqs 19460,25220 --nets 30:100:1500,100:100:1500,30:100:1280 --ks 16
+# run[1]: t_start=2026-11-15T06:26:28Z, t_end=2026-11-15T06:29:52Z, load_before=0.25, load_after=0.26, load_1_5_15_before=0.25/0.49/0.78, load_1_5_15_after=0.26/0.39/0.68, rc=0
+# pqcm-header-end
+i,t_tcp_ms,t_hs_ms,t_total_ms,bytes_w,bytes_r,snd_mss,snd_cwnd0,retrans,rtt_us,data_segs_out,data_segs_in,err,reused,prime_ms
+0,31.682,63.056,157.043,26856,23904,1440,10,0,31301,21,18,,1,157.042
+1,31.662,63.343,158.196,26856,23904,1440,10,0,31171,21,18,,1,158.424
+2,31.652,63.204,157.051,26856,23904,1440,10,0,31470,21,18,,1,158.493
+3,31.637,63.581,157.010,26856,23904,1440,10,0,30933,21,18,,1,157.778
+4,31.627,62.946,157.092,26856,23904,1440,10,0,31117,21,18,,1,157.758
+5,31.218,63.311,157.730,26856,23904,1440,10,0,31065,21,18,,1,157.391
+6,31.683,63.876,158.230,26856,23904,1440,10,0,31318,21,18,,1,157.491
+7,31.675,63.443,158.259,26856,23904,1440,10,0,31301,21,18,,1,157.615
+8,31.344,63.267,157.699,26856,23904,1440,10,0,31532,21,18,,1,158.135
+9,30.212,61.243,153.613,26856,23904,1440,10,0,30497,21,18,,1,157.695
