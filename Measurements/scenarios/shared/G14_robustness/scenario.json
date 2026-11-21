@@ -1,0 +1,14 @@
+{
+ "id": "G14",
+ "title": "Ticket tests of L1 under BBR (arm bbr) and under Linux delayed acknowledgments (arm delack): stage C (client window) and stage D (ticket timing)",
+ "serves": "L1 (limitations: other congestion controllers; quickack in the testbed)",
+ "device_classes": ["mint-x86", "gx10"],
+ "needs_root": true,
+ "needs": ["netns", "tc", "tcp_bbr (arm bbr)"],
+ "tune": "optional",
+ "est_minutes": 120,
+ "predictions": ["results/g14_predictions_bbr_c.csv", "results/g14_predictions_bbr_d.csv", "results/g14_predictions_delack_c.csv", "results/g14_predictions_delack_d.csv", "results/g14_cells.json", "results/g14_robustness_predictions.md"],
+ "stages": ["custom: run_testbed.py --profile core --resume with --cc bbr or --delack; cells of results/g14_cells.json"],
+ "status": "prepared 19 Nov 2026; criteria B1-B5 and D1-D5 of results/g14_robustness_predictions.md APPROVED 2026-11-19 (commit and push them before measuring)",
+ "notes": "Run each arm once per machine: ./run.sh --arm bbr and ./run.sh --arm delack (n = 40 per cell; about 60 minutes each on the X250). Analyse with testbed/analyze_g14.py --arm ARM --run DIR/data."
+}

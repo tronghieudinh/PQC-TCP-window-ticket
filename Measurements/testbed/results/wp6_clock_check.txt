@@ -1,0 +1,6 @@
+6 files, 340 ACKs joined on both clocks
+offset (capture - bpftrace) minus the median of its file, us: median 0.0, 5th -7.9, 95th 9.3, largest absolute 39.8
+late ACKs: 117
+return of the 16 KB write minus the first response segment (capture clock moved to bpftrace clock), us: median -257.7, 10th -259.7, 90th -230.2
+ACK minus the write return on bpftrace (ENQ), us: median 181.2;  ACK minus the first response segment on the capture, us: median -73.2
+difference between the two, us: median 255.1

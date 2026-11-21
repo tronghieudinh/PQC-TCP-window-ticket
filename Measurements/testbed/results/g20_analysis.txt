@@ -1,0 +1,6 @@
+G20 (BBR cells of G14, n = 200)
+  cell                           G14     now    difference  BBR model  Reno model  valid
+  ECDSA-P256 req 19460 resp 16580    419.0   419.0     -0.04      500.7       501.0  200
+  ML-DSA-87| req 19460 resp  6500    358.1   358.1     -0.02      303.9       402.8  200
+  ML-DSA-87| req 19460 resp  7940    358.3   358.2     -0.03      304.0       402.9  200
+  S1 MET (3 of 3 within 5 ms)   S2 MET

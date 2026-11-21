@@ -1,0 +1,34 @@
+1a. stage F, 799 ACKs: share where (rel_tail > T) == (tcp_slow_start called)
+  T = 0.020 ms: 746 of 799 (93.4%)
+  T = 0.030 ms: 746 of 799 (93.4%)
+  T = 0.040 ms: 752 of 799 (94.1%)
+  T = 0.049 ms: 764 of 799 (95.6%)
+  T = 0.060 ms: 771 of 799 (96.5%)
+  T = 0.070 ms: 772 of 799 (96.6%)
+  T = 0.080 ms: 773 of 799 (96.7%)
+  T = 0.100 ms: 771 of 799 (96.5%)
+
+1b. request-size sweep, per transaction: share where (ACK - tail > T) == (burst > 10)
+  T = 0.020 ms: 377 of 399 (94.5%)
+  T = 0.030 ms: 385 of 399 (96.5%)
+  T = 0.040 ms: 387 of 399 (97.0%)
+  T = 0.049 ms: 394 of 399 (98.7%)
+  T = 0.060 ms: 394 of 399 (98.7%)
+  T = 0.070 ms: 392 of 399 (98.2%)
+  T = 0.080 ms: 388 of 399 (97.2%)
+  T = 0.100 ms: 388 of 399 (97.2%)
+
+2. Wilson intervals
+  plain TCP: window rule exact configurations                  12 of   13   92.3%  95% Wilson [66.7, 98.6]
+  client-window test: validated rule right                     28 of   28  100.0%  95% Wilson [87.9, 100.0]
+  ticket test: early ticket right on discriminating cells      10 of   10  100.0%  95% Wilson [72.2, 100.0]
+  ticket test: early ticket right on all cells                 76 of   80   95.0%  95% Wilson [87.8, 98.0]
+  mixed pairs: server window follows the client's ticket        3 of    4   75.0%  95% Wilson [30.1, 95.4]
+  captures: rule on ML-DSA transactions (first run)           132 of  134   98.5%  95% Wilson [94.7, 99.6]
+  sweep with predictions in advance: cells right               36 of   36  100.0%  95% Wilson [90.4, 100.0]
+  sweep: transactions classified by the rule                  394 of  399   98.7%  95% Wilson [97.1, 99.5]
+  function trace: rule classifies ACKs                        274 of  288   95.1%  95% Wilson [92.0, 97.1]
+  state trace: slow start iff the kernel's test holds         799 of  799  100.0%  95% Wilson [99.5, 100.0]
+  state trace: burst equals the window after the last ACK     236 of  236  100.0%  95% Wilson [98.4, 100.0]
+  state trace: burst = window at write - unacked ticket       212 of  236   89.8%  95% Wilson [85.3, 93.1]
+  state trace: rule agrees with the state near T               51 of   74   68.9%  95% Wilson [57.7, 78.3]

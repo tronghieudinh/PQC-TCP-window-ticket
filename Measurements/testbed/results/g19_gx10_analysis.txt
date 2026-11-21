@@ -1,0 +1,7 @@
+G19 on a second machine: 100 cells measured, 0 missing or with fewer than 30 valid transactions (reference run: 100 cells)
+  early-ticket model wrong on 4 cells of the Arm run (reference run: 5); wrong on both: 4; wrong only on the Arm run: 0; wrong only on the reference: 1
+  cells wrong on the Arm run, cell numbers: ['32', '56', '66', '72']; on the reference: ['10', '32', '56', '66', '72']
+  wrong cells that are one round trip too slow (model too slow by one RTT, within 10 %): 4 of 4
+  measured excess, Arm minus reference: mean absolute difference 2.10 ms, largest 83.12 ms
+  (G19 criteria for the Arm run, reported only) R1 wrong 4; R2 within 2 ms 59; R3 mean absolute error 8.13 ms; R5 D = 7, early wrong 1, joined wrong 6
+  A1 MET  A2 MET  A3 MET  A4 MET

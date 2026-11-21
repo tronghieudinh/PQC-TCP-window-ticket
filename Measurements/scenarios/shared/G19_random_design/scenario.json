@@ -1,0 +1,26 @@
+{
+ "id": "G19",
+ "title": "Held-out test of the model of L1 on 100 cells drawn at random from a stated design space (resumed TLS 1.3)",
+ "serves": "L1 (generalisation of the model beyond cells chosen by the authors)",
+ "device_classes": [
+  "mint-x86",
+  "gx10"
+ ],
+ "needs_root": true,
+ "needs": [
+  "netns",
+  "tc"
+ ],
+ "tune": "optional",
+ "est_minutes": 45,
+ "predictions": [
+  "results/g19_cells.csv",
+  "results/g19_predictions.csv",
+  "results/phase2_predictions.md"
+ ],
+ "stages": [
+  "run_testbed.py --profile core --resume --configs-from results/g19_cells.csv --n 30"
+ ],
+ "status": "prepared 20 Nov 2026; criteria R1-R5 of results/phase2_predictions.md APPROVED 2026-11-20 (commit and push them before measuring)",
+ "notes": "One call, about 30 to 45 minutes on the X250. Analyse with testbed/analyze_g19.py --run DIR/data/g19.csv."
+}

@@ -1,0 +1,1 @@
+server=user@x250,ifc=eno2,ifs=enp0s25,offload=keep,ssh=-p 22 -i ~/.ssh/id_ed25519 -o BatchMode=yes -o ConnectTimeout=10 -o UserKnownHostsFile=~/.ssh/known_hosts,certs_local=~/meas_copy/certs,certs_remote=~/meas_copy/certs

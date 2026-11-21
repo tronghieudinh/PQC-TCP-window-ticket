@@ -1,0 +1,20 @@
+{
+ "id": "G21",
+ "title": "Tail latency (P90 to P99.9) of six key cells of L1 with n = 1000 resumed transactions",
+ "serves": "L1 (the 30 transactions per cell say nothing about tails)",
+ "device_classes": [
+  "mint-x86"
+ ],
+ "needs_root": true,
+ "needs": [
+  "netns",
+  "tc"
+ ],
+ "tune": "optional",
+ "est_minutes": 70,
+ "predictions": [
+  "results/phase2_predictions.md"
+ ],
+ "status": "prepared 20 Nov 2026; criteria T1-T2 of results/phase2_predictions.md APPROVED 2026-11-20 (commit and push them before measuring)",
+ "notes": "Six calls, n = 1000. Analyse with testbed/analyze_g20_g21.py --exp g21."
+}

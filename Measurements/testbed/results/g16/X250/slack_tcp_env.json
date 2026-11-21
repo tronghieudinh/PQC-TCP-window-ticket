@@ -1,0 +1,20 @@
+{
+  "kernel": "7.0.0-42-generic",
+  "machine": "x86_64",
+  "cpu": "Intel(R) Core(TM) i7-5600U CPU @ 2.60GHz",
+  "congestion_control": "cubic",
+  "slow_start_after_idle": "1",
+  "initial_window_default": 10,
+  "utc": "2026-11-19T21:36:24Z",
+  "args": {
+    "stage": "A",
+    "n1_a": "1,3,5,6,8,10,12,16,24,40",
+    "configs": "loss01,loss05,loss1",
+    "reps_a": 200,
+    "reps_b": 15,
+    "out": "~/pqc_measurements/scenarios/G16/20261120-043558-X250/data/slack_tcp.csv",
+    "trace": false,
+    "trace_configs": "base",
+    "dry_run": false
+  }
+}

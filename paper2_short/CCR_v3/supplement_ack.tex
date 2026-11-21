@@ -1,0 +1,248 @@
+\documentclass[9pt]{article}
+\usepackage[margin=2cm]{geometry}
+\usepackage{booktabs,array,xspace,xcolor}
+\usepackage{microtype}
+\usepackage{tikz}
+\input{../Latex/numbers_short}
+\input{../Latex/g19_cells_table}
+\newcommand{\ms}{\,ms\xspace}
+\newcommand{\citeone}{[5]}
+\renewcommand{\cite}[1]{[#1]}
+\title{Supplement to ``How Linux Grows the TCP Window After a Short Flight, and What It Costs Post-Quantum TLS'': what is known about the processing of the ticket's acknowledgments}
+\author{Trong-Hieu Dinh \and Trong-Minh Hoang}
+\date{}
+\begin{document}
+\maketitle
+This supplement holds (1) the details of the acknowledgment-processing tests that the paper summarises in one paragraph (Section~4) and (2) the table that compares the five models of Section 4. It accompanies the paper of the same title; every number is computed from the archive by \texttt{make\_assets\_short.py}, and the statistics of the paper itself are in its own tables. Rows 7 to 11 of Table~3 of the paper are the tests described here. The supplement is organised so that a reader can tell what each test is, how it was set up, whether its criteria were fixed beforehand, and which script produced each number: Table~\ref{tab:pop} lists the populations and the kind of evidence, Table~\ref{tab:setup} the setup, Table~\ref{tab:crit} the registered criteria and their outcomes, and Table~\ref{tab:repro} the scripts. Three kinds of evidence are distinguished throughout: a \emph{registered} test (the criterion was committed before the run, and failures are reported as failures), an \emph{intervention} (something is changed on purpose), and a \emph{post hoc} reading (made after seeing the data; it suggests, it does not confirm).
+
+\section*{Tests, setup and criteria}
+The tests of Table~\ref{tab:pop} are not one sample: the units differ and the runs are separate.
+
+\begin{table}[h]
+\caption{Populations of the tests.}
+\label{tab:pop}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{0.17\textwidth}p{0.13\textwidth}p{0.065\textwidth}p{0.20\textwidth}p{0.26\textwidth}@{}}
+\toprule
+Test & Unit & Size & Evidence & Used for\\
+\midrule
+Captures of the server's link & transaction & \RaceN & the rule was found on these (post hoc) & order of the ticket's acknowledgments and the response (\RaceMlN\ with ML-DSA)\\
+Request-size sweep & cell / transaction & \RaceTwoScored\ / \RaceTwoOosN & registered, met & the rule against the burst; the \RaceTwoScored\ cells are those outside the borderline band\\
+Function trace & acknowledgment & \KerN & registered, met & \texttt{tcp\_slow\_start} against the timing rule (\KerBeforeN\ before the last request segment, \KerAfterN\ after it)\\
+State trace & acknowledgment & \StN & registered: one criterion met, two not; further readings post hoc & the kernel's own test against \texttt{tcp\_slow\_start}; \StPThreeN\ lie near the threshold\\
+Socket backlog & acknowledgment & \BkN & registered, not met; further reading post hoc & ownership of the socket as the cause of the delay\\
+Softirq queue & acknowledgment & \HN & registered, not met; timing post hoc & queueing as the cause; \HALate\ are late acknowledgments\\
+Clock-safe repeat, race design & transaction & \RpKFourN & registered (K1--K7): K2, K4, K5 met, K1 not met; K3, K6, K7 reported & time bases, the true send time of the server's segments, the share acknowledged before the write\\
+Clock-safe repeat, softirq design & acknowledgment & \RpKFiveN & registered, as above & late acknowledgments against the first response segment\\
+No-ticket intervention & cell & \NtkCells & intervention, registered, met & role of the ticket; \NtkEffect\ cells have a burst above ten with the ticket\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All tests ran in the namespace testbed on the main platform of the paper (Section~2), the server on CPU~1 and the client on CPU~0, on 1 and 2 November 2026, except the clock-safe repeat of 21 November 2026 (which also ran on the OptiPlex). In Table~\ref{tab:setup} the suites are ECDSA-P256 (E), ML-DSA-44 (M44) and ML-DSA-65 (M65), the networks are given as RTT in ms (at 100 Mbit/s and MTU 1500 unless stated), and $n$ is the number of resumed transactions per cell.
+
+\begin{table}[h]
+\caption{Setup of the tests.}
+\label{tab:setup}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{0.14\textwidth}p{0.36\textwidth}rp{0.35\textwidth}@{}}
+\toprule
+Test & Cells & $n$ & Probes\\
+\midrule
+Captures & E, M44, M65; ten networks (RTT 5, 10, 15, 20, 30, 50, 100; RTT 100 at 10 Mbit/s, at MTU 1280 and at 9\,000); request 19\,460\,B, response 13 segments & 8 & \texttt{tcpdump} on the server's link; tracepoint \texttt{tcp:tcp\_probe}\\
+Request-size sweep & M44, M65; RTT 30 and 100; ten request sizes from 15\,140 to 28\,100\,B (steps of 1\,440\,B), response 16 segments (40 cells) & 10 & \texttt{tcpdump} on the server's link\\
+Function trace & M44, M65; RTT 5 and 30; requests 19\,460 and 25\,220\,B; response 16 segments (8 cells) & 6 & function tracer on \texttt{tcp\_reno\_cong\_avoid}, \texttt{tcp\_slow\_start}, \texttt{tcp\_sendmsg}, \texttt{tcp\_rcv\_established}; \texttt{tcp\_probe}; capture\\
+State trace & E, M44, M65; RTT 5, 30, 100; RTT 30 at 10 Mbit/s and at MTU 1280; the same two requests; response 16 segments & 6 & \texttt{bpftrace} kprobes on \texttt{tcp\_reno\_cong\_avoid} (\texttt{snd\_cwnd}, \texttt{snd\_ssthresh}, \texttt{packets\_out}, \texttt{max\_packets\_out}, \texttt{is\_cwnd\_limited}) and \texttt{tcp\_slow\_start}; capture\\
+Socket backlog & E, M44, M65; RTT 30, 100; RTT 30 at MTU 1280; the same two requests (18 cells) & 10 & kprobes on \texttt{\_\_release\_sock}, \texttt{tcp\_sendmsg}, \texttt{tcp\_reno\_cong\_avoid}, \texttt{tcp\_slow\_start}; capture\\
+Softirq queue & E, M44, M65; RTT 30, 100; request 19\,460\,B; response 16 segments & 15 & tracepoints \texttt{net:netif\_rx}, \texttt{irq:softirq\_entry/exit}, \texttt{sched:sched\_switch}; kprobes on \texttt{tcp\_v6\_rcv}, \texttt{tcp\_sendmsg}, \texttt{\_\_release\_sock} and the two Reno functions; capture. The server on CPU~3 was an exploratory second arm, not reported\\
+Clock-safe repeat & the race design and the softirq design again, with the CPU clock fixed (performance governor, no turbo) and, as a first repeat, as the system leaves it & 8, 15 & \texttt{ticket\_xmit.bt} (XQ, XS, RX, the server's write) and the softirq probes with XQ and XS; \texttt{clock\_sync.py}; capture\\
+No-ticket intervention & the 18 cells of the backlog run, with and without a ticket on resumed connections (\texttt{tls\_probe --no-resumed-ticket}) & 10 & capture\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each criterion of Table~\ref{tab:crit} was fixed in a prediction file or an analysis script committed before the run; where the commit order of a file has a caveat it is recorded in the pre-registration table of the archive (\texttt{PREREGISTRATION\_L1.md}).
+
+\begin{table}[h]
+\caption{Registered criteria and outcomes.}
+\label{tab:crit}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{0.13\textwidth}p{0.35\textwidth}p{0.30\textwidth}p{0.13\textwidth}@{}}
+\toprule
+Test & Criterion & Result & Outcome\\
+\midrule
+Captures (hypothesis H\_race) & burst above ten occurs only when the ticket's acknowledgment arrives before the write, in at least 80\% & the ticket was acknowledged before the write in \RaceBeforePct\% of the transactions, windows of ten included (read on the capture's clock) & not supported\\
+Sweep & at least 90\% of the scored cells right; first request size with a burst of ten within one segment (1\,440\,B) of the predicted one & \RaceTwoRight\ of \RaceTwoScored\ cells; within one segment in all four series & met\\
+Function trace & at least 90\% of the acknowledgments classified by the rule & \KerRight\ of \KerN\ (\KerPct\%) & met\\
+State, P1 & \texttt{tcp\_slow\_start} is called iff the kernel's own test holds, in at least 98\% & \StPOneRight\ of \StPOneN & met\\
+State, P2 & burst equals the window at the write minus the ticket segments still unacknowledged, within one segment, in at least 90\% of the transactions & \StPTwoPct\% & not met\\
+State, P3 & the 0.049\ms rule agrees with the state for at least 90\% of the acknowledgments within 0.1\ms of the threshold & \StPThreeRight\ of \StPThreeN\ (\StPThreePct\%) & not met\\
+Backlog, G1a & of the acknowledgments that arrived before the write and called \texttt{tcp\_slow\_start}, at least 90\% were deferred to the backlog & \BkAPct\% & not met\\
+Backlog, G1b & of those processed on arrival, at least 90\% did not call it & \BkBPct\% & not met\\
+Softirq, H1a & at least 80\% of the late acknowledgments were queued before the write returned & \HAOne\ of \HALate\ (\HAPct\%) & not met\\
+Softirq, H1b & of those, at least 80\% of the waits overlap the server running on the same CPU & \HBOne\ of \HBN & not met\\
+Clock-safe repeat, K1--K4 & see Table~\ref{tab:clock} & K2, K4, K5 met; K1 not met in each of three runs & 8 of 11 met\\
+No ticket, G2a--c & burst of ten or less in at least 95\% of the transactions of every cell without a ticket (a); in the cells where the ticket gave a burst above ten in half or more, in all of them (b); median burst without a ticket not larger than with (c) & \NtkCells\ of \NtkCells\ cells (a); \NtkEffect\ of \NtkEffect\ (b); \NtkCells\ of \NtkCells\ (c) & met\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section*{Background: what the kernel tests}
+Reno's handler for an acknowledgment, \texttt{tcp\_reno\_cong\_avoid()}, returns at once unless \texttt{tcp\_is\_cwnd\_limited()} holds; only then does it call \texttt{tcp\_slow\_start()}, which adds the newly acknowledged segments to \texttt{snd\_cwnd}. The test holds if the flag \texttt{is\_cwnd\_limited} is set, which the sender does when the segments in flight reached \texttt{snd\_cwnd} at its last send, or, during slow start, if \texttt{snd\_cwnd} is below twice \texttt{max\_packets\_out}, the largest number of segments that were in flight in the last window. So an acknowledgment grows the window only if it is processed while the sender is, or has recently been, using the window. For the ticket's acknowledgment this decides everything: if it is processed before the response is written nothing is in flight (\texttt{packets\_out} is about one) and it does not count; if it is processed with the response in flight (\texttt{packets\_out} equal to the window) it does. The tests below ask which of the two happens, and why.
+
+\emph{Clocks.} Three times are compared in this supplement: when an acknowledgment is on the server's link (the capture, \texttt{tcpdump} on the server's veth end, wall clock), when the application's write returns, and when the kernel processes the acknowledgment (both from \texttt{bpftrace}, \texttt{nsecs}, monotonic clock). The capture stamps a packet from the client on arrival at the server; it stamps a packet from the server after the egress delay of \texttt{netem}, so the analysis moves it back by half the nominal RTT. Four kernel runs are used together with the capture. The function trace (\KerN\ acknowledgments) fixes the constant between the two clocks with one packet seen by both, so the misses below lie within \KerMissNear\ms of the threshold, about the precision of that alignment. The state and backlog traces join each acknowledgment to the capture by client port and acknowledgment number and compare only times of one clock, so they need no alignment. For the softirq run we checked the alignment afterwards (post hoc, \texttt{analyze\_clock\_check.py}): the offset between the capture's arrival stamp and the \texttt{netif\_rx} time of the same acknowledgment (\ClkN\ acknowledgments) has a 5th to 95th percentile of \ClkLo\ to \ClkHi\,\textmu s around its file's median and a largest deviation of \ClkMax\,\textmu s. Client-to-server times are therefore safe to a few tens of microseconds. Server-to-client times are not: with the offset of the same file, the first segment of the response lands \ClkWriteAbs\,\textmu s after the return of the write that sent it, which cannot be, since the write returns only after it has sent it. The nominal RTT/2 is therefore too small by about that much, of the order of the excess delay \texttt{netem} adds (0.3\ms of RTT on this machine in the calibration runs of 15 November). Orderings between a client packet and a server packet on the capture are thus uncertain by about 0.26\ms in the data of this supplement, more than the 0.049\ms threshold and the 0.07\ms below.
+
+Figure~\ref{fig:timeline} shows one late acknowledgment of the ticket on two clocks, with the return of the response write at 0 (medians of the softirq run). On the \texttt{bpftrace} clock the acknowledgment is queued \HEnqMed\,\textmu s after the write returned and processed \HWaitMed\,\textmu s later. The capture, aligned to \texttt{bpftrace} by the arrival stamps of the client's segments (precision about 10\,\textmu s), places the first segment of the response \ClkWriteAbs\,\textmu s after the write returned, which cannot be: the correction of the server's stamps by half the nominal RTT is too small. Read on the capture alone, the acknowledgment appears \HPcapMedAbsUs\,\textmu s before the response; on the one clock it is after it. The true send time (red, dashed) is not read from these traces; the repeat of Section ``Repeat with every event on one clock'' measures it.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[x=0.022cm, y=1cm, font=\footnotesize]
+  \pgfmathsetmacro{\xe}{\HEnqMed}\pgfmathsetmacro{\xr}{\HEnqMed+\HWaitMed}\pgfmathsetmacro{\xs}{\ClkWriteAbs}
+  \draw[->] (-310,2.2) -- (340,2.2) node[right] {$\mu$s};
+  \foreach \t in {-300,-200,-100,0,100,200,300} {\draw (\t,2.15) -- (\t,2.25) node[above] {\t};}
+  \node[anchor=west] at (-300,1.75) {bpftrace, one clock};
+  \draw[thick] (0,1.0) -- (0,1.4) node[above] {write returns};
+  \draw[thick] (\xe,1.0) -- (\xe,1.4) node[above] {ACK queued};
+  \draw[thick] (\xr,0.8) -- (\xr,1.2) node[right] {\texttt{tcp\_v6\_rcv}, \texttt{tcp\_slow\_start}};
+  \draw[<->] (0,0.75) -- node[below] {\HEnqMed\,\textmu s} (\xe,0.75);
+  \node[anchor=west] at (-300,-0.05) {capture, aligned to it};
+  \draw[thick] (\xe,-0.8) -- (\xe,-0.4) node[above left] {ACK on the link};
+  \draw[thick,red] (\xs,-0.8) -- (\xs,-0.4) node[above right,red] {first response segment, as stamped};
+  \draw[<->] (\xe,-0.95) -- node[below] {\HPcapMedAbsUs\,\textmu s} (\xs,-0.95);
+  \draw[dashed,red,->] (\xs,-1.9) -- (-30,-1.9) node[midway,below=3pt,red] {true send time of that segment: before the write returned (see the repeat)};
+\end{tikzpicture}
+\caption{One late acknowledgment of the ticket on two clocks.}
+\label{fig:timeline}
+\end{figure}
+
+\emph{When the acknowledgment counts.} The order of the ticket's acknowledgment and the response does not decide the window. Captures on the server's link (\RaceN\ resumed transactions, ten networks) show at least one ticket segment acknowledged before the response is written in \RaceBeforePct\% of them, including those where the window stayed at ten (read on the capture's clock, which orders a client packet and a server packet only to about a quarter of a millisecond, see Clocks; \RpKSixPct\% of \RpKSixN\ on one clock, Table~\ref{tab:clock}). What does separate the outcomes (a finding made afterwards) is the arrival of the ticket's last acknowledgment: the window exceeds ten segments when it comes more than \RaceThr\ms after the last request segment (\RaceRight\ of \RaceMlN\ ML-DSA transactions; exact 95\% interval \CiRaceLo--\CiRaceHi\%).
+
+A request-size sweep with predictions committed beforehand confirmed the rule. Outside a borderline band (cells whose median lies within \RaceBand\ms of the threshold), \RaceTwoRight\ of \RaceTwoScored\ cells had the predicted class (95\% Wilson interval [90, 100]\%), and the rule classified \RaceTwoOosRight\ of \RaceTwoOosN\ transactions ([97, 99.5]\%). It gives the direction of the effect, not the size of the window. The controls with a small request are all right (\ECtlWrong\ of \ECtlN\ cells wrong). The threshold is a local ordering at the server, a matter of microseconds and unrelated to the RTT. On this machine the rule barely depends on it (the table below: \ThrSLoR--\ThrSHiR\% of the transactions from 0.04 to 0.10\ms, \ThrSA\% at 0.02\ms), with the CPU clock fixed it carries over to a second x86 machine (see Repeat with every event on one clock), while its agreement with the kernel's state fails on Arm (Section~5 of the paper). The table gives the share of observations where ``the ACK arrives more than $T$ after the last request segment'' agrees with the outcome; $T=\RaceThr$\ms was chosen on the first run, so the table is post hoc.
+
+\emph{What the kernel does.} A function trace of the server's kernel (criterion in the analysis script, committed before the run) covers \KerN\ acknowledgments of the ticket. Reno examines every one. It calls \texttt{tcp\_slow\_start} for none of the \KerBeforeN\ that arrive before the last request segment and for \KerAfterSS\% of the \KerAfterN\ that arrive after it. The rule classifies \KerRight\ of \KerN\ (\KerPct\%; exact interval \CiKerLo--\CiKerHi\%). The \KerWrong\ misses lie within \KerMissNear\ms of the threshold, about the resolution with which the two clocks are aligned.
+
+A second run sidesteps the alignment problem by reading the sender's state at each acknowledgment (bpftrace probes on both functions; \StN\ acknowledgments, joined with the capture by port and acknowledgment number). \texttt{tcp\_\allowbreak slow\_\allowbreak start} is called iff the kernel's own test holds, i.e.\ \texttt{is\_\allowbreak cwnd\_\allowbreak limited} holds or \texttt{snd\_\allowbreak cwnd} is below twice \texttt{max\_\allowbreak packets\_\allowbreak out} (\StPOneRight\ of \StPOneN, as registered). Two other registered criteria failed. The response burst equals the window at the write minus the ticket segments still unacknowledged in \StPTwoPct\% of the transactions (criterion 90\%), and the 0.049\ms rule agrees with the state for \StPThreeRight\ of \StPThreeN\ acknowledgments near the threshold (\StPThreePct\%). The threshold is a proxy, then, not the mechanism, and no constant of Linux TCP.
+
+Looking at the data afterwards (post hoc), \StLateInflight\ of the \StLate\ acknowledgments that come more than \RaceThr\ms after the last request segment are processed with the response already in flight, where the test holds (median \texttt{packets\_out} \StAfterPk, against \StBeforePk\ for the others). Of the \StEarly\ acknowledgments up to \RaceThr\ms after it, \StEarlyLimited\ are limited, all of them ML-DSA-65, where \texttt{max\_packets\_out} reaches six and $10<2\times6$. A third group is more puzzling, with the reservation of Clocks: the capture shows \StDeferredN\ acknowledgments before the write but more than \RaceThr\ms after the last request segment, and \StDeferred\ of them are processed after the write. The window follows from the last acknowledgment of the ticket: the burst of the response equals the window after it (\StPTwoBRight\ of \StPTwoBN\ within one segment).
+
+\emph{Why the acknowledgments are late, and the intervention.} Two explanations for the delay failed. The first asked whether socket ownership explains it (a third run, probes on the socket backlog; \BkN\ ticket acknowledgments). Only \BkDef\ were processed from the backlog, and both registered criteria failed (\BkAPct\% and \BkBPct\% against 90\%). Afterwards we found that \texttt{tcp\_slow\_start} was called for all \PhAfterSS\ acknowledgments processed after the first write of the response returned, and for \PhBeforeSS\ of the \PhBefore\ processed before it (post hoc), most of them in softirq context. The second asked whether they wait in the softirq queue (a fourth run, probes on the queueing to the CPU backlog, on the receive path and on the softirq; \HN\ ticket acknowledgments), and it failed its registered criteria too. Only \HAOne\ of the \HALate\ late acknowledgments (\HAPct\%) had been queued before the write returned (criterion 80\%), and the wait from queueing to processing was short (median \HWaitMed\,\textmu s, on the same CPU). Post hoc, they were queued a median \HEnqMed\,\textmu s after the write returned, while the capture puts them 0.07\ms before it; the two orderings differ by \ClkDiff\,\textmu s, the size of the uncertainty described under Clocks, and the order on the kernel's own clock is the one to trust: the acknowledgments reached the server's input queue after the write had returned, which is why that criterion failed.
+
+An intervention at least settles the role of the ticket. When the server issues no ticket on resumed connections (predicted beforehand), the response burst is at most ten segments in all \NtkCells\ cells, including the \NtkEffect\ in which it exceeds ten with the ticket (exact sign test on those pairs $p=\SignNtkP$; with seven pairs no result can be smaller).
+
+\begin{table}[h]
+\caption{Robustness of the ticket-timing rule to its threshold $T$ (post hoc).}
+\label{tab:thr}
+\centering\small
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}p{0.30\columnwidth}rrrrrr@{}}
+\toprule
+$T$ (ms) & 0.02 & 0.04 & 0.049 & 0.06 & 0.08 & 0.10\\
+\midrule
+Burst $>10$, \RaceTwoOosN\ transactions (\%) & \ThrSA & \ThrSB & \ThrSC & \ThrSD & \ThrSE & \ThrSF\\
+\texttt{tcp\_slow\_start} called, \StN\ ACKs (\%) & \ThrFA & \ThrFB & \ThrFC & \ThrFD & \ThrFE & \ThrFF\\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\section*{Repeat with every event on one clock}
+The clock check led to a repeat of the traces on 21 November 2026 on the same machine (the X250) and, with the CPU clock fixed, on the Optiplex, with the procedure and the criteria K1 to K7 fixed beforehand (\texttt{results/wp6\_pred\_clock.md}). Before each trace \texttt{clock\_sync.py} reads the offset between the wall clock and the monotonic clock, the state of the kernel's clock, of NTP (switched off for the run) and of the CPU clock; after the trace it reads the offset again and refuses the file if it moved by more than 20\,\textmu s (\RpFiles\ of \RpFiles\ files passed). A new probe set, \texttt{ticket\_xmit.bt}, records on the \texttt{bpftrace} clock when each segment of the connection is handed to the device (XQ), when it leaves the queueing discipline, which is where \texttt{tcpdump} stamps it (XS), when a segment arrives (RX) and when the server's write returns, so that the true send time of the server's segments is read, not inferred. The repeat has the race design again (30 files) and the design of the softirq test again (6 files). It ran in two states of the CPU: first with the CPU clock as the system leaves it, then fixed (performance governor, no turbo) as in the first traces; the first repeat had left the clock to the system. Table~\ref{tab:clock} gives the outcomes.
+
+\begin{table}[h]
+\caption{Outcomes of the clock-safe repeat.}
+\label{tab:clock}
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}p{0.24\textwidth}p{0.17\textwidth}p{0.17\textwidth}p{0.17\textwidth}p{0.14\textwidth}@{}}
+\toprule
+Criterion (fixed beforehand) & X250, CPU clock fixed & X250, clock as left & Optiplex, clock fixed & Outcome (fixed)\\
+\midrule
+K1 arrival stamps equal RX: at least 95\% within 20\,\textmu s, all within 50\,\textmu s & \RpKOnePct\%, largest \RpKOneMax\,\textmu s & \RuKOnePct\%, largest \RuKOneMax\,\textmu s & \RoKOnePct\%, largest \RoKOneMax\,\textmu s & not met on both\\
+K2 capture stamp of a server segment equals XS: at least 95\% within 20\,\textmu s & \RpKTwoPct\% (median $\RpKTwoMed$\,\textmu s) & \RuKTwoPct\% (median $\RuKTwoMed$\,\textmu s) & \RoKTwoPct\% (median $\RoKTwoMed$\,\textmu s) & met on both\\
+K3 delay that the device adds beyond RTT/2, per direction (reported) & \RpKThreeLo\ to \RpKThreeHi\,\textmu s, median \RpKThreeMed & \RuKThreeLo\ to \RuKThreeHi\,\textmu s, median \RuKThreeMed & \RoKThreeLo\ to \RoKThreeHi\,\textmu s, median \RoKThreeMed & reported\\
+K4 first response segment queued before the write returns: at least 99\% & \RpKFourRight\ of \RpKFourN & \RuKFourRight\ of \RuKFourN & \RoKFourRight\ of \RoKFourN & met on both\\
+K5 late acknowledgments reach the queue after that segment: at least 90\% & \RpKFiveRight\ of \RpKFiveN & \RuKFiveRight\ of \RuKFiveN & \RoKFiveRight\ of \RoKFiveN\ (too few to test) & met; Optiplex untested\\
+K6 a ticket segment acknowledged before the write, overall and with a burst of ten or less, both at least 50\% (the sentence of Section~4 stays) & \RpKSixPct\% of \RpKSixN; \RpKSixSmallPct\% of \RpKSixSmallN & \RuKSixPct\% of \RuKSixN; \RuKSixSmallPct\% of \RuKSixSmallN & \RoKSixPct\% of \RoKSixN; \RoKSixSmallPct\% of \RoKSixSmallN & rule met on both: sentence stays\\
+K7 rule of 0.049\ms on ML-DSA at MTU below 9\,000: transactions with a burst above ten, and the rule's accuracy (reported) & \RpKSevenPos\ of \RpKSevenN; \RpKSevenRight\ (\RpKSevenPct\%); best threshold \RpKSevenBestLo\ to \RpKSevenBestHi\ms & \RuKSevenPos\ of \RuKSevenN; \RuKSevenRight\ (\RuKSevenPct\%); best \RuKSevenBestLo\ms & \RoKSevenPos\ of \RoKSevenN; \RoKSevenRight\ (\RoKSevenPct\%); best \RoKSevenBestLo\ms & reported\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\emph{The clock.} The arrival stamps of the client's segments agree with RX to within $\RpKOneLo$ to $+\RpKOneHi$\,\textmu s for 90\% of the segments (5th to 95th percentile), with a tail to \RpKOneMax\,\textmu s, so K1 is not met as registered. The stamps of the server's segments are within 20\,\textmu s of XS once a constant is removed (K2): \texttt{tcpdump} stamps a segment about \RpKTwoMed\,\textmu s from the tracepoint (negative: before it). With the CPU clock left to the system both K1 and K2 fail (\RuKOnePct\% and \RuKTwoPct\%): the stamps scatter more. The delay that the device adds beyond half the nominal RTT is about \RpKThreeMed\,\textmu s in each direction, and the analysis of the first traces moved the server's stamps back by the nominal half only; the 0.26\ms of the Clocks paragraph came from those traces and is of the same order.
+
+\emph{The order.} On one clock the first segment of the response is queued before the write that sent it returns, in all \RpKFourN\ transactions, and the late acknowledgments reach the server's queue after that segment in all \RpKFiveN\ cases. The reading from the capture of the first traces, that the acknowledgment came before the response, was an effect of the stamps. The share of transactions with a ticket segment acknowledged before the response is written, \RaceBeforePct\% on the capture of the first run, is \RpKSixPct\% of \RpKSixN\ transactions with the correction (\RpKSixCapPct\% on the capture's own stamps for the same transactions), and \RpKSixSmallPct\% where the burst stayed at ten or less, so the sentence of Section~4 stays with the new percentage.
+
+\emph{The CPU clock.} The repeat with the clock left to the system did not reproduce the first traces. ECDSA-P256 had a burst of ten in every transaction of the first run (\BuFirstEcUp\ of \BuFirstEcN\ above ten), and in \BuPrEcUp\ of \BuPrEcN\ with the clock fixed (\BuPcEcUp\ of \BuPcEcN\ in a control with the instruments of the first run), but in \BuUrEcUp\ of \BuUrEcN\ with the clock left to the system (\BuUtEcUp\ of \BuUtEcN\ when repeated, \BuUcEcUp\ of \BuUcEcN\ with the instruments of the first run). The probes are therefore not the cause, and the control with the clock fixed reproduces the first traces (criterion T1, registered before it ran). Two settings of the clock were then separated on the X250, R2 only: with the performance governor and turbo on (3.2 GHz), ECDSA-P256 had a burst above ten in \BuIsolAEcUp\ of \BuIsolAEcN\ transactions, like the fixed clock, and the best threshold of the rule is \RaKSevenBestLo\ms; with the system's own governor (ondemand, the idle cores at 500 MHz in the record of \texttt{clock\_sync.py}) and turbo off, in \BuIsolBEcUp\ of \BuIsolBEcN, like the clock left to the system, and the best threshold is \RbKSevenBestLo\ms (K1 \RbKOnePct\%, K2 \RbKTwoPct\%, and \RbKSixPct\% of \RbKSixN\ transactions with a ticket segment acknowledged before the write). This is what we had predicted before the runs: the governor carries the difference and turbo does not. Nothing else was varied. The timing rule shows the same dependence: with the clock fixed the threshold of the first run, 0.049\ms, classifies \RpKSevenRight\ of \RpKSevenN\ transactions of the repeat (\RpKSevenPct\%) without being refitted, and the best threshold on these data is \RpKSevenBestLo\ to \RpKSevenBestHi\ms; with the clock left to the system the best threshold is \RuKSevenBestLo\ms. The threshold is thus a property of the state of the machine, not of Linux TCP.
+
+\emph{Run to run.} The same repeat on the X250 once more, with the CPU clock fixed, agrees with the first: K2 and K4 are met (\RqKTwoPct\%, \RqKFourRight\ of \RqKFourN), K5 is met (\RqKFiveRight\ of \RqKFiveN), K1 is not met again (\RqKOnePct\%), \RqKSixPct\% of \RqKSixN\ transactions have a ticket segment acknowledged before the write (against \RpKSixPct\%), and the rule of 0.049\ms classifies \RqKSevenRight\ of \RqKSevenN\ ML-DSA transactions (\RqKSevenPct\%, against \RpKSevenPct\%) with a best threshold of \RqKSevenBestLo\ms. The agreement criteria registered beforehand (within 5 points on the share and on the accuracy, within 0.02\ms on the threshold) are met, so the two figures are a range of two runs rather than one number.
+
+\emph{A second machine.} The same repeat on the Optiplex (i7-8700, Linux 7.0.0-42, the CPU clock fixed) gives the same picture of the clock, with one difference of degree: K1 is not met (\RoKOnePct\% within 20\,\textmu s), K2 and K4 are met, and the device adds more delay on this machine, about \RoKThreeMed\,\textmu s beyond RTT/2 at the longer RTTs against \RpKThreeMed\,\textmu s on the X250 (K3). The share of transactions with a ticket segment acknowledged before the write is \RoKSixPct\% (K6), so the sentence of Section~4 holds on both machines. The ticket enlarges the server's window much more rarely on the Optiplex: of the \RoKSevenN\ ML-DSA transactions at MTU below 9\,000 the burst exceeds ten in \RoKSevenPos\ (\RpKSevenPos\ on the X250), so the softirq design gave too few late acknowledgments for K5 (\RoKFiveN). The rule of 0.049\ms still separates them, \RoKSevenRight\ of \RoKSevenN\ without refitting (\RoKSevenPct\%; the trivial answer, a burst of ten in every transaction, gets \the\numexpr\RoKSevenN-\RoKSevenPos\relax), and the best threshold is \RoKSevenBestLo\ms. We had written beforehand that the Optiplex's best threshold would differ from the X250's by more than 0.02\ms; it differs by \RoKSevenDiff\ms, so that prediction failed, and the threshold carried over to this second x86 machine once the CPU clock was fixed.
+
+\section*{The same tests on other machines}
+On 21 November 2026 the random design of the paper (row 20 of Table~3) was measured on three more runs, with criteria fixed beforehand: on the Arm machine and on a second x86 machine (A1 to A4, the first X250 run as reference) and again on the X250 (V1 to V3). The ticket tests on new cells and with delayed acknowledgments (rows 16 and 18) were measured on the same two machines (K1 to K4 and D1 to D5). Table~\ref{tab:cells} lists the cells that the model got wrong in at least one of the four runs of the random design; a cell is wrong when the model is off by more than half the RTT, and the measured excess is the median of the resumed transactions on the shaped link minus the median on the unshaped base.
+
+\begin{table}[h]
+\caption{Cells the model got wrong in at least one run (measured excess in ms; bold: wrong).}
+\label{tab:cells}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}rllrrrrrrr@{}}
+\toprule
+Cell & Suite & RTT & Request / response (B) & Model & X250 run 1 & X250 run 2 & GX10 & Optiplex\\
+\midrule
+\GnineCellRows
+\bottomrule
+\end{tabular}
+\end{table}
+
+The model is wrong on \GnineCellsWrongXOne\ cells of the first X250 run, \GnineCellsWrongXTwo\ of its repeat, \GnineCellsWrongGx\ on the Arm machine and \GnineCellsWrongOp\ on the Optiplex, and \GnineCellsEvery\ cells (56 and 72) are wrong on every run. Every wrong cell is a round trip faster than the model says. The other cells that fail do so on some machines only: criterion A2 (at least four of the five cells wrong on the first X250 run are wrong on the second machine) is met on the Arm machine and not met on the Optiplex, and V1 (the same on the X250 again) is met. We read this as the registered rule says: the region where the model fails depends in part on the machine, a statement about the server's window, not a failure of the model to follow the ticket. The ticket tests of rows 16 and 18 are met on both machines (\GtwelveRepMet\ of \GtwelveRepK\ criteria).
+
+\section*{What remains open}
+\emph{Established.} (i) The ticket matters: without it the burst is at most ten segments in every cell (the intervention). (ii) The window after it follows from the last acknowledgment of the ticket: the burst of the response equals the window left after it (\StPTwoBRight\ of \StPTwoBN\ within one segment), and \texttt{tcp\_slow\_start} runs exactly when the kernel's own test holds (\StPOneRight\ of \StPOneN). (iii) That test holds when the acknowledgment is processed with the response already in flight (post hoc: \StLateInflight\ of \StLate). (iv) The late acknowledgments, those processed after the first write of the response has returned, reach the server's input queue after that return (a median \HEnqMed\,\textmu s on the \texttt{bpftrace} clock) and are processed within \HWaitMed\,\textmu s, on the same CPU.
+
+\emph{Not established.} Why those acknowledgments reach the server's queue some \HEnqMed\,\textmu s after the write. Two candidates were tested and failed (socket ownership, the softirq queue); both would have acted inside the server's host after the queue, and the data put the delay before it, on the path from the client's \texttt{netem} through the virtual link. Whether this happens only in the emulated link is not settled: the ticket cells give the predicted windows on a cable between two machines (row 25 of Table~3 of the paper), which speaks against an artefact of the emulation but was not traced there. The timing rule of 0.049\ms is a proxy for this ordering at the server, found on the first run; it holds on the same machine with the CPU clock fixed and not with the clock left to the system, it carried over to a second x86 machine with the clock fixed and its agreement with the kernel's state failed on Arm; it is not a constant of Linux TCP. The share of transactions with a ticket segment acknowledged before the write is \RaceBeforePct\% on the capture of the first run and \RpKSixPct\% with every event on one clock (Table~\ref{tab:clock}). The repeat with every event on one clock (previous section) removed the doubt about the order: on the host's own clock the acknowledgments that count reach the queue after the response has been queued, and the cause of that is still open.
+
+\section*{What each part of the model adds}
+Table~\ref{tab:ablation} gives the mean absolute error (MAE, in ms) of each model and the number of cells it gets wrong by a round trip.
+
+\begin{table}[h]
+\caption{What each part of the model adds.}
+\label{tab:ablation}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{\AblFixedN\ resumed} & \multicolumn{2}{c}{\AblCFixedN\ client window}\\
+Model & MAE & wrong & MAE & wrong\\
+\midrule
+Window fixed at $w_0$ & \AblFixedMae & \AblFixedOff & \AblCFixedMae & \AblCFixedOff\\
+Textbook slow start & \AblSlowMae & \AblSlowOff & \AblCSlowMae & \AblCSlowOff\\
++ Linux validation, rule (1) & \AblLinuxMae & \AblLinuxOff & \AblCLinuxMae & \AblCLinuxOff\\
++ OpenSSL write pattern, ticket joined & \AblJoinedMae & \AblJoinedOff & --- & ---\\
++ ticket written on the Finished & \AblEarlyMae & \AblEarlyOff & --- & ---\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section*{Where each number comes from}
+Table~\ref{tab:repro} lists the script and the output behind each number. Scripts are in \texttt{Measurements/testbed/}, outputs in \texttt{Measurements/testbed/results/}; \texttt{make\_assets\_short.py} (in \texttt{paper2\_short/Latex/}) reads the outputs and writes every number of the paper and of this supplement to \texttt{numbers\_short.tex}. The raw traces are on Zenodo (doi:\allowbreak10.5281/\allowbreak zenodo.\allowbreak24384873); \texttt{tools/raw\_traces.sh verify} reruns the analyses on them and compares the outputs with the archive.
+
+\begin{table}[h]
+\caption{Scripts and outputs.}
+\label{tab:repro}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{0.40\textwidth}p{0.25\textwidth}p{0.28\textwidth}@{}}
+\toprule
+Number & Script & Output\\
+\midrule
+Captures: \RaceN\ transactions, \RaceBeforePct\%, \RaceRight\ of \RaceMlN & \texttt{analyze\_ticket\_race.py} & \texttt{ticket\_race.csv}, \texttt{wp6\_analysis\_race.txt}\\
+Sweep: \RaceTwoRight\ of \RaceTwoScored, \RaceTwoOosRight\ of \RaceTwoOosN & \texttt{analyze\_race2.py} & \texttt{wp6\_analysis\_race2.txt}\\
+Threshold table & \texttt{threshold\_sweep.py} & \texttt{wp6\_analysis\_threshold.txt}\\
+Function trace: \KerRight\ of \KerN & \texttt{analyze\_ftrace.py} & \texttt{wp6\_analysis\_kernel.txt}\\
+State trace: \StN, P1--P3 & \texttt{analyze\_state.py} & \texttt{wp6\_analysis\_state.txt}, \texttt{ticket\_state.csv}\\
+Backlog: \BkN & \texttt{analyze\_backlog.py}, \texttt{analyze\_backlog\_posthoc.py} & \texttt{wp6\_analysis\_backlog.txt}, \texttt{wp6\_analysis\_backlog\_posthoc.txt}\\
+Softirq: \HN, \HALate, \HEnqMed\,\textmu s & \texttt{analyze\_softirq.py}, \texttt{analyze\_softirq\_posthoc.py} & \texttt{wp6\_analysis\_softirq.txt}, \texttt{wp6\_analysis\_softirq\_posthoc.txt}\\
+No ticket: \NtkCells\ cells, $p=\SignNtkP$ & \texttt{analyze\_notkt.py} & \texttt{wp6\_analysis\_notkt.txt}\\
+Clocks: \ClkN\ acknowledgments & \texttt{analyze\_clock\_check.py} & \texttt{wp6\_clock\_check.txt}\\
+Other machines: A1--A4, V1--V3, K1--K4, D1--D5 & \texttt{analyze\_\allowbreak g19\_\allowbreak arm.py}, \texttt{analyze\_\allowbreak g12.py}, \texttt{analyze\_\allowbreak g14.py} & \texttt{g19\_\allowbreak *\_\allowbreak analysis.txt}, \texttt{g12\_\allowbreak *\_\allowbreak analysis.txt}, \texttt{g14\_\allowbreak *\_\allowbreak analysis\_\allowbreak delack.txt}\\
+Clock-safe repeat (Table~\ref{tab:clock}) & \texttt{clock\_sync.py}, \texttt{ticket\_\allowbreak xmit.bt}, \texttt{analyze\_\allowbreak clock\_\allowbreak repeat.py}, \texttt{compare\_\allowbreak race\_\allowbreak bursts.py} & \texttt{wp6\_clock\_\allowbreak repeat\_\allowbreak tuned\_\allowbreak analysis.txt}, \texttt{wp6\_clock\_\allowbreak repeat\_\allowbreak analysis.txt}, \texttt{wp6\_clock\_\allowbreak repeat\_\allowbreak bursts.txt}\\
+Model components (last table) & \texttt{analyze\_l1\_model\_comparison.py} & \texttt{l1\_model\_comparison.csv}, \texttt{.txt}\\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{document}

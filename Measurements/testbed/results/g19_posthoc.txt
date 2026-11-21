@@ -1,0 +1,7 @@
+G19 post hoc (not pre-registered)
+  cells wrong by half an RTT: 5; every one a round trip too slow (error within 10 % of -RTT): yes
+  response segments of the wrong cells: 9 to 14
+  cells with a response of 12 segments or more: 27, wrong 4; of 9 to 11: 16, wrong 1; fewer than 9: 57, wrong 0
+  mean absolute error of the other 95 cells: 1.00 ms
+  other cells off by more than 2 ms: 10, rates ['10'] Mbit/s, errors 2.1 to 9.8 ms
+  cells where the two ticket models differ: 7; early model wrong on 1, joined model wrong on 6

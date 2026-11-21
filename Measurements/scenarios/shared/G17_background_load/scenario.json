@@ -1,0 +1,25 @@
+{
+ "id": "G17",
+ "title": "The window rule and the ticket model of L1 under background load: cross traffic on the link, a busy loop on every CPU, both",
+ "serves": "L1 (objection: one connection at a time on an idle machine)",
+ "device_classes": [
+  "mint-x86"
+ ],
+ "needs_root": true,
+ "needs": [
+  "netns",
+  "tc"
+ ],
+ "tune": "optional",
+ "est_minutes": 100,
+ "predictions": [
+  "results/g17_predictions.csv",
+  "results/g17_cells.json",
+  "results/g17_levels.json",
+  "results/phase2_predictions.md",
+  "results/g14_predictions_delack_c.csv",
+  "results/g14_predictions_delack_d.csv"
+ ],
+ "status": "prepared 20 Nov 2026; criteria Y1-Y4 of results/phase2_predictions.md APPROVED 2026-11-20 (commit and push them before measuring)",
+ "notes": "Four levels (L0 none, L1 cross traffic, L2 CPU, L3 both), 9 calls each, n = 30; the load is started and stopped by run_testbed.py inside the namespaces (testbed/bgload.py, PQC_LOAD). Run ./run.sh --limit 1 first as a smoke test. Analyse with testbed/analyze_g17.py --run DIR/data."
+}

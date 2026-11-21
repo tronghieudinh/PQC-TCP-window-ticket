@@ -1,0 +1,9 @@
+G19b (ECDSA-P256, request 3 203 B, RTT 150 ms, 1 Gbit/s, MTU 1400)
+  response  measured   G19 model  measured-ticket model  valid
+      9500     450.7       450.1                 450.1  100
+     10400     450.7       450.1                 450.1  100
+     10800     450.7       600.1                 450.1  100
+     11150     450.7       600.1                 450.1  200
+     11600     450.7       600.1                 450.1  100
+     12400     600.9       600.1                 600.1  100
+  U1 MET  U2 MET  U3 MET  U4 MET

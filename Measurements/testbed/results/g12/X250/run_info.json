@@ -1,0 +1,35 @@
+{
+ "scenario": "G12",
+ "device_fingerprint": "9191a226e61f",
+ "preflight_before": "warn",
+ "dry_run": false,
+ "n": "40",
+ "no_tune": false,
+ "args": "",
+ "started": "2026-11-19T16:27:29+07:00",
+ "finished": "2026-11-19T17:46:27+07:00",
+ "failed_commands": 0,
+ "fingerprint_same_after": true,
+ "state_change": {
+  "load": [
+   [
+    0.03,
+    0.02,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "temp_max_c": [
+   44.0,
+   39.0
+  ],
+  "freq_ratio_median": [
+   0.99,
+   0.33
+  ]
+ }
+}

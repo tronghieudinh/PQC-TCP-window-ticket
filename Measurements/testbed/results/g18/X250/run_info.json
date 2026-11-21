@@ -1,0 +1,35 @@
+{
+ "scenario": "G18",
+ "device_fingerprint": "9191a226e61f",
+ "preflight_before": "warn",
+ "dry_run": false,
+ "n": "",
+ "no_tune": false,
+ "args": "",
+ "started": "2026-11-20T19:43:21+07:00",
+ "finished": "2026-11-20T20:24:56+07:00",
+ "failed_commands": 0,
+ "fingerprint_same_after": true,
+ "state_change": {
+  "load": [
+   [
+    0.06,
+    0.03,
+    0.0
+   ],
+   [
+    0.0,
+    0.02,
+    0.0
+   ]
+  ],
+  "temp_max_c": [
+   41.0,
+   39.0
+  ],
+  "freq_ratio_median": [
+   0.94,
+   0.99
+  ]
+ }
+}

@@ -1,0 +1,22 @@
+[
+ {
+  "name": "L0",
+  "load": "",
+  "text": "none (control)"
+ },
+ {
+  "name": "L1",
+  "load": "udp=40,tcp=10x2",
+  "text": "cross traffic, 60 % of the link"
+ },
+ {
+  "name": "L2",
+  "load": "cpu=all",
+  "text": "a busy loop on every CPU"
+ },
+ {
+  "name": "L3",
+  "load": "udp=40,tcp=10x2,cpu=all",
+  "text": "cross traffic and CPU load"
+ }
+]

@@ -1,0 +1,87 @@
+[
+ {
+  "stage": "C",
+  "req": 12260,
+  "resp": 222,
+  "suites": [
+   "ECDSA-P256|X25519",
+   "ML-DSA-44|ML-KEM-768",
+   "ML-DSA-65|ML-KEM-768",
+   "ML-DSA-87|ML-KEM-1024"
+  ]
+ },
+ {
+  "stage": "C",
+  "req": 15140,
+  "resp": 222,
+  "suites": [
+   "ECDSA-P256|X25519",
+   "ML-DSA-44|ML-KEM-768",
+   "ML-DSA-65|ML-KEM-768",
+   "ML-DSA-87|ML-KEM-1024"
+  ]
+ },
+ {
+  "stage": "C",
+  "req": 18020,
+  "resp": 222,
+  "suites": [
+   "ECDSA-P256|X25519",
+   "ML-DSA-44|ML-KEM-768",
+   "ML-DSA-65|ML-KEM-768",
+   "ML-DSA-87|ML-KEM-1024"
+  ]
+ },
+ {
+  "stage": "D",
+  "req": 19460,
+  "resp": 10820,
+  "suites": [
+   "ML-DSA-44|ML-KEM-768",
+   "ML-DSA-65|ML-KEM-768"
+  ]
+ },
+ {
+  "stage": "D",
+  "req": 19460,
+  "resp": 12260,
+  "suites": [
+   "ML-DSA-44|ML-KEM-768",
+   "ML-DSA-65|ML-KEM-768"
+  ]
+ },
+ {
+  "stage": "D",
+  "req": 19460,
+  "resp": 13700,
+  "suites": [
+   "ECDSA-P256|X25519",
+   "ML-DSA-44|ML-KEM-768",
+   "ML-DSA-65|ML-KEM-768"
+  ]
+ },
+ {
+  "stage": "D",
+  "req": 19460,
+  "resp": 7940,
+  "suites": [
+   "ML-DSA-65|ML-KEM-768"
+  ]
+ },
+ {
+  "stage": "D",
+  "req": 19460,
+  "resp": 9380,
+  "suites": [
+   "ML-DSA-65|ML-KEM-768"
+  ]
+ },
+ {
+  "stage": "D",
+  "req": 302,
+  "resp": 9380,
+  "suites": [
+   "ML-DSA-44|ML-KEM-768"
+  ]
+ }
+]

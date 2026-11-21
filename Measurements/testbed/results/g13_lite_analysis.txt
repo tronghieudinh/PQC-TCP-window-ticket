@@ -1,0 +1,7 @@
+G13-lite part A (plain TCP, real link)
+  sizes with the median window equal to rule (1): base: 20 of 20, rtt30: 20 of 20
+  connections with the window of rule (1): 800 of 800 (100.0 %)
+  F1 MET  F2 MET  F3 MET
+G13-lite part B (TLS, real link; criteria D1-D5 of G14)
+  stage C: rule (1) wrong on 0 of 28 cells; stage D: 10 discriminating cells, early-ticket model wrong on 0, joined-ticket model wrong on 10; early-ticket model wrong on 0 of 32 design cells (0 missing)
+  D1 MET  D2 MET  D3 MET  D4 MET  D5 MET

@@ -1,0 +1,31 @@
+{
+ "scenario": "G19",
+ "device_fingerprint": "459751b5992e",
+ "preflight_before": "warn",
+ "dry_run": false,
+ "n": "",
+ "no_tune": false,
+ "args": "",
+ "started": "2026-11-21T12:58:45+07:00",
+ "finished": "2026-11-21T14:07:35+07:00",
+ "failed_commands": 0,
+ "fingerprint_same_after": true,
+ "state_change": {
+  "load": [
+   [
+    0.32,
+    0.39,
+    0.37
+   ],
+   [
+    0.31,
+    0.46,
+    0.46
+   ]
+  ],
+  "temp_max_c": [
+   45.6,
+   46.7
+  ]
+ }
+}

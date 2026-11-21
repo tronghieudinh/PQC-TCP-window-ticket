@@ -1,0 +1,28 @@
+{
+ "id": "G10",
+ "title": "Ticket tests of L1 on a second TLS library (Go crypto/tls): client window (stage C) and the ticket written with the server's first flight (stage D), predictions from the calibrated write pattern",
+ "serves": "L1 (limitation: one TLS library), Paper 1 (limits)",
+ "device_classes": [
+  "mint-x86",
+  "gx10"
+ ],
+ "needs_root": true,
+ "needs": [
+  "netns",
+  "tc"
+ ],
+ "tune": "optional",
+ "est_minutes": 100,
+ "predictions": [
+  "results/go_calibration.json",
+  "results/g10_go_predictions_c.csv",
+  "results/g10_go_predictions_d.csv",
+  "results/g10_go_cells.json",
+  "results/g10_go_predictions.md"
+ ],
+ "stages": [
+  "custom: run_testbed.py --profile core --resume with PQC_PROBE=tls_probe_go; the cells of results/g10_go_cells.json, grouped by (request, response)"
+ ],
+ "status": "written 2026-11-19; criteria H1-H5 in results/g10_go_predictions.md APPROVED 2026-11-19 (commit and push them before measuring); any machine (X250 first)",
+ "notes": "Needs the Go probe on the machine: testbed/build_go_probe.sh (Go >= 1.27; --install-go downloads it). run.sh checks that the write pattern of the probe on THIS machine equals the calibrated one (go_calibrate.py --check, tolerance 16 B) before measuring. Analyse with testbed/analyze_g10.py."
+}

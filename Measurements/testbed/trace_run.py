@@ -88,6 +88,8 @@ def run_one(tb, probe, suite, req, resp, depth, mtls, n, outdir, tag, rtt, pcap,
         tr = subprocess.Popen(["cat", f"{TRACEFS}/trace_pipe"], stdout=open(os.path.join(outdir, tag + ".trace.txt"), "w"))
     else:        # parts F and G read only the bpftrace output and the captures: no trace_pipe file at all
         tr = subprocess.Popen(["true"])
+    if os.environ.get("PQC_CLOCK_SYNC", "1") != "0":      # fixes and records the time bases before the run; --after checks that the offset has not moved (clock_sync.py)
+        subprocess.run([sys.executable, os.path.join(HERE, "clock_sync.py"), "--out", os.path.join(outdir, tag)], check=False)
     time.sleep(0.5)
     try:
         r = subprocess.run(cli_cmd, capture_output=True, text=True, timeout=(n + 2) * (2 * rtt / 1000 * 12 + 2) + 60)
@@ -95,6 +97,8 @@ def run_one(tb, probe, suite, req, resp, depth, mtls, n, outdir, tag, rtt, pcap,
     finally:
         time.sleep(0.5)
         open(f"{TRACEFS}/events/tcp/tcp_probe/enable", "w").write("0")
+        if os.environ.get("PQC_CLOCK_SYNC", "1") != "0":
+            subprocess.run([sys.executable, os.path.join(HERE, "clock_sync.py"), "--out", os.path.join(outdir, tag), "--after"], check=False)
         if ft:
             try:
                 open(f"{TRACEFS}/current_tracer", "w").write("nop")
@@ -131,6 +135,7 @@ def main():
     ap.add_argument("--rtt", type=float, default=0)
     ap.add_argument("--rate", type=float, default=0)
     ap.add_argument("--mtu", type=int, default=0)
+    ap.add_argument("--depth", type=int, default=0, help="certificate chain depth (default: the preset's; G10 uses 1)")
     ap.add_argument("--no-pcap", action="store_true")
     ap.add_argument("--nets", default="", help="race: comma list rtt:rate:mtu")
     ap.add_argument("--ks", default="", help="race: comma list of response sizes in segments")
@@ -142,7 +147,9 @@ def main():
     reqs = [int(x) for x in a.reqs.split(",")] if a.reqs else pr["reqs"]
     resps = [int(x) for x in a.resps.split(",")] if a.resps else pr.get("resps", [])
     rtt, rate, mtu = a.rtt or pr.get("rtt", 100.0), a.rate or pr.get("rate", 100.0), a.mtu or pr.get("mtu", 1500)
-    probe = os.path.join(HERE, "tls_probe")
+    probe = os.environ.get("PQC_PROBE") or os.path.join(HERE, "tls_probe")   # PQC_PROBE: tls_probe_go (G10)
+    if a.depth:
+        pr["depth"] = a.depth
     outdir = os.path.join(HERE, "results", os.environ.get("PQC_OUTDIR", f"trace_{a.scenario}"))
     os.makedirs(outdir, exist_ok=True)
     tb = tbnet.Testbed("direct")

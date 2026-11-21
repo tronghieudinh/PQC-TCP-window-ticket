@@ -1,0 +1,5 @@
+stage C (cell; measured excess; model_bbr_ms, model_rule1_ms; error of first)
+stage D (suite; request; response segments; measured; model_early_ms, model_reno_early_ms; differ)
+  ECDSA-P256|X25519      req 19460 k=12  meas   419.0  model_early_ms   500.7  model_reno_early_ms   501.0  err1 -81.6 err2 -82.0 differ=0
+  ML-DSA-87|ML-KEM-1024  req 19460 k= 5  meas   358.1  model_early_ms   303.9  model_reno_early_ms   402.8  err1 +54.2 err2 -44.7 differ=1
+  ML-DSA-87|ML-KEM-1024  req 19460 k= 6  meas   358.3  model_early_ms   304.0  model_reno_early_ms   402.9  err1 +54.3 err2 -44.7 differ=1

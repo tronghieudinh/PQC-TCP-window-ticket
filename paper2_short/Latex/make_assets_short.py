@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """make_assets_short.py - figures and numbers of the short paper (WP5), from Measurements/testbed/results. Output: figures/*.pdf, numbers_short.tex"""
-import collections, csv, os, statistics as st, sys
+import collections, csv, json, math, os, statistics as st, sys
+os.environ.setdefault("SOURCE_DATE_EPOCH", "1795219200")      # 21 Nov 2026 00:00 UTC: matplotlib then writes the same PDF bytes on every run (no creation date), so the figures do not show up as changed in git
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -25,7 +26,8 @@ w0 = {}
 for r in a:
     obs[r["cfg"]][int(r["n1"])].append(int(r["cwnd_pre2"]))
     w0[r["cfg"]] = int(r["icw"])
-fig, ax = plt.subplots(figsize=(3.4, 2.5))
+_FLAT = os.environ.get('PQC_FIG_FLAT') == '1'; _SUF = '_v3' if _FLAT else ''  # flatter copies for CCR_v3 (page budget); the other variants keep the original size
+fig, ax = plt.subplots(figsize=(3.4, 1.85 if _FLAT else 2.5))
 ns = list(range(1, 41))
 for w, mk, col in ((4, "s", GREY), (10, "o", INK), (20, "^", ACC)):
     ax.plot(ns, [closed(w, n) for n in ns], color=col, lw=0.7, zorder=1)
@@ -43,7 +45,7 @@ ax.set_ylim(0, 63)
 ax.set_xlabel("segments in the first flight, $n$"); ax.set_ylabel("window afterwards (segments)")
 ax.legend(frameon=False, loc="upper left", fontsize=6.5)
 ax.spines[["top", "right"]].set_visible(False)
-fig.tight_layout(pad=0.4); fig.savefig(os.path.join(HERE, "figures", "fig_window.pdf")); plt.close(fig)
+fig.tight_layout(pad=0.4); fig.savefig(os.path.join(HERE, "figures", f"fig_window{_SUF}.pdf")); plt.close(fig)
 
 exact = [c for c, d in obs.items() if all(int(st.median(v)) == closed(w0[c], n) for n, v in d.items())]
 num("NCfg", len(obs)); num("NExact", len(exact))
@@ -62,14 +64,14 @@ num("NStageB", f"{len(b):,}".replace(",", "{,}"))
 sm = {(r["suite"], int(r["req"])): float(r["resumed_excess"]) for r in rd(os.path.join(RES, "resume_summary_slack_tls.csv"))}
 pr = rd(os.path.join(RES, "slack_predictions.csv"))
 SH = {"ECDSA-P256|X25519": ("ECDSA-P256", 2), "ML-DSA-44|ML-KEM-768": ("ML-DSA-44", 5), "ML-DSA-65|ML-KEM-768": ("ML-DSA-65", 6), "ML-DSA-87|ML-KEM-1024": ("ML-DSA-87", 8)}
-fig, axs = plt.subplots(2, 2, figsize=(3.4, 3.0), sharex=True, sharey=True)
+fig, axs = plt.subplots(2, 2, figsize=(3.4, 2.5 if _FLAT else 3.2), sharex=True, sharey=True)
 for ax, (su, (nm, ch)) in zip(axs.flat, SH.items()):
     pts = sorted((int(p["req_segments"]), p) for p in pr if p["suite"] == su and (p["suite"], int(p["req"])) in sm)
     xs = [k for k, _ in pts]
-    ax.plot(xs, [float(p["model_slack0_ms"]) for _, p in pts], "-", color=INK, lw=1.0, drawstyle="steps-mid", label="validated rule", zorder=2)
-    ax.plot(xs, [float(p["model_slack2_ms"]) for _, p in pts], "--", color=ACC, lw=1.0, drawstyle="steps-mid", label="window +2", zorder=3)
+    ax.plot(xs, [float(p["model_slack0_ms"]) for _, p in pts], "-", color=INK, lw=1.0, drawstyle="steps-mid", label="rule (1)", zorder=2)
+    ax.plot(xs, [float(p["model_slack2_ms"]) for _, p in pts], "--", color=ACC, lw=1.0, drawstyle="steps-mid", label="loosened rule", zorder=3)
     ax.plot(xs, [sm[(su, int(p["req"]))] for _, p in pts], "o", ms=3.2, mfc="white", mec=INK, mew=0.7, label="measured", zorder=4)
-    ax.set_title(f"{nm}  (ClientHello {ch} seg.)", fontsize=6.5, pad=2)
+    ax.set_title(f"{nm}\nClientHello {ch} seg.", fontsize=6.3, pad=2, linespacing=1.0)
     ax.spines[["top", "right"]].set_visible(False)
     ax.set_xticks([9, 11, 13, 15]); ax.set_yticks([300, 400])
     ax.set_ylim(285, 420)
@@ -79,7 +81,7 @@ for ax in axs[:, 0]:
     ax.set_ylabel("latency (ms)", fontsize=7)
 h, l = axs[0, 0].get_legend_handles_labels()
 fig.legend(h, l, loc="upper center", ncol=3, frameon=False, fontsize=6.3, handletextpad=0.4, columnspacing=1.0)
-fig.tight_layout(pad=0.4, rect=(0, 0, 1, 0.93)); fig.savefig(os.path.join(HERE, "figures", "fig_stagec.pdf")); plt.close(fig)
+fig.tight_layout(pad=0.4, rect=(0, 0, 1, 0.94)); fig.savefig(os.path.join(HERE, "figures", f"fig_stagec{_SUF}.pdf")); plt.close(fig)
 for s_, w_ in ((0, "Zero"), (1, "One"), (2, "Two"), (3, "Three")):
     e = [float(p[f"model_slack{s_}_ms"]) - sm[(p["suite"], int(p["req"]))] for p in pr if (p["suite"], int(p["req"])) in sm]
     num(f"CMae{w_}", f"{st.mean(abs(x) for x in e):.2f}"); num(f"CMax{w_}", f"{max(abs(x) for x in e):.1f}"); num(f"CWrong{w_}", sum(abs(x) > 50 for x in e))
@@ -233,6 +235,93 @@ _grab(os.path.join(RES, "wp6_analysis_softirq.txt"), [
     (r"early: tcp_slow_start called for (\d+) of", ["HEarlySS"]),
     (r"H1a .*?: (\d+) of (\d+) \(([\d.]+)%", ["HAOne", "HALate", "HAPct"])])
 _grab(os.path.join(RES, "wp6_analysis_softirq_posthoc.txt"), [(r"ENQ - write return \(us\): median ([\d.]+)", ["HEnqMed"]), (r"pcap-based rel_write \(ms\) of the same ACKs: median (-?[\d.]+)", ["HPcapMed"])])
+_grab(os.path.join(RES, "wp6_clock_check.txt"), [
+    (r"joined on both clocks\n.*?5th (-?[\d.]+), 95th (-?[\d.]+), largest absolute ([\d.]+)", ["ClkLo", "ClkHi", "ClkMax"]),
+    (r"first response segment .*?median (-?[\d.]+)", ["ClkWriteGap"])])
+_grab(os.path.join(RES, "wp6_clock_check.txt"), [(r"(\d+) files, (\d+) ACKs joined on both clocks", ["ClkFiles", "ClkN"]), (r"difference between the two, us: median ([\d.]+)", ["ClkDiff"])])
+if "ClkWriteGap" in NUMS: num("ClkWriteAbs", str(NUMS["ClkWriteGap"]).lstrip("-"))
+_grab(os.path.join(RES, "wp6_analysis_softirq.txt"), [(r"H1b .*?: (\d+) of (\d+) \(([\d.]+)%", ["HBOne", "HBN", "HBPct"])])
+if "HPcapMed" in NUMS: num("HPcapMedAbsUs", f"{abs(float(NUMS['HPcapMed'])) * 1000:.0f}")
+def _clk(prefix, fname):
+    pth = os.path.join(RES, fname)
+    if not os.path.exists(pth): return
+    t = open(pth).read()
+    def g(rx, names):
+        m = _re.search(rx, t, _re.S)
+        if m:
+            for n, v in zip(names, m.groups()): num(prefix + n, v)
+    g(r"(\d+) segments in (\d+) files: within 20 us ([\d.]+)%, 5th (-?[\d.]+), 95th ([\d.]+), largest ([\d.]+) us", ["KOneN", "Files", "KOnePct", "KOneLo", "KOneHi", "KOneMax"])
+    g(r"K2: (\d+) server segments: within 20 us ([\d.]+)%, median (-?[\d.]+) us", ["KTwoN", "KTwoPct", "KTwoMed"])
+    ex = [float(x) for x in _re.findall(r"excess \+(\d+\.\d)", t)]
+    if ex: num(prefix + "KThreeLo", f"{min(ex):.0f}"); num(prefix + "KThreeHi", f"{max(ex):.0f}"); num(prefix + "KThreeMed", f"{sorted(ex)[len(ex) // 2]:.0f}")
+    g(r"K4.*?\n\s+(\d+) of (\d+) transactions", ["KFourRight", "KFourN"])
+    g(r"K5.*?\n\s+(\d+) of (\d+) \(", ["KFiveRight", "KFiveN"])
+    g(r"(\d+) transactions \(\d+ skipped for lack of an RX match\): clock-safe t_w \(XQ\) (\d+)%; the capture's t_w, same transactions (\d+)%", ["KSixN", "KSixPct", "KSixCapPct"])
+    g(r"burst of ten segments or less: (\d+) transactions, clock-safe (\d+)%", ["KSixSmallN", "KSixSmallPct"])
+    g(r"burst above ten in (\d+); the threshold of the first run, 0\.049 ms \(out of sample\): (\d+) of (\d+) right \(([\d.]+)%\); the best threshold on these data \(in sample, as the first run's was\): (\d+) of \d+ at ([\d.]+) to ([\d.]+) ms", ["KSevenPos", "KSevenRight", "KSevenN", "KSevenPct", "KSevenBest", "KSevenBestLo", "KSevenBestHi"])
+_clk("Rp", "wp6_clock_repeat_tuned_analysis.txt")
+_clk("Ru", "wp6_clock_repeat_analysis.txt")
+_clk("Ro", "wp6_clock_repeat_optiplex_analysis.txt")
+_clk("Rq", "wp6_clock_repeat_tuned2_analysis.txt")
+_clk("Ra", "wp6_clock_repeat_isolA_analysis.txt")
+_clk("Rb", "wp6_clock_repeat_isolB_analysis.txt")
+_bu = os.path.join(RES, "wp6_clock_repeat_bursts.txt")
+if os.path.exists(_bu):
+    for _ln in open(_bu):
+        _m = _re.match(r"\s+(first run|trace_clock_race|trace_clock_ctrl1|trace_clock_race2|trace_clock_ctrl1_t|trace_clock_race_t)\s+ECDSA-P256: (\d+)/(\d+)\s+ML-DSA-44: (\d+)/(\d+)", _ln)
+        if _m:
+            _k = {"first run": "First", "trace_clock_race": "Ur", "trace_clock_ctrl1": "Uc", "trace_clock_race2": "Ut", "trace_clock_ctrl1_t": "Pc", "trace_clock_race_t": "Pr"}[_m.group(1)]
+            num("Bu" + _k + "EcUp", _m.group(2)); num("Bu" + _k + "EcN", _m.group(3))
+def _g19_cells_table():
+    runs = [("g19_gx10_cells.txt", "arm", "GX10"), ("g19_x250_run2_cells.txt", "arm", "X250 run 2"), ("g19_optiplex_cells.txt", "arm", "Optiplex")]
+    rx = _re.compile(r"^\s*(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)")
+    data = {}
+    for fn, _, name in runs:
+        pth = os.path.join(RES, fn)
+        if not os.path.exists(pth): return
+        for ln in open(pth):
+            m = rx.match(ln)
+            if m:
+                c = int(m.group(1)); d = data.setdefault(c, dict(suite=m.group(2).split("|")[0], rtt=int(m.group(5)), req=int(m.group(3)), resp=int(m.group(4)), model=float(m.group(10)), runs={}))
+                d["runs"][name] = float(m.group(8)); d["runs"].setdefault("X250 run 1", float(m.group(9)))
+    def wrong(d, v): return abs(d["model"] - v) > 0.5 * d["rtt"]
+    bad = sorted(c for c, d in data.items() if any(wrong(d, v) for v in d["runs"].values()))
+    order = ["X250 run 1", "X250 run 2", "GX10", "Optiplex"]
+    rows = []
+    for c in bad:
+        d = data[c]; cells = []
+        for n in order:
+            v = d["runs"].get(n)
+            cells.append("---" if v is None else (f"\\textbf{{{v:.0f}}}" if wrong(d, v) else f"{v:.0f}"))
+        rows.append(f"{c} & {d['suite']} & {d['rtt']} & {d['req']:,} / {d['resp']:,} & {d['model']:.0f} & " .replace(",", "\\,") + " & ".join(cells) + "\\\\")
+    open(os.path.join(HERE_TEX, "g19_cells_table.tex"), "w").write("\\newcommand{\\GnineCellRows}{" + "\n".join(rows) + "}\n")
+    nw = {n: sum(wrong(d, d["runs"][n]) for d in data.values() if n in d["runs"]) for n in order}
+    for n, k in zip(order, ["XOne", "XTwo", "Gx", "Op"]): num("GnineCellsWrong" + k, nw[n])
+    num("GnineCellsEvery", sum(all(wrong(d, d["runs"][n]) for n in order if n in d["runs"]) for d in data.values()))
+    num("GnineCellsUnion", len(bad))
+HERE_TEX = os.path.dirname(os.path.abspath(__file__))
+_g19_cells_table()
+def _count_met(files, rx):
+    k = n = 0
+    for fn in files:
+        pth = os.path.join(RES, fn)
+        if not os.path.exists(pth): return None
+        for m in _re.finditer(rx, open(pth).read()):
+            n += 1; k += m.group(2) == "MET"
+    return k, n
+for _nm, _fs, _rx in (("GnineRepGx", ["g19_gx10_analysis.txt"], r"\b(A\d) (NOT MET|MET)"), ("GnineRepOp", ["g19_optiplex_analysis.txt"], r"\b(A\d) (NOT MET|MET)"),
+                      ("GtwelveRep", ["g12_gx10_analysis.txt", "g12_optiplex_analysis.txt", "g14_gx10_analysis_delack.txt", "g14_optiplex_analysis_delack.txt"], r"\b([KD]\d) (NOT MET|MET)")):
+    _r = _count_met(_fs, _rx)
+    if _r: num(_nm + "Met", _r[0]); num(_nm + "K", _r[1])
+if "RoKSevenBestLo" in NUMS and "RpKSevenBestLo" in NUMS: num("RoKSevenDiff", f"{abs(float(NUMS['RoKSevenBestLo']) - float(NUMS['RpKSevenBestLo'])):.3f}")
+_bi = os.path.join(RES, "wp6_clock_repeat_bursts_isol.txt")
+if os.path.exists(_bi):
+    for _ln in open(_bi):
+        _m = _re.match(r"\s+(trace_clock_race_isolA|trace_clock_race_isolB)\s+ECDSA-P256: (\d+)/(\d+)\s+ML-DSA-44: (\d+)/(\d+)\s+ML-DSA-65: (\d+)/(\d+)", _ln)
+        if _m:
+            _k = "A" if _m.group(1).endswith("A") else "B"
+            num("BuIsol" + _k + "EcUp", _m.group(2)); num("BuIsol" + _k + "EcN", _m.group(3))
+            num("BuIsol" + _k + "MlUp", int(_m.group(4)) + int(_m.group(6))); num("BuIsol" + _k + "MlN", int(_m.group(5)) + int(_m.group(7)))
 _pt = os.path.join(RES, "wp6_analysis_backlog_posthoc.txt")
 if os.path.exists(_pt):
     _c = {}
@@ -296,6 +385,303 @@ for _m in _re.finditer(r"OpenSSL (\S+): stage C (\d+) cells \(validated rule wro
     num(_p + "Met", sum(1 for _g in _m.groups()[12:] if _g.endswith("MET") and not _g.endswith("NOT MET")))
 _xd = _re.findall(r"max \|diff\| ms ([\d.]+)", open(os.path.join(RES, "g9_crossversion.txt")).read())
 num("GxMaxDiff", f"{max(float(x) for x in _xd):.2f}")
+# ---- G10: the ticket tests on Go crypto/tls (analysis output of analyze_g10.py; defined only once the measurement exists: no macro is used in main.tex before that)
+_g10p = os.path.join(RES, "g10_analysis.txt")
+if os.path.exists(_g10p):
+    _g10 = open(_g10p).read()
+    _m = _re.search(r"stage C: (\d+) cells measured \((\d+) missing\); validated rule \(1\) wrong on (\d+); loosened by 2 wrong on (\d+) of its (\d+) discriminating cells; textbook slow start wrong on (\d+) of its (\d+)\n"
+                    r"\s+stage D: (\d+) cells measured \((\d+) missing\); (\d+) cells where 'go' and 'joined' differ: 'go' wrong on (\d+), 'joined' wrong on (\d+); 'go' wrong on (\d+) of (\d+), MAE ([\d.]+) ms\n"
+                    r"\s+(H1 (?:NOT )?MET)\s+(H2 (?:NOT )?MET)\s+(H3 (?:NOT )?MET)\s+(H4 (?:NOT )?MET)\s+(H5 (?:NOT )?MET)", _g10)
+    if _m:
+        for _k, _i in (("GoCN", 1), ("GoCWrong", 3), ("GoCLooseDis", 4), ("GoCLooseN", 5), ("GoCTextDis", 6), ("GoCTextN", 7), ("GoDN", 8), ("GoDisN", 10), ("GoDisGoWrong", 11),
+                       ("GoDisJoinedWrong", 12), ("GoWrongAll", 13), ("GoAllN", 14)):
+            num(_k, _m.group(_i))
+        num("GoMae", _m.group(15))
+        num("GoMet", sum(1 for _g in _m.groups()[15:] if _g.endswith("MET") and not _g.endswith("NOT MET")))
+        for _h, _g in zip(("One", "Two", "Three", "Four", "Five"), _m.groups()[15:]):
+            num("GoH" + _h, "met" if not _g.endswith("NOT MET") else "not met")
+        _wl = _re.search(r"cells wrong by more than 50 ms \(suite, request, k, prediction, measured\): (.*)", _g10)
+        _cells = _re.findall(r"\('([^']+)'", _wl.group(1)) if _wl else []
+        num("GoWrongSuiteN", len(_cells))
+        num("GoWrongEightySeven", sum(1 for _c in _cells if _c.startswith("ML-DSA-87")))
+        _hc = _re.search(r"H5 with the close_notify allowance .*?: (MET|NOT MET) \((\d+) cells differ by more than 16 B, (\d+) after", _g10)
+        if _hc:
+            num("GoFiveCn", "met" if _hc.group(1) == "MET" else "not met"); num("GoBytesOff", _hc.group(2))
+# ---- G11: BBR and fq pacing on plain TCP (analysis output of analyze_g11.py)
+_g11p = os.path.join(RES, "g11_analysis.txt")
+if os.path.exists(_g11p):
+    _q = _re.search(r"((?:Q\d\w* (?:NOT )?MET\s+)+)", open(_g11p).read())
+    if _q:
+        _qs = _re.findall(r"Q\d\w* ((?:NOT )?MET)", _q.group(1))
+        num("GelevenN", len(_qs)); num("GelevenMet", sum(1 for _x in _qs if _x == "MET"))
+# ---- G12: the ticket-timing test on new cells (analysis output of analyze_g12.py)
+_g12p = os.path.join(RES, "g12_analysis.txt")
+if os.path.exists(_g12p):
+    _t = open(_g12p).read()
+    _r = _re.findall(r"RTT (\d+) ms: (\d+) of (\d+) cells \((\d+) missing\); (\d+) discriminating: early wrong (\d+), joined wrong (\d+); early wrong on (\d+) of (\d+)", _t)
+    _k = _re.findall(r"K\d (NOT MET|MET)", _t)
+    if _r:
+        num("GtwelveRtts", len(_r)); num("GtwelveCells", sum(int(x[2]) for x in _r)); num("GtwelveDis", sum(int(x[4]) for x in _r))
+        num("GtwelveEarlyDis", sum(int(x[5]) for x in _r)); num("GtwelveJoinedDis", sum(int(x[6]) for x in _r)); num("GtwelveEarlyAll", sum(int(x[7]) for x in _r))
+        num("GtwelveMet", sum(1 for x in _k if x == "MET")); num("GtwelveK", len(_k))
+        _n = sum(int(x[4]) for x in _r); _x = _n - sum(int(x[5]) for x in _r); _z = 1.96
+        _c = (_x + _z * _z / 2) / (_n + _z * _z); _h = _z * math.sqrt(_x / _n * (1 - _x / _n) / _n + _z * _z / (4 * _n * _n)) / (1 + _z * _z / _n)
+        num("GtwelveWilsonLo", f"{(_c - _h) * 100:.0f}")
+# ---- G14: ticket tests under BBR and under delayed acknowledgments (analysis output of analyze_g14.py)
+_g14b, _g14d = os.path.join(RES, "g14_analysis_bbr.txt"), os.path.join(RES, "g14_analysis_delack.txt")
+if os.path.exists(_g14b):
+    _t = open(_g14b).read()
+    _m = _re.search(r"(\d+) stage-C and (\d+) stage-D design cells", _t); _c = _re.search(r"model w0 \+ n wrong on (\d+); rule \(1\) wrong on (\d+) of the (\d+) cells", _t)
+    _d = _re.search(r"BBR model wrong on (\d+) of (\d+); model of L1 wrong on (\d+) of the (\d+) cells", _t); _k = _re.findall(r"B\d (NOT MET|MET)", _t)
+    if _m and _c and _d:
+        num("GfBbrCN", _m.group(1)); num("GfBbrDN", _m.group(2)); num("GfBbrCWrong", _c.group(1)); num("GfBbrRuleWrong", _c.group(2)); num("GfBbrCDiff", _c.group(3))
+        num("GfBbrDWrong", _d.group(1)); num("GfBbrRenoWrong", _d.group(3)); num("GfBbrDDiff", _d.group(4))
+        num("GfBbrMet", sum(1 for x in _k if x == "MET")); num("GfBbrK", len(_k))
+if os.path.exists(_g14d):
+    _t = open(_g14d).read()
+    _m = _re.search(r"(\d+) stage-C and (\d+) stage-D design cells", _t); _c = _re.search(r"rule \(1\) wrong on (\d+)", _t)
+    _d = _re.search(r"(\d+) discriminating cells: early-ticket model wrong on (\d+), joined-ticket model wrong on (\d+); early-ticket model wrong on (\d+) of (\d+)", _t); _k = _re.findall(r"D\d (NOT MET|MET)", _t)
+    if _m and _c and _d:
+        num("GfDelCN", _m.group(1)); num("GfDelCWrong", _c.group(1)); num("GfDelDDiff", _d.group(1)); num("GfDelEarlyDiff", _d.group(2)); num("GfDelJoinedDiff", _d.group(3))
+        num("GfDelEarlyAll", _d.group(4)); num("GfDelDN", _d.group(5)); num("GfDelMet", sum(1 for x in _k if x == "MET")); num("GfDelK", len(_k))
+# ---- G16: the window rule on plain TCP under loss (analysis output of analyze_g16.py and the per-cell table)
+_g16p = os.path.join(RES, "g16_analysis.txt"); _g16c = os.path.join(RES, "g16_cells.txt")
+if os.path.exists(_g16p) and os.path.exists(_g16c):
+    _t = open(_g16p).read()
+    _a = _re.search(r"L1 (?:NOT )?MET: (\d+) of (\d+) cells", _t); _b = _re.search(r"L2 (?:NOT )?MET: (\d+) of (\d+) connections", _t); _k = _re.findall(r"L\d (NOT MET|MET)", _t)
+    _rows = _re.findall(r"^(loss\d+)\s+n=\s*(\d+)\s+([\d.]+)\s+([\d.]+)\s+([+-][\d.]+)\s+([\d.]+)%", open(_g16c).read(), _re.M)
+    if _a and _b and _rows:
+        num("GsixWithin", _a.group(1)); num("GsixCells", _a.group(2)); num("GsixOff", int(_a.group(2)) - int(_a.group(1)))
+        num("GsixNoRetxOk", _b.group(1)); num("GsixNoRetxN", _b.group(2)); num("GsixNoRetxPct", f"{100 * int(_b.group(1)) / int(_b.group(2)):.1f}")
+        num("GsixMet", sum(1 for x in _k if x == "MET")); num("GsixK", len(_k)); num("GsixConn", 6000)
+        _w = [r for r in _rows if r[0] == "loss1" and r[1] == "40"][0]
+        num("GsixWorstMeas", f"{float(_w[2]):.0f}"); num("GsixWorstPred", f"{float(_w[3]):.0f}"); num("GsixWorstRetx", f"{float(_w[5]):.1f}")
+        num("GsixAllAbove", "all" if all(float(r[4]) > 0 for r in _rows if abs(float(r[4])) > 6) else "not all")
+# ---- spread of the latency inside a cell (shaped, resumed, at least 20 transactions): interquartile range, ticket-timing and client-window cells
+_iq = []
+for _f in ("nst_tls.csv", "slack_tls.csv"):
+    _g = collections.defaultdict(list)
+    for _r in csv.DictReader(open(os.path.join(RES, _f))):
+        if _r["err"] or _r["reused"] != "1" or _r["net_id"] != "shaped":
+            continue
+        _g[(_r["suite"], _r["req"], _r["resp"], _r.get("rtt_ms"), _r.get("mtu"), _r.get("rate_mbps"))].append(float(_r["t_total_ms"]))
+    for _v in _g.values():
+        if len(_v) >= 20:
+            _q = st.quantiles(_v, n=4); _iq.append(_q[2] - _q[0])
+num("SpreadMed", f"{st.median(_iq):.2f}"); num("SpreadMax", f"{max(_iq):.2f}")
+# ---- G10 post hoc variant (g10_posthoc_pipeline.txt): wrong cells before and after
+_g10ph = os.path.join(RES, "g10_posthoc_pipeline.txt")
+if os.path.exists(_g10ph):
+    _rows = _re.findall(r"stage [CD] \S+\s+cells\s+\d+\s+pre-registered wrong\s+(\d+)\s+pipelined wrong\s+(\d+)", open(_g10ph).read())
+    num("GoPostBefore", sum(int(a) for a, _ in _rows)); num("GoPostAfter", sum(int(b) for _, b in _rows))
+# ---- HANDTYPED: numbers that used to be typed in the text, now computed from the data, the model or the analysis outputs (see HANDTYPED_NUMBERS.md)
+import math as _m, subprocess as _sp, dataclasses as _dc
+_TB = os.path.join(V5, "Measurements", "testbed")
+sys.path.insert(0, _TB)
+import analyze_testbed as _A  # noqa: E402
+_WORD = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen"}
+def _rd_text(path): return open(path, errors="ignore").read()
+def _vi(x): return x.replace(",", ".")
+def _rule(w0, n): return max(w0, min(w0 + n, 2 * n))
+def _thin(n): return f"{int(n):,}".replace(",", "\\,")
+# kernel logic against the closed form
+_kp = _re.search(r"closed form \(1\): (\d+) of (\d+)", _sp.run([sys.executable, os.path.join(V5, "Simulation", "window_from_kernel.py")], capture_output=True, text=True).stdout)
+num("KernPairs", _kp.group(1))
+# the boundary of rule (1) with w0 = 10
+num("WFive", _rule(10, 5)); num("WSix", _rule(10, 6))
+# model sizes: ClientHello, ticket and flights for the four suites (resumed, mutual TLS, depth 2, MSS 1440)
+_SU = {"Ec": "ECDSA-P256|X25519", "MlFourFour": "ML-DSA-44|ML-KEM-768", "MlSixFive": "ML-DSA-65|ML-KEM-768", "MlEightSeven": "ML-DSA-87|ML-KEM-1024"}
+_REQ, _RESP = 14500, 12100
+for _k, _su in _SU.items():
+    _fl = S.build_flow(_su, _A.probe_protocol("1", str(_REQ), str(_RESP), "2"), 2, "resumed", False)
+    _ch = [st_[2] for st_ in _fl.steps if st_[0] == "x" and st_[1] == 0][0]
+    num("ChSeg" + _k, _m.ceil(_ch / 1440)); num("NstSeg" + _k, _m.ceil(_fl.nst / 1440))
+    if _k == "MlFourFour":
+        num("NstKBMlFourFour", f"{_fl.nst / 1000:.1f}")
+        num("CellReqSegs", sum(_m.ceil(w / 1440) for w in _fl.writes[2])); num("CellRespSegs", sum(_m.ceil(w / 1440) for w in _fl.writes[3]))
+num("CellReq", _thin(_REQ))
+# the two diagnosed cells: measured excess and joined-ticket model (resume_summary.csv); the counterfactual without the ticket
+for _r in rd(os.path.join(RES, "resume_summary.csv")):
+    if (_r["suite"], _r["req"], _r["resp"], _r["rtt_ms"], _r["rate_mbps"], _r["mtu"], _r["icw"], _r["depth"], _r["mtls"]) == (_SU["MlFourFour"], str(_REQ), str(_RESP), "100", "100", "1500", "10", "2", "1"):
+        num("ExMeasMlFourFour", f"{float(_r['resumed_excess']):.0f}"); num("ExJoinedMlFourFour", f"{float(_r['resumed_model']):.0f}")
+_cf = _re.findall(r"^ML-DSA-65\|ML-KEM-768\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)", _rd_text(os.path.join(RES, "counterfactual_noticket.txt")), _re.M)[0]
+num("CfMeasMlSixFive", f"{float(_cf[0]):.0f}"); num("CfNoneMlSixFive", f"{float(_cf[3]):.0f}")
+_lr = _re.search(r"loosened by two segments\s+joined\s+([\d.]+)", _rd_text(os.path.join(RES, "loosened_rule_resumed.txt")))
+num("LooseMae", f"{float(_lr.group(1)):.1f}")
+# stage B: mean error of the second flight with the kernel's own window
+_sb = [float(x) for x in _re.findall(r"MAE of second-flight time \(ms\): with the kernel's own window\s+([\d.]+)", _rd_text(os.path.join(RES, "slack_analysis.txt")))]
+num("StageBLo", f"{min(_sb):.1f}"); num("StageBHi", f"{max(_sb):.1f}")
+# companion paper: configurations of the full-handshake validation
+num("PFullA", len(rd(os.path.join(V5, "paper1", "Latex", "data", "testbed_configurations.csv"))))
+# Dubetskyy and Cano segment counts
+_db = _rd_text(os.path.join(RES, "dubetskyy_segments_20261116.txt"))
+num("DubN", _re.search(r"write pattern (\d+) of (\d+)", _db).group(1))
+_d3 = _re.search(r"3 three segments[^\n]*?(\d+) of (\d+)", _db)
+num("DubThree", _d3.group(1)); num("DubScen", _d3.group(2))
+# threshold and band of the ticket-timing rule
+_rb = _re.search(r"THRESH, BAND = ([\d.]+), ([\d.]+)", _rd_text(os.path.join(_TB, "race2_predict.py")))
+num("RaceThrC", _rb.group(1)); num("RaceBand", _rb.group(2))
+_th = _rd_text(os.path.join(RES, "wp6_analysis_threshold.txt")); _sec = _th.split("1b.")
+for _tag, _txt in (("F", _sec[0]), ("S", _sec[1])):
+    for _li, _t in zip("ABCDEF", ("0.020", "0.040", "0.049", "0.060", "0.080", "0.100")):
+        _v = _re.search(r"T = " + _t.replace(".", r"\.") + r" ms: \d+ of \d+ \(([\d.]+)%\)", _txt)
+        num(f"Thr{_tag}{_li}", _v.group(1))
+# server window after a ticket: smallest burst above ten in the race captures and the largest fitted response
+num("SrvWinLo", min(int(x["burst"]) for x in rd(os.path.join(RES, "ticket_race.csv")) if int(x["burst"]) > 10))
+num("SrvWinHi", max(int(NUMS[k]) for k in ("EFitEcdsa", "EFitMlFourFour", "EFitMlSixFive")))
+# MTU 9000 with the receive buffer raised: flight sizes below rule (1)
+_S2 = RW.stage_a(os.path.join(RES, "rwnd_large", "slack.csv"))["mtu9000"]
+_bad = sorted(n for n, v in _S2.items() if st.median(v) != RW.closed(n))
+num("NineFailN", len(_bad)); num("NineFailLo", _bad[0]); num("NineFailHi", _bad[-1])
+# Go: ticket sizes and ClientHello segments from the calibration
+_gc = json.load(open(os.path.join(RES, "go_calibration.json")))["suites"]
+_tk = [v["ticket_bytes"] for v in _gc.values()]
+num("GoTktLoKB", f"{min(_tk) / 1000:.1f}"); num("GoTktHiKB", f"{max(_tk) / 1000:.0f}")
+for _k, _su in _SU.items():
+    num("GoCh" + _k, _m.ceil(sum(_gc[_su]["resumed_client_hello_writes"]) / 1440))
+_g10t = _rd_text(os.path.join(RES, "g10_analysis.txt"))
+num("GoClose", _re.search(r"allowance \((\d+) B read by the client\)", _g10t).group(1))
+num("GoK", len(_re.findall(r"H\d (?:NOT )?MET", _g10t.split("\n")[3])))
+num("GxK", len(_re.findall(r"G\d (?:NOT )?MET", _rd_text(os.path.join(RES, "g9_analysis.txt")).split("\n")[1])))
+# G11: BBR and Cubic with fq against rule (1)
+def _g11(cfg):
+    return {int(a): int(b) for a, b in _re.findall(r"(\d+):(\d+)", _re.search(r"^  " + cfg + r"\s+window after n1: ([^\n]+)", _rd_text(os.path.join(RES, "g11_analysis.txt")), _re.M).group(1))}
+_rule1 = _g11(r"rule \(1\)"); _bbr = _g11("bbr"); _cub = _g11("cubic_fq")
+num("GelBbrWrong", sum(_bbr[n] != _rule1[n] for n in _rule1)); num("GelBbrMax", max(n for n in _rule1 if _bbr[n] != _rule1[n]))
+_cd = [n for n in _rule1 if _cub[n] != _rule1[n]]
+num("GelCubDiff", len(_cd)); num("GelCubSizes", len(_rule1)); num("GelCubAt", _cd[0]); num("GelCubDelta", abs(_cub[_cd[0]] - _rule1[_cd[0]]))
+def _g11b(cfg):
+    return {int(a): int(b) for a, b in _re.findall(r"(\d+):(\d+)", _re.search(r"^  " + cfg + r"\s+burst time \(ms\): ([^\n]+)", _rd_text(os.path.join(RES, "g11_analysis.txt")), _re.M).group(1))}
+_bb, _bs = _g11b("bbr"), _g11b("base")
+num("GelBbrBurstMax", max(_bb[n] - _bs[n] for n in _bs))
+# G14 BBR: the two cells between the models and the cell below both
+_gb = _rd_text(os.path.join(RES, "g14_cells_bbr.txt"))
+_mid = _re.findall(r"differ=1", _gb); _m1 = _re.search(r"err1 ([+-][\d.]+) err2 ([+-][\d.]+) differ=1", _gb)
+num("GfMidAbove", f"{abs(float(_m1.group(1))):.0f}"); num("GfMidBelow", f"{abs(float(_m1.group(2))):.0f}")
+num("GfMidN", len(_mid)); num("GfLow", f"{max(abs(float(a)) for a in _re.findall(r'err[12] ([+-][\d.]+) differ=0', _gb)):.0f}")
+# Arm machine (GX10): analysis notes of 6.14 and 7.0, Vietnamese decimal commas
+_a614 = _rd_text(os.path.join(RES, "gx10_6.14_phan_tich_20261114.txt")); _a70 = _rd_text(os.path.join(RES, "gx10_7.0_G3b_G4_G6_phan_tich_20261115.txt"))
+num("ArmStateSixFourteen", _re.search(r"815 ACK của vé\): P1[^\n]*?(\d+)/(\d+)", _a614).group(1)); num("ArmStateSevenZero", _re.search(r"817 ACK của vé\): P1[^\n]*?(\d+)/(\d+)", _a70).group(1))
+num("ArmBurstSixFourteen", _vi(_re.search(r"cwnd lúc ghi - đoạn vé chưa được ACK, trong 1 đoạn: \d+/\d+ \(([\d,]+) %", _a614).group(1)))
+num("ArmBurstSevenZero", _vi(_re.search(r"trong 1 đoạn: \d+/\d+ \(([\d,]+) %\): ĐẠT \(6\.14", _a70).group(1)))
+num("ArmThrSixFourteen", _vi(_re.search(r"gần ngưỡng 0,1 ms trạng thái khớp quy tắc phần C: \d+/\d+ \(([\d,]+) %", _a614).group(1)))
+num("ArmThrSevenZero", _vi(_re.search(r"phần C: \d+/\d+ \(([\d,]+) %; tiêu chí", _a70).group(1)))
+num("ArmBkSixFourteen", _vi(_re.search(r"chỉ \d+ \(([\d,]+) %\) được xử lý trong __release_sock", _a614).group(1))); num("ArmBkSevenZero", _vi(_re.search(r"\d+ \(([\d,]+) %\) xử lý trong __release_sock", _a70).group(1)))
+_l614 = _re.search(r"chỉ (\d+)/(\d+) ACK muộn", _a614); _l70 = _re.search(r"nhánh A \(CPU 1\): (\d+)/(\d+) ACK muộn", _a70)
+num("ArmLateSixFourteen", _l614.group(1)); num("ArmLateNSixFourteen", _l614.group(2)); num("ArmLateSevenZero", _l70.group(1)); num("ArmLateNSevenZero", _l70.group(2))
+num("ArmNoTktCells", _re.search(r"hai nhánh có vé và không vé, (\d+) ô", _a614).group(1)); num("ArmTktChange", _re.search(r"ở >= nửa giao dịch ở (\d+) ô \(X250", _a614).group(1))
+num("ArmNoTktOk", _re.search(r"G2a nhánh B burst <= 10 ở >= 95 % giao dịch: (\d+)/(\d+) ô", _a614).group(1))
+num("BkIPct", f"{100 * int(NUMS['BkDef']) / int(NUMS['BkN']):.1f}")
+# the window rule on the machines of Table 4 (share of flight sizes with the exact window at MTU 9000)
+_wm = _rd_text(os.path.join(V5, "paper2_short", "results", "window_rule_across_machines_20261115.txt"))
+_rows = []
+for _ln in _wm.splitlines():
+    _mm = _re.match(r"^(X250|i9-10900K|GX10)\b.*?\b(\d+\.\d+)\.\d+.*?\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)\s*$", _ln)
+    if _mm: _rows.append((_mm.group(1), _mm.group(2), _mm.group(3), _mm.group(4), _mm.group(5), _mm.group(6)))
+_m9 = {}
+for _mach, _kern, _b, _m12, _m9k, _i20 in _rows:
+    _m9.setdefault((_mach, _kern), []).append(round(100 * float(_vi(_m9k))))
+num("MtuISixEight", _m9[("X250", "6.8")][0]); num("MtuISixFourteen", _m9[("X250", "6.14")][0]); num("MtuISixSeventeen", _m9[("X250", "6.17")][0]); num("MtuISevenZero", _m9[("X250", "7.0")][0])
+num("MtuNineI", _m9[("i9-10900K", "7.0")][0]); num("MtuArmSixFourteen", _m9[("GX10", "6.14")][0])
+num("MtuArmSevenZero", _re.search(r"MTU 9000 (\d+) %", _a70).group(1))
+_all9 = [v for x in _m9.values() for v in x] + [int(NUMS["MtuArmSevenZero"])]
+num("MtuLo", min(_all9)); num("MtuHi", max(_all9))
+num("NRunsN", len(_rows) + 1); num("NCombN", len(_m9) + 1)
+num("NRunsW", _WORD[len(_rows) + 1]); num("NCombW", _WORD[len(_m9) + 1])
+# probes: transactions per cell, flight sizes of stage A
+_nc = collections.Counter(collections.Counter((x["suite"], x["req"], x["resp"], x["rtt_ms"], x["mtu"], x["rate_mbps"]) for x in rd(os.path.join(RES, "nst_tls.csv")) if not x["err"] and x["reused"] == "1" and x["net_id"] == "shaped").values()).most_common(1)[0][0]
+num("NPerCell", _nc)
+_n1 = [int(x) for x in _re.search(r'^N1_A = "([\d,]+)"', _rd_text(os.path.join(_TB, "run_slack.py")), _re.M).group(1).split(",")]
+_run = [n for n in _n1 if n <= 16]
+num("NOneList", f"{_run[0]}\\ldots{_run[-1]},\\," + ",\\,".join(str(n) for n in _n1 if n > 16))
+# loss test: the sentence in the text
+num("GsixPctTxt", NUMS["GsixNoRetxPct"])
+# the same numbers as words, for running text
+for _k, _kk in (("ChSegMlFourFour", "ChSegMlFourFourW"), ("CellReqSegs", "CellReqSegsW"), ("CellRespSegs", "CellRespSegsW"), ("ArmTktChange", "ArmTktChangeW"), ("NtkEffect", "NtkEffectW"),
+                ("GoK", "GoKW"), ("GelBbrWrong", "GelBbrWrongW"), ("GelCubDiff", "GelCubDiffW"), ("GelCubDelta", "GelCubDeltaW"), ("GfMidN", "GfMidNW"), ("NineFailN", "NineFailNW")):
+    num(_kk, _WORD[int(NUMS[_k])])
+num("ThrSLoR", f"{min(float(NUMS['ThrS' + c]) for c in 'BCDEF'):.0f}"); num("ThrSHiR", f"{max(float(NUMS['ThrS' + c]) for c in 'BCDEF'):.0f}")
+# ---- G19: the model on 100 cells drawn at random (analyze_g19.py, analyze_g19_posthoc.py)
+_g19a, _g19p = os.path.join(RES, "g19_analysis.txt"), os.path.join(RES, "g19_posthoc.txt")
+if os.path.exists(_g19a) and os.path.exists(_g19p):
+    _ta, _tp = _rd_text(_g19a), _rd_text(_g19p)
+    _m = _re.search(r"(\d+) cells measured", _ta); num("GnineN", _m.group(1))
+    _m = _re.search(r"wrong by more than half an RTT on (\d+) of", _ta); num("GnineWrong", _m.group(1))
+    _m = _re.search(r"within 2 ms on (\d+) of \d+ \(at least 85\); R3 mean absolute error ([\d.]+) ms", _ta); num("GnineWithinTwo", _m.group(1)); num("GnineMae", f"{float(_m.group(2)):.1f}")
+    _m = _re.search(r"differ: (\d+); early model wrong on (\d+), joined model wrong on (\d+)", _ta); num("GnineDisc", _m.group(1)); num("GnineDiscEarly", _m.group(2)); num("GnineDiscJoined", _m.group(3))
+    _k = _re.findall(r"R\d (NOT MET|MET)", _ta); num("GnineMet", sum(1 for x in _k if x == "MET")); num("GnineK", len(_k))
+    _m = _re.search(r"response segments of the wrong cells: (\d+) to (\d+)", _tp); num("GnineRespLo", _m.group(1)); num("GnineRespHi", _m.group(2))
+    _m = _re.search(r"12 segments or more: (\d+), wrong (\d+); of 9 to 11: (\d+), wrong (\d+); fewer than 9: (\d+), wrong (\d+)", _tp)
+    for _nm, _v in zip(("GnineLargeN", "GnineLargeWrong", "GnineMidN", "GnineMidWrong", "GnineSmallN", "GnineSmallWrong"), _m.groups()):
+        num(_nm, _v)
+    _m = _re.search(r"mean absolute error of the other (\d+) cells: ([\d.]+) ms", _tp); num("GnineOtherN", _m.group(1)); num("GnineMaeOther", f"{float(_m.group(2)):.1f}")
+    _m = _re.search(r"off by more than 2 ms: (\d+), rates \[([^\]]*)\] Mbit/s, errors ([\d.]+) to ([\d.]+) ms", _tp); num("GnineOffN", _m.group(1)); num("GnineOffRate", _m.group(2).replace("'", "")); num("GnineOffLo", f"{float(_m.group(3)):.0f}"); num("GnineOffHi", f"{float(_m.group(4)):.0f}")
+    for _nm, _src in (("GnineWrongW", "GnineWrong"), ("GnineOffNW", "GnineOffN"), ("GnineLargeWrongW", "GnineLargeWrong"), ("GnineMidWrongW", "GnineMidWrong"), ("GnineDiscEarlyW", "GnineDiscEarly")):
+        num(_nm, _WORD.get(int(NUMS[_src]), str(NUMS[_src])))
+    num("GnineSmallWrongW", "none" if int(NUMS["GnineSmallWrong"]) == 0 else str(NUMS["GnineSmallWrong"]))
+# ---- G20: the three deviating BBR cells of G14 measured again (analyze_g20_g21.py --exp g20)
+_g20 = os.path.join(RES, "g20_analysis.txt")
+if os.path.exists(_g20):
+    _t = _rd_text(_g20)
+    _d = [float(x) for x in _re.findall(r"^\s+\S+\s+req \d+ resp\s+\d+\s+[\d.]+\s+[\d.]+\s+([+-][\d.]+)", _t, _re.M)]
+    _k = _re.findall(r"S\d (NOT MET|MET)", _t)
+    num("GtwentyMaxDiff", f"{max(abs(x) for x in _d):.2f}"); num("GtwentyCells", len(_d)); num("GtwentyMet", sum(1 for x in _k if x == "MET")); num("GtwentyK", len(_k))
+# ---- G21: tails of six cells, n = 1000 (analyze_g20_g21.py --exp g21)
+_g21 = os.path.join(RES, "g21_analysis.txt")
+if os.path.exists(_g21):
+    _t = _rd_text(_g21)
+    _r = [(int(a), *map(float, b)) for a, *b in _re.findall(r"^\s+\S+\|?\s+req\s+\d+\s+resp\s+\d+\s+(\d+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+) %", _t, _re.M)]
+    _k = _re.findall(r"T\d (?:NOT MET|MET)", _t)
+    num("GtwentyoneCells", len(_r)); num("GtwentyoneMinN", min(x[0] for x in _r))
+    num("GtwentyoneMaxPt", f"{max(x[5] - x[1] for x in _r):.1f}"); num("GtwentyoneMaxMx", f"{max(x[6] - x[1] for x in _r):.1f}")
+    num("GtwentyoneMaxP", f"{max(x[4] - x[1] for x in _r):.1f}"); num("GtwentyoneShare", f"{max(x[7] for x in _r):.1f}")
+    num("GtwentyoneMet", sum(1 for x in _k if not x.endswith("NOT MET"))); num("GtwentyoneK", len(_k))
+# ---- G18: pipelined variant on 60 new Go cells (analyze_g18.py)
+_g18 = os.path.join(RES, "g18_analysis.txt")
+if os.path.exists(_g18):
+    _t = _rd_text(_g18)
+    _m = _re.search(r"ML-DSA-87 \((\d+) cells\): pipelined variant wrong on (\d+), pre-registered 'go' model wrong on (\d+)", _t)
+    num("GeighteenN", _m.group(1)); num("GeighteenWrongPip", _m.group(2)); num("GeighteenWrongGo", _m.group(3))
+    _m = _re.search(r"controls \((\d+) cells\)", _t); num("GeighteenCtlN", _m.group(1))
+    _m = _re.search(r"pipelined variant: ML-DSA-87 ([\d.]+) ms, controls ([\d.]+) ms", _t); num("GeighteenMaxErr", _m.group(1)); num("GeighteenCtlErr", _m.group(2))
+    _k = _re.findall(r"P\d (?:NOT MET|MET)", _t); num("GeighteenMet", sum(1 for x in _k if not x.endswith("NOT MET"))); num("GeighteenK", len(_k))
+# ---- G17: model under background load (analyze_g17.py)
+_g17 = os.path.join(RES, "g17_analysis.txt")
+if os.path.exists(_g17):
+    _t = _rd_text(_g17)
+    _L = _re.findall(r"^\s+L(\d): (\d+) of (\d+) cells measured \((\d+) missing\); model wrong on (\d+); joined-ticket model wrong on (\d+) of (\d+)", _t, _re.M)
+    num("GseventeenCells", _L[0][2]); num("GseventeenDisc", _L[0][6])
+    num("GseventeenWrongMax", max(int(x[4]) for x in _L)); num("GseventeenJoinedMin", min(int(x[5]) for x in _L)); num("GseventeenMissing", sum(int(x[3]) for x in _L))
+    _sh = [float(x) for x in _re.findall(r"largest ([\d.]+) ms", _t)]
+    num("GseventeenShiftMax", f"{max(_sh):.1f}")
+    _m = _re.search(r"udp-send ([\d.]+) Mbit/s, tcp-send ([\d.]+) Mbit/s", _t); num("GseventeenUdp", f"{float(_m.group(1)):.0f}"); num("GseventeenTcp", f"{float(_m.group(2)):.0f}")
+    _k = _re.findall(r"Y\d (?:NOT MET|MET)", _t); num("GseventeenMet", sum(1 for x in _k if not x.endswith("NOT MET"))); num("GseventeenK", len(_k))
+# ---- G13-lite: the window rule and the ticket tests on a physical link between two machines (analyze_g13_lite.py)
+_g13 = os.path.join(RES, "g13_lite_analysis.txt")
+if os.path.exists(_g13):
+    _t = _rd_text(_g13)
+    _m = _re.search(r"base: (\d+) of (\d+), rtt30: (\d+) of (\d+)", _t); num("GthirteenSizesBase", _m.group(1)); num("GthirteenSizesN", _m.group(2)); num("GthirteenSizesRtt", _m.group(3))
+    _m = _re.search(r"connections with the window of rule \(1\): (\d+) of (\d+) \(([\d.]+) %\)", _t); num("GthirteenConnOk", _m.group(1)); num("GthirteenConn", _m.group(2)); num("GthirteenConnPct", _m.group(3))
+    _m = _re.search(r"stage C: rule \(1\) wrong on (\d+) of (\d+) cells; stage D: (\d+) discriminating cells, early-ticket model wrong on (\d+), joined-ticket model wrong on (\d+); early-ticket model wrong on (\d+) of (\d+) design cells \((\d+) missing\)", _t)
+    for _k, _v in zip(("CWrong", "CN", "Disc", "DiscEarly", "DiscJoined", "EarlyAll", "DN", "Missing"), _m.groups()):
+        num("Gthirteen" + _k, _v)
+    _k = _re.findall(r"[FD]\d (?:NOT MET|MET)", _t); num("GthirteenMet", sum(1 for x in _k if not x.endswith("NOT MET"))); num("GthirteenK", len(_k))
+# ---- G19 post hoc ticket size (analyze_g19_ticketsize.py) and its test G19b (analyze_g19b.py)
+_tz, _gb = os.path.join(RES, "g19_ticketsize.txt"), os.path.join(RES, "g19b_analysis.txt")
+if os.path.exists(_tz) and os.path.exists(_gb):
+    _t = _rd_text(_tz)
+    _m = _re.search(r"ECDSA-P256\s+(\d+)\s+(\d+)\s+(\d+)", _t); num("TktModelEc", _m.group(1)); num("TktWireEc", _m.group(2))
+    _m = _re.search(r"differences between (\d+) and (\d+) bytes", _t); num("TktDiffLo", _m.group(1)); num("TktDiffHi", _m.group(2))
+    _m = _re.search(r"(\d+) of (\d+) change by more than 1 ms .*?cells wrong by half an RTT: (\d+) before, (\d+) after", _t); num("TktChanged", _m.group(1)); num("TktWrongBefore", _m.group(3)); num("TktWrongAfter", _m.group(4))
+    _m = _re.search(r"cell \d+ ECDSA-P256 response \d+ MTU \d+: ([\d.]+) -> ([\d.]+) ms", _t); num("TktCellOld", f"{float(_m.group(1)):.0f}"); num("TktCellNew", f"{float(_m.group(2)):.0f}")
+    num("TktWrongAfterW", _WORD[int(NUMS["TktWrongAfter"])])
+    _g = _rd_text(_gb)
+    _k = _re.findall(r"U\d (NOT MET|MET)", _g); num("GnineBMet", sum(1 for x in _k if x == "MET")); num("GnineBK", len(_k))
+    _rows = [(int(a), float(b), float(c), float(d), int(e)) for a, b, c, d, e in _re.findall(r"^\s+(\d+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+(\d+)$", _g, _re.M)]
+    num("GnineBCells", len(_rows)); num("GnineBRepeat", f"{[r_[1] for r_ in _rows if r_[0] == 11150][0]:.1f}")
+    _lo = max(r_[0] for r_ in _rows if r_[1] < 525); _hi = min(r_[0] for r_ in _rows if r_[1] >= 525)
+    num("GnineBLo", _thin(_lo)); num("GnineBHi", _thin(_hi))
+    num("GnineBDisc", sum(1 for r_ in _rows if abs(r_[2] - r_[3]) > 75))
 # ---- exact (Clopper-Pearson) 95% intervals for the main proportions, and exact sign tests for the two paired contrasts
 from scipy.stats import beta as _beta, binomtest as _bt
 def _cp(k, n):
@@ -309,8 +695,15 @@ _d = int(NUMS["DDiff"]); _e = int(NUMS["DEarlyWrongDiff"]); _j = int(NUMS["DJoin
 num("SignDP", f"{_bt(_d - _e, _d, 0.5).pvalue:.3f}" if _j == _d and _e == 0 else "NA")
 # No-ticket intervention: NtkEffect cells exceed ten segments with the ticket and none without (the other cells are concordant).
 num("SignNtkP", f"{_bt(int(NUMS['NtkEffect']), int(NUMS['NtkEffect']), 0.5).pvalue:.3f}" if int(NUMS["NtkEffect"]) == int(NUMS["NtkEffectOk"]) else "NA")
+def _fmt(v):
+    """integers of four digits or more get a thin space between the thousands, in the same style everywhere in the text (19\\,460); 5{,}200 of older macros is converted too"""
+    t = str(v)
+    t = re.sub(r"^(\d{1,3})(?:\{,\}(\d{3}))+$", lambda m: t.replace("{,}", "\\,"), t)
+    if re.fullmatch(r"\d{4,}", t):
+        t = f"{int(t):,}".replace(",", "\\,")
+    return t
 with open(os.path.join(HERE, "numbers_short.tex"), "w") as fh:
     fh.write("% generated by make_assets_short.py - do not edit\n")
     for k, v in NUMS.items():
-        fh.write(f"\\newcommand{{\\{k}}}{{{v}}}\n")
+        fh.write(f"\\newcommand{{\\{k}}}{{{_fmt(v)}}}\n")
 print(len(NUMS), "numbers")

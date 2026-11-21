@@ -1,0 +1,35 @@
+{
+ "scenario": "G17",
+ "device_fingerprint": "9191a226e61f",
+ "preflight_before": "warn",
+ "dry_run": false,
+ "n": "",
+ "no_tune": false,
+ "args": "",
+ "started": "2026-11-20T20:30:02+07:00",
+ "finished": "2026-11-20T21:32:56+07:00",
+ "failed_commands": 0,
+ "fingerprint_same_after": true,
+ "state_change": {
+  "load": [
+   [
+    0.05,
+    0.01,
+    0.0
+   ],
+   [
+    4.89,
+    4.53,
+    3.89
+   ]
+  ],
+  "temp_max_c": [
+   42.0,
+   75.0
+  ],
+  "freq_ratio_median": [
+   0.95,
+   0.97
+  ]
+ }
+}

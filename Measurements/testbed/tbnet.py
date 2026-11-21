@@ -73,6 +73,17 @@ class Testbed:
     def exec_prefix(self, who: str) -> list:
         return ["ip", "netns", "exec", {"c": NS_C, "p": NS_P, "s": NS_S}[who]]
 
+    physical = False
+
+    def map_cmd(self, cmd):          # identity here; tbnet_phys.PhysTestbed turns a command for the server host into an SSH call
+        return cmd
+
+    def rpath(self, p):
+        return p
+
+    def sync(self, work):
+        pass
+
     @property
     def client_target(self) -> str:             # address the client connects to
         return A_P1
@@ -124,7 +135,7 @@ class Testbed:
         return [(NS_C, "vc0", A_P1), (NS_P, "vp0", A_C1), (NS_P, "vp1", A_S2), (NS_S, "vs0", A_P2)]
 
     def shape(self, rtt_ms: float, rate_mbps: float, loss_pct: float, mtu: int, icw: int, cc: str = "reno",
-              initrwnd: int = 100, quickack: bool = True):
+              initrwnd: int = 100, quickack: bool = True, qdisc: str = ""):
         """Apply one network configuration. rtt_ms = rate_mbps = loss_pct = 0 means 'unshaped'."""
         shaped = rtt_ms > 0 or rate_mbps > 0 or loss_pct > 0
         client_link = [(NS_C, "vc0"), (NS_S if self.topology == "direct" else NS_P,
@@ -135,7 +146,7 @@ class Testbed:
             if not shaped:
                 self.run(["tc", "qdisc", "del", "dev", ifc, "root"], ns=ns, check=False, capture=True)
                 continue
-            cmd = ["tc", "qdisc", "replace", "dev", ifc, "root", "netem", "limit", "100000"]
+            cmd = ["tc", "qdisc", "replace", "dev", ifc, "root"] + (["handle", "1:"] if qdisc else []) + ["netem", "limit", "100000"]
             if rtt_ms > 0:
                 cmd += ["delay", f"{rtt_ms / 2:g}ms"]
             if loss_pct > 0:
@@ -149,6 +160,8 @@ class Testbed:
             if rate_mbps > 0:
                 cmd += ["rate", f"{rate_mbps:g}mbit"]
             self.run(cmd, ns=ns)
+            if qdisc:       # G11: a pacing qdisc (fq) as the child of netem on the same interface (opt-in; every other scenario leaves qdisc empty)
+                self.run(["tc", "qdisc", "replace", "dev", ifc, "parent", "1:1", "handle", "10:", qdisc], ns=ns)
         for ns, ifc, peer in self._links():
             route = (["ip", "route", "replace", f"{peer}/32"] if IPV4 else ["ip", "-6", "route", "replace", f"{peer}/128"]) + ["dev", ifc,
                      "initcwnd", str(icw), "initrwnd", str(initrwnd), "congctl", cc]
@@ -186,3 +199,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def make_testbed(topology="direct", dry_run=False, verbose=False, timestamps=False):
+    """The namespace testbed, or the physical one (two machines, scenario G13-lite) when PQC_PHYS is set (see tbnet_phys.py)."""
+    if os.environ.get("PQC_PHYS"):
+        import tbnet_phys
+        return tbnet_phys.PhysTestbed(os.environ["PQC_PHYS"], dry_run=dry_run, verbose=verbose, timestamps=timestamps)
+    return Testbed(topology, dry_run=dry_run, verbose=verbose, timestamps=timestamps)

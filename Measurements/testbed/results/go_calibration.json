@@ -1,0 +1,151 @@
+{
+ "request": 302,
+ "response": 222,
+ "depth": 1,
+ "probe_sha256": "7087c4ea10a5abb914fce6d4b96ac9c99c3549c17081e158173f826267da9aca",
+ "probe_version": "go1.27.4 linux arm64",
+ "suites": {
+  "ECDSA-P256|X25519": {
+   "resumed_client_hello_writes": [
+    2071
+   ],
+   "resumed_client_finished": 64,
+   "resumed_request_writes": [
+    324
+   ],
+   "resumed_server_flight_writes": [
+    2012
+   ],
+   "resumed_response_writes": [
+    244
+   ],
+   "close_notify": 24,
+   "full_server_flight": 1622,
+   "full_server_ticket_writes": [
+    1787
+   ],
+   "full_response_writes": [
+    244
+   ],
+   "full_client_writes": [
+    276,
+    1214,
+    324,
+    24
+   ],
+   "leaf_server_pem_bytes": 1432,
+   "leaf_client_pem_bytes": 1432,
+   "inter_chain_pem_bytes": 0,
+   "sha256_server_pem": "e3c3fecc895b13751eb006d32e91a25af4481fab35d240e86d829193e163401c",
+   "sha256_client_pem": "da317ceabad6fb6c4c32b55a6e40e70e56eede92e72507e1f39d36703f004790",
+   "ticket_bytes": 1787
+  },
+  "ML-DSA-44|ML-KEM-768": {
+   "resumed_client_hello_writes": [
+    10448
+   ],
+   "resumed_client_finished": 64,
+   "resumed_request_writes": [
+    324
+   ],
+   "resumed_server_flight_writes": [
+    10293
+   ],
+   "resumed_response_writes": [
+    244
+   ],
+   "close_notify": 24,
+   "full_server_flight": 8655,
+   "full_server_ticket_writes": [
+    8980
+   ],
+   "full_response_writes": [
+    244
+   ],
+   "full_client_writes": [
+    1460,
+    7160,
+    324,
+    24
+   ],
+   "leaf_server_pem_bytes": 6299,
+   "leaf_client_pem_bytes": 6299,
+   "inter_chain_pem_bytes": 0,
+   "sha256_server_pem": "fda72dbd101103cbccc31f0e2965c6c29cb0052a8f5ed7c46e803ad9cc6f658d",
+   "sha256_client_pem": "f4c5fa158e05469562eb6684c99c1915583438d76bad48188bba111020582556",
+   "ticket_bytes": 8980
+  },
+  "ML-DSA-65|ML-KEM-768": {
+   "resumed_client_hello_writes": [
+    13506
+   ],
+   "resumed_client_finished": 64,
+   "resumed_request_writes": [
+    324
+   ],
+   "resumed_server_flight_writes": [
+    13351
+   ],
+   "resumed_response_writes": [
+    244
+   ],
+   "close_notify": 24,
+   "full_server_flight": 11073,
+   "full_server_ticket_writes": [
+    12038
+   ],
+   "full_response_writes": [
+    244
+   ],
+   "full_client_writes": [
+    1460,
+    9578,
+    324,
+    24
+   ],
+   "leaf_server_pem_bytes": 8370,
+   "leaf_client_pem_bytes": 8370,
+   "inter_chain_pem_bytes": 0,
+   "sha256_server_pem": "5fe2f6045f5adfeff03dfc05f64130abfee6380c62eeade885b69af7072e05a2",
+   "sha256_client_pem": "b2246df6eb51c6e561006ea6b2d8769caa2651f657060732d7480a121698df68",
+   "ticket_bytes": 12038
+  },
+  "ML-DSA-87|ML-KEM-1024": {
+   "resumed_client_hello_writes": [
+    16389,
+    1390
+   ],
+   "resumed_client_finished": 64,
+   "resumed_request_writes": [
+    324
+   ],
+   "resumed_server_flight_writes": [
+    17715
+   ],
+   "resumed_response_writes": [
+    244
+   ],
+   "close_notify": 24,
+   "full_server_flight": 14797,
+   "full_server_ticket_writes": [
+    15954
+   ],
+   "full_response_writes": [
+    244
+   ],
+   "full_client_writes": [
+    1812,
+    12854,
+    324,
+    24
+   ],
+   "leaf_server_pem_bytes": 11023,
+   "leaf_client_pem_bytes": 11023,
+   "inter_chain_pem_bytes": 0,
+   "sha256_server_pem": "6aacafdeeb8b5db5f82891d796e6fc532bf69b93aff76de6bb9bb7617be13622",
+   "sha256_client_pem": "e00f09e7cf9053dc8c0ca5bf58d693d7d1f222ce6ec2ba2370af03242a5d2e07",
+   "ticket_bytes": 15954
+  }
+ },
+ "measured": "2026-11-19 09:25:30"
+}

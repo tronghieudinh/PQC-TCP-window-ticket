@@ -1,0 +1,70 @@
+#!/usr/bin/env bpftrace
+/*
+ * Clock-safe ordering of the server's own segments, the arrivals of the client's segments and the returns of the server's writes, ALL on ONE clock (nsecs).
+ *   sudo bpftrace -q ticket_xmit.bt 4433 > tag.bpf.txt            ($1 = port of the server; used through PQC_BPF=ticket_xmit.bt in trace_run.py)
+ *   XQ ns cpu sport dport seq len   a TCP segment of the connection is handed to the device queue (net_dev_queue: BEFORE the netem delay of that device)
+ *   XS ns cpu sport dport seq len   the same segment leaves the qdisc (net_dev_start_xmit: AFTER the delay; this is where tcpdump stamps it)
+ *   RX ns cpu sport dport seq ack len   a segment is queued to a CPU backlog on arrival (netif_rx; this is where the arrival stamp of tcpdump is taken)
+ *   SEND ns tid dport write_seq_before write_seq_after   return of a tcp_sendmsg of the server
+ * XS - XQ of one segment is the delay the device really added; the capture of S>C packets is stamped at XS, so the true send time is XQ, not "stamp - RTT/2".
+ * The headers are read through skb->network_header, valid at all three points (the Ethernet header is present at XQ and XS and absent at RX).
+ * Written 21 Nov 2026 after the clock check (results/wp6_clock_check.txt); NOT yet run: smoke it with  python3 clock_sync.py --smoke  before any measurement.
+ */
+BEGIN { printf("READY\n"); }
+
+tracepoint:net:net_dev_queue
+{
+  $skb = (struct sk_buff *)args->skbaddr;
+  $n = (uint8 *)($skb->head + $skb->network_header);
+  if ((*$n >> 4) == 6 && *($n + 6) == 6) {
+    $sp = ((uint16)*($n + 40) << 8) | (uint16)*($n + 41); $dp = ((uint16)*($n + 42) << 8) | (uint16)*($n + 43);
+    if ($sp == $1 || $dp == $1) {
+      $seq = ((uint32)*($n + 44) << 24) | ((uint32)*($n + 45) << 16) | ((uint32)*($n + 46) << 8) | (uint32)*($n + 47);
+      $pl = (((uint16)*($n + 4) << 8) | (uint16)*($n + 5)) - ((*($n + 52) >> 4) * 4);
+      printf("XQ %llu %d %u %u %u %u\n", nsecs, cpu, $sp, $dp, $seq, $pl);
+    }
+  }
+}
+
+tracepoint:net:net_dev_start_xmit
+{
+  $skb = (struct sk_buff *)args->skbaddr;
+  $n = (uint8 *)($skb->head + $skb->network_header);
+  if ((*$n >> 4) == 6 && *($n + 6) == 6) {
+    $sp = ((uint16)*($n + 40) << 8) | (uint16)*($n + 41); $dp = ((uint16)*($n + 42) << 8) | (uint16)*($n + 43);
+    if ($sp == $1 || $dp == $1) {
+      $seq = ((uint32)*($n + 44) << 24) | ((uint32)*($n + 45) << 16) | ((uint32)*($n + 46) << 8) | (uint32)*($n + 47);
+      $pl = (((uint16)*($n + 4) << 8) | (uint16)*($n + 5)) - ((*($n + 52) >> 4) * 4);
+      printf("XS %llu %d %u %u %u %u\n", nsecs, cpu, $sp, $dp, $seq, $pl);
+    }
+  }
+}
+
+tracepoint:net:netif_rx
+{
+  $skb = (struct sk_buff *)args->skbaddr;
+  $n = (uint8 *)($skb->head + $skb->network_header);
+  if ((*$n >> 4) == 6 && *($n + 6) == 6) {
+    $sp = ((uint16)*($n + 40) << 8) | (uint16)*($n + 41); $dp = ((uint16)*($n + 42) << 8) | (uint16)*($n + 43);
+    if ($sp == $1 || $dp == $1) {
+      $seq = ((uint32)*($n + 44) << 24) | ((uint32)*($n + 45) << 16) | ((uint32)*($n + 46) << 8) | (uint32)*($n + 47);
+      $ack = ((uint32)*($n + 48) << 24) | ((uint32)*($n + 49) << 16) | ((uint32)*($n + 50) << 8) | (uint32)*($n + 51);
+      $pl = (((uint16)*($n + 4) << 8) | (uint16)*($n + 5)) - ((*($n + 52) >> 4) * 4);
+      printf("RX %llu %d %u %u %u %u %u\n", nsecs, cpu, $sp, $dp, $seq, $ack, $pl);
+    }
+  }
+}
+
+kprobe:tcp_sendmsg
+{
+  $sk = (struct sock *)arg0;
+  if ($sk->__sk_common.skc_num == $1) { $tp = (struct tcp_sock *)arg0; @ssk[tid] = arg0; @sws[tid] = $tp->write_seq; }
+}
+kretprobe:tcp_sendmsg
+/@ssk[tid] != 0/
+{
+  $sk = (struct sock *)@ssk[tid]; $tp = (struct tcp_sock *)@ssk[tid];
+  printf("SEND %llu %d %u %u %u\n", nsecs, tid, bswap($sk->__sk_common.skc_dport), @sws[tid], $tp->write_seq);
+  delete(@ssk[tid]); delete(@sws[tid]);
+}
+END { clear(@ssk); clear(@sws); }

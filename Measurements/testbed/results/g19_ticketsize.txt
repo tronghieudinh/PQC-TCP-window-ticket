@@ -1,0 +1,8 @@
+G19 post hoc: ticket size (not pre-registered; tested by G19b)
+  suite        model  wire (most common)  difference
+  ECDSA-P256    1349                1279          70
+  ML-DSA-44     4940                4879          61
+  ML-DSA-65     6469                6415          54
+  differences between 54 and 70 bytes; the model is larger than the wire ticket for every suite measured
+  G19 predictions recomputed with the measured ticket size: 1 of 100 change by more than 1 ms (same with ML-DSA-87 at 54 or 70 bytes: yes); cells wrong by half an RTT: 5 before, 4 after
+  cell 56 ECDSA-P256 response 11150 MTU 1400: 600.1 -> 450.1 ms (measured 450.7)

@@ -1,0 +1,9 @@
+POST HOC, not pre-registered. Cells wrong by more than 50 ms: pre-registered prediction / pipelined variant
+  stage C ECDSA-P256  cells   8   pre-registered wrong   0   pipelined wrong   0
+  stage C ML-DSA-44   cells   8   pre-registered wrong   0   pipelined wrong   0
+  stage C ML-DSA-65   cells   8   pre-registered wrong   0   pipelined wrong   0
+  stage C ML-DSA-87   cells   8   pre-registered wrong   8   pipelined wrong   1
+  stage D ECDSA-P256  cells  18   pre-registered wrong   0   pipelined wrong   0
+  stage D ML-DSA-44   cells  34   pre-registered wrong   0   pipelined wrong   0
+  stage D ML-DSA-65   cells  44   pre-registered wrong   0   pipelined wrong   0
+  stage D ML-DSA-87   cells  18   pre-registered wrong  12   pipelined wrong   0

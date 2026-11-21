@@ -1,0 +1,906 @@
+{
+ "cells": {
+  "C": [
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 7940,
+    "resp": 222,
+    "k": 7
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 9380,
+    "resp": 222,
+    "k": 8
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 10820,
+    "resp": 222,
+    "k": 9
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 12260,
+    "resp": 222,
+    "k": 10
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 13700,
+    "resp": 222,
+    "k": 11
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 15140,
+    "resp": 222,
+    "k": 12
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 16580,
+    "resp": 222,
+    "k": 13
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 18020,
+    "resp": 222,
+    "k": 14
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 16580,
+    "resp": 222,
+    "k": 13
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 18020,
+    "resp": 222,
+    "k": 14
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 222,
+    "k": 15
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 20900,
+    "resp": 222,
+    "k": 16
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 22340,
+    "resp": 222,
+    "k": 17
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 23780,
+    "resp": 222,
+    "k": 18
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 25220,
+    "resp": 222,
+    "k": 19
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 26660,
+    "resp": 222,
+    "k": 20
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 22340,
+    "resp": 222,
+    "k": 17
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 23780,
+    "resp": 222,
+    "k": 18
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 25220,
+    "resp": 222,
+    "k": 19
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 26660,
+    "resp": 222,
+    "k": 20
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 28100,
+    "resp": 222,
+    "k": 21
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 29540,
+    "resp": 222,
+    "k": 22
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 30980,
+    "resp": 222,
+    "k": 23
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 32420,
+    "resp": 222,
+    "k": 24
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 25220,
+    "resp": 222,
+    "k": 19
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 26660,
+    "resp": 222,
+    "k": 20
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 28100,
+    "resp": 222,
+    "k": 21
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 29540,
+    "resp": 222,
+    "k": 22
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 30980,
+    "resp": 222,
+    "k": 23
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 32420,
+    "resp": 222,
+    "k": 24
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 33860,
+    "resp": 222,
+    "k": 25
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 35300,
+    "resp": 222,
+    "k": 26
+   }
+  ],
+  "D": [
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 302,
+    "resp": 3620,
+    "k": 3
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 302,
+    "resp": 9380,
+    "k": 7
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 302,
+    "resp": 10820,
+    "k": 8
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 302,
+    "resp": 12260,
+    "k": 9
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 302,
+    "resp": 13700,
+    "k": 10
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 302,
+    "resp": 15140,
+    "k": 11
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 302,
+    "resp": 20900,
+    "k": 15
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 302,
+    "resp": 26660,
+    "k": 19
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 302,
+    "resp": 32420,
+    "k": 23
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 19460,
+    "resp": 3620,
+    "k": 3
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 19460,
+    "resp": 9380,
+    "k": 7
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 19460,
+    "resp": 10820,
+    "k": 8
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 19460,
+    "resp": 12260,
+    "k": 9
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 19460,
+    "resp": 13700,
+    "k": 10
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 19460,
+    "resp": 15140,
+    "k": 11
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 19460,
+    "resp": 20900,
+    "k": 15
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 19460,
+    "resp": 26660,
+    "k": 19
+   },
+   {
+    "suite": "ECDSA-P256|X25519",
+    "req": 19460,
+    "resp": 32420,
+    "k": 23
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 3620,
+    "k": 3
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 5060,
+    "k": 4
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 6500,
+    "k": 5
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 7940,
+    "k": 6
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 9380,
+    "k": 7
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 10820,
+    "k": 8
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 12260,
+    "k": 9
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 13700,
+    "k": 10
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 15140,
+    "k": 11
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 16580,
+    "k": 12
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 18020,
+    "k": 13
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 19460,
+    "k": 14
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 20900,
+    "k": 15
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 22340,
+    "k": 16
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 26660,
+    "k": 19
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 32420,
+    "k": 23
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 302,
+    "resp": 33860,
+    "k": 24
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 3620,
+    "k": 3
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 5060,
+    "k": 4
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 6500,
+    "k": 5
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 7940,
+    "k": 6
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 9380,
+    "k": 7
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 10820,
+    "k": 8
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 12260,
+    "k": 9
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 13700,
+    "k": 10
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 15140,
+    "k": 11
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 16580,
+    "k": 12
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 18020,
+    "k": 13
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 19460,
+    "k": 14
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 20900,
+    "k": 15
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 22340,
+    "k": 16
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 26660,
+    "k": 19
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 32420,
+    "k": 23
+   },
+   {
+    "suite": "ML-DSA-44|ML-KEM-768",
+    "req": 19460,
+    "resp": 33860,
+    "k": 24
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 3620,
+    "k": 3
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 5060,
+    "k": 4
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 6500,
+    "k": 5
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 7940,
+    "k": 6
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 9380,
+    "k": 7
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 10820,
+    "k": 8
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 12260,
+    "k": 9
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 13700,
+    "k": 10
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 15140,
+    "k": 11
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 16580,
+    "k": 12
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 18020,
+    "k": 13
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 19460,
+    "k": 14
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 20900,
+    "k": 15
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 22340,
+    "k": 16
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 23780,
+    "k": 17
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 25220,
+    "k": 18
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 26660,
+    "k": 19
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 28100,
+    "k": 20
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 29540,
+    "k": 21
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 30980,
+    "k": 22
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 32420,
+    "k": 23
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 302,
+    "resp": 33860,
+    "k": 24
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 3620,
+    "k": 3
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 5060,
+    "k": 4
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 6500,
+    "k": 5
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 7940,
+    "k": 6
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 9380,
+    "k": 7
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 10820,
+    "k": 8
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 12260,
+    "k": 9
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 13700,
+    "k": 10
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 15140,
+    "k": 11
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 16580,
+    "k": 12
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 18020,
+    "k": 13
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 19460,
+    "k": 14
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 20900,
+    "k": 15
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 22340,
+    "k": 16
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 23780,
+    "k": 17
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 25220,
+    "k": 18
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 26660,
+    "k": 19
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 28100,
+    "k": 20
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 29540,
+    "k": 21
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 30980,
+    "k": 22
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 32420,
+    "k": 23
+   },
+   {
+    "suite": "ML-DSA-65|ML-KEM-768",
+    "req": 19460,
+    "resp": 33860,
+    "k": 24
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 302,
+    "resp": 3620,
+    "k": 3
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 302,
+    "resp": 9380,
+    "k": 7
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 302,
+    "resp": 15140,
+    "k": 11
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 302,
+    "resp": 20900,
+    "k": 15
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 302,
+    "resp": 26660,
+    "k": 19
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 302,
+    "resp": 28100,
+    "k": 20
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 302,
+    "resp": 29540,
+    "k": 21
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 302,
+    "resp": 30980,
+    "k": 22
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 302,
+    "resp": 32420,
+    "k": 23
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 19460,
+    "resp": 3620,
+    "k": 3
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 19460,
+    "resp": 9380,
+    "k": 7
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 19460,
+    "resp": 15140,
+    "k": 11
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 19460,
+    "resp": 20900,
+    "k": 15
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 19460,
+    "resp": 26660,
+    "k": 19
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 19460,
+    "resp": 28100,
+    "k": 20
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 19460,
+    "resp": 29540,
+    "k": 21
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 19460,
+    "resp": 30980,
+    "k": 22
+   },
+   {
+    "suite": "ML-DSA-87|ML-KEM-1024",
+    "req": 19460,
+    "resp": 32420,
+    "k": 23
+   }
+  ]
+ },
+ "info": {
+  "ECDSA-P256|X25519": {
+   "ch_segments": 2,
+   "client_window": 10,
+   "ticket_bytes": 1787
+  },
+  "ML-DSA-44|ML-KEM-768": {
+   "ch_segments": 8,
+   "client_window": 16,
+   "ticket_bytes": 8980
+  },
+  "ML-DSA-65|ML-KEM-768": {
+   "ch_segments": 10,
+   "client_window": 20,
+   "ticket_bytes": 12038
+  },
+  "ML-DSA-87|ML-KEM-1024": {
+   "ch_segments": 13,
+   "client_window": 22,
+   "ticket_bytes": 15954
+  }
+ }
+}

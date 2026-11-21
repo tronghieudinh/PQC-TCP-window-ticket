@@ -1,0 +1,19 @@
+# G11: the window after a short flight under BBR and under fq pacing (plain TCP). Hypotheses and criteria (written 19 Nov 2026; criteria Q1-Q5 APPROVED by the authors on 19 Nov 2026; commit and push this file BEFORE measuring)
+
+Question: L1's rule (1), w(n) = max(w0, min(w0 + n, 2n)), is the window Linux Reno (and Cubic) leaves after an n-segment flight. L1 states that other controllers and pacing were not tested. Does (1) hold under BBR, and under fq pacing? Exploratory test with hypotheses derived from the kernel source (mainline `master` read 19 Nov 2026: `net/ipv4/tcp_bbr.c`, `net/sched/sch_fq.c`); no model is changed.
+
+## Hypotheses (from the source)
+- BBR (in-tree BBRv1): `bbr_set_cwnd` adds the acknowledged packets to the window while the window is below its target (bandwidth x minimum RTT x gain) or fewer than TCP_INIT_CWND packets have been delivered, and it does not test whether the sender was window-limited (`tcp_bbr.c:527-559`, lines 549-552). At 100 Mbit/s and 100 ms the target is above 2 000 segments, so after an n-segment flight the window is w0 + n, for every n of the stage-A list. Rule (1) gives w0 + n only for n >= 10, so it is wrong for n = 1..9 (nothing grows below n = 5, 2n above).
+- fq pacing: fq lets a flow send an initial quantum of 10 x MTU (`q->initial_quantum = 10 * mtu`, `sch_fq.c:1273`) before it paces at the socket's pacing rate (`sch_fq.c:780-860`: while `f->credit > 0` a packet is sent at once). With an initial window of 10 packets of the MTU, a burst of n <= 10 segments is not paced: the window should be (1) and the burst time that of the unpaced base. Above n = 10 the bursts are paced and the window may differ (the sender may stop being window-limited when the pacing, not the window, holds the packets back); this is NOT predicted, only measured.
+
+## Measurement
+Scenario `scenarios/shared/G11_cc_pacing` (`run.sh`): `run_slack.py --stage A` (plain TCP, `tcp_flight`, netns, RTT 100 ms, 100 Mbit/s, MTU 1500, initial window 10, quickack, no timestamps, no offload), configurations `base` (Reno, no pacing: the baseline of the same machine), `bbr`, `reno_fq`, `cubic_fq` (fq as the child of netem on both interfaces), burst sizes n1 = 1..16, 20, 24, 31, 40, 20 repetitions each. Statistic: median window after the burst (`cwnd_pre2`) and median burst time (`t_b1_ms`) per configuration and size.
+
+## Criteria (thresholds are not adjusted after the measurement)
+- Q1: under `bbr` the window equals w0 + n1 for at least 18 of the 20 sizes.
+- Q2: under `bbr`, rule (1) is wrong for at least 8 of the 9 sizes n1 <= 9.
+- Q3: under `reno_fq` and under `cubic_fq` (each), the window equals rule (1) for at least 9 of the 10 sizes n1 <= 10.
+- Q4: under `reno_fq` and `cubic_fq` (each), the burst time is within 3 ms of the base configuration's for at least 9 of the 10 sizes n1 <= 10.
+- Q5 (baseline): `base` has the window of rule (1) for at least 18 of the 20 sizes; otherwise the other results are INCONCLUSIVE.
+Reading: Q1-Q2 met means (1) is specific to the Reno/Cubic window test and a BBR sender leaves w0 + n (so the recommendations that rest on (1) do not carry to BBR); Q1 or Q2 not met is a finding about the BBR in this kernel (its target or its start-up state limits the window) to be traced before it is written up. Q3-Q4 met means fq pacing does not change the window or the time of a flight within the initial quantum, so a paced server behaves as in the tests for n <= 10; not met means pacing already acts below the initial quantum. Descriptive, not criteria: the windows and burst times above n1 = 10 under fq, and the window after 40 segments under BBR.
+Analysis: `testbed/analyze_g11.py` (tested on synthetic data equal to the hypotheses: all met). The configurations `bbr`, `reno_fq`, `cubic_fq` need the modules `tcp_bbr` and `sch_fq`; BBR is the in-tree BBRv1 of the running kernel (not BBRv3).

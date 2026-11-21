@@ -1,0 +1,9 @@
+G17 (22 cells under background load, RTT 100 ms)
+  L0: 22 of 22 cells measured (0 missing); model wrong on 0; joined-ticket model wrong on 10 of 10 discriminating cells
+  L1: 22 of 22 cells measured (0 missing); model wrong on 0; joined-ticket model wrong on 10 of 10 discriminating cells; load achieved: udp-send 38.4 Mbit/s, tcp-send 20.0 Mbit/s
+  L2: 22 of 22 cells measured (0 missing); model wrong on 0; joined-ticket model wrong on 10 of 10 discriminating cells; load achieved: 
+  L3: 22 of 22 cells measured (0 missing); model wrong on 0; joined-ticket model wrong on 10 of 10 discriminating cells; load achieved: udp-send 38.4 Mbit/s, tcp-send 20.0 Mbit/s
+  shift of the measured excess against L0, L1: median 0.60 ms, largest 1.18 ms
+  shift of the measured excess against L0, L2: median 1.57 ms, largest 2.27 ms
+  shift of the measured excess against L0, L3: median 0.63 ms, largest 1.71 ms
+  Y1 MET  Y2 MET  Y3 MET  Y4 MET

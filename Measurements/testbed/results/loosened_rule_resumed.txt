@@ -1,0 +1,6 @@
+model over the 144 resumed configurations (model latency without CPU against measured excess, ms)
+window rule                 ticket      MAE   wrong by more than half an RTT
+validated rule (1)         joined     1.42   2
+validated rule (1)         early      0.54   0
+loosened by two segments  joined     0.53   0
+loosened by two segments  early      0.53   0

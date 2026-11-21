@@ -1,0 +1,21 @@
+{
+ "id": "G20",
+ "title": "Resampling (n = 200) of the three BBR cells of G14 that deviate (two ML-DSA-87 cells between the models, one ECDSA cell below both)",
+ "serves": "L1 (is the narrow pass of criteria B3 and B4 real or noise)",
+ "device_classes": [
+  "mint-x86"
+ ],
+ "needs_root": true,
+ "needs": [
+  "netns",
+  "tc",
+  "tcp_bbr"
+ ],
+ "tune": "optional",
+ "est_minutes": 25,
+ "predictions": [
+  "results/phase2_predictions.md"
+ ],
+ "status": "prepared 20 Nov 2026; criteria S1-S2 of results/phase2_predictions.md APPROVED 2026-11-20 (commit and push them before measuring)",
+ "notes": "Three calls. Analyse with testbed/analyze_g20_g21.py --exp g20."
+}

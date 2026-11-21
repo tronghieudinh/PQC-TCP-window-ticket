@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import tbnet  # noqa: E402
 
-BASE = dict(rtt=100.0, rate=100.0, mtu=1500, icw=10, cc="reno", quickack=1, ts=0, offload=0)
+BASE = dict(rtt=100.0, rate=100.0, mtu=1500, icw=10, cc="reno", quickack=1, ts=0, offload=0, qdisc="", loss=0.0)
 CONFIGS = {
     "base": {},
     "rtt30": dict(rtt=30.0), "rtt5": dict(rtt=5.0), "rate10": dict(rate=10.0), "rate1000": dict(rate=1000.0),
@@ -31,6 +31,11 @@ CONFIGS = {
     "icw4": dict(icw=4), "icw20": dict(icw=20),
     "delack": dict(quickack=0), "cubic": dict(cc="cubic"), "ts": dict(ts=1), "offload": dict(offload=1),
 }
+# G11 (not in the default list: name them with --configs): BBR and fq pacing, plain TCP. Predictions: results/g11_cc_pacing_predictions.md
+CONFIGS_EXTRA = {"bbr": dict(cc="bbr"), "reno_fq": dict(qdisc="fq"), "cubic_fq": dict(cc="cubic", qdisc="fq"),
+                 # G16: independent packet loss per direction (netem), plain TCP stage A. Predictions: results/g16_loss_predictions.md
+                 "loss01": dict(loss=0.1), "loss05": dict(loss=0.5), "loss1": dict(loss=1.0)}
+ALL_CONFIGS = {**CONFIGS, **CONFIGS_EXTRA}
 N1_A = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,24,31,40"
 N1_B = "1,2,3,4,5,6,7,8,9,10,11,12"           # the whole range around the thresholds of every window below
 # stage B: n2 brackets the window each configuration can have (initcwnd and the growth after n1); the others use the base list
@@ -44,21 +49,25 @@ TRACE = "/sys/kernel/tracing"
 
 
 def set_offload(tb, on):
+    if getattr(tb, "physical", False):          # real NICs (G13-lite): offloads stay as set by the spec of tbnet_phys
+        return
     for ns, ifc in ((tbnet.NS_C, "vc0"), (tbnet.NS_S, "vs0")):
         tb.run(["ethtool", "-K", ifc, "tso", "on" if on else "off", "gso", "on" if on else "off", "gro", "on" if on else "off"],
                ns=ns, check=False, capture=True)
 
 
 def run_flight(tb, cfg, stage, n1, n2, reps, split, w, trace_file=None):
-    srv = subprocess.Popen(tb.exec_prefix("s") + [os.path.join(HERE, "tcp_flight"), "server", "--bind", tbnet.A_P1, "--port", "4500"],
-                           stdout=subprocess.PIPE, text=True)
+    if getattr(tb, "physical", False):
+        tb.stop_server()                                       # a server left by an earlier run would hold the port
+    srv = subprocess.Popen(tb.map_cmd(tb.exec_prefix("s") + [tb.rpath(os.path.join(HERE, "tcp_flight")), "server", "--bind", tb.server_bind, "--port", "4500"]),
+                           stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, text=True)
     try:
         srv.stdout.readline()                                  # READY
         tr = None
         if trace_file:
             open(f"{TRACE}/events/tcp/tcp_probe/enable", "w").write("1")
             tr = subprocess.Popen(["cat", f"{TRACE}/trace_pipe"], stdout=open(trace_file, "w"))
-        cmd = tb.exec_prefix("c") + [os.path.join(HERE, "tcp_flight"), "client", "--connect", tbnet.A_P1, "--port", "4500", "--n1", n1,
+        cmd = tb.exec_prefix("c") + [os.path.join(HERE, "tcp_flight"), "client", "--connect", tb.client_target, "--port", "4500", "--n1", n1,
                                       "--n2", n2, "--reps", str(reps), "--delay-ms", "30"] + (["--split"] if split else [])
         r = subprocess.run(cmd, capture_output=True, text=True)
         if tr:
@@ -69,6 +78,8 @@ def run_flight(tb, cfg, stage, n1, n2, reps, split, w, trace_file=None):
             w.writerow({**{k: cfg[k] for k in ("rtt", "rate", "mtu", "icw", "cc", "quickack", "ts", "offload")}, "cfg": cfg["name"], "stage": stage, **row})
     finally:
         srv.terminate()
+        if getattr(tb, "physical", False):
+            tb.stop_server()                                   # closing the local ssh does not end the server on the other host
 
 
 def main():
@@ -101,6 +112,10 @@ def main():
         os.makedirs(os.path.dirname(a.out), exist_ok=True)
         json.dump(env, open(os.path.splitext(a.out)[0] + "_env.json", "w"), indent=2)
     names = a.configs.split(",")
+    if not a.dry_run:                                   # G11: the kernel modules of the extra configurations (no-op for the others)
+        for n_ in names:
+            for mod_ in (("tcp_bbr",) if {**BASE, **ALL_CONFIGS[n_]}.get("cc") == "bbr" else ()) + (("sch_fq",) if ALL_CONFIGS[n_].get("qdisc") == "fq" else ()):
+                subprocess.run(["modprobe", mod_], check=False)
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     done = set()
     if os.path.exists(a.out):
@@ -111,15 +126,15 @@ def main():
     if new:
         w.writeheader()
     for ts in (0, 1):
-        todo = [n for n in names if {**BASE, **CONFIGS[n]}["ts"] == ts]
+        todo = [n for n in names if {**BASE, **ALL_CONFIGS[n]}["ts"] == ts]
         if not todo:
             continue
-        tb = tbnet.Testbed("direct", dry_run=a.dry_run, timestamps=bool(ts))
+        tb = tbnet.make_testbed("direct", dry_run=a.dry_run, timestamps=bool(ts))
         tb.up()
         try:
             for n in todo:
-                cfg = {**BASE, **CONFIGS[n], "name": n}
-                tb.shape(cfg["rtt"], cfg["rate"], 0.0, cfg["mtu"], cfg["icw"], cfg["cc"], quickack=bool(cfg["quickack"]))
+                cfg = {**BASE, **ALL_CONFIGS[n], "name": n}
+                tb.shape(cfg["rtt"], cfg["rate"], cfg["loss"], cfg["mtu"], cfg["icw"], cfg["cc"], quickack=bool(cfg["quickack"]), qdisc=cfg["qdisc"])
                 set_offload(tb, cfg["offload"])
                 if not a.dry_run and not tb.smoke_test():
                     print(f"{n}: ping failed, skipped", file=sys.stderr)

@@ -1,0 +1,30 @@
+clock-safe repeat: R1 softirq: 6 files, R2 race: 30 files
+
+K1 alignment (capture arrival stamp - RX of the same segment, deviation from the median of its file)
+  27163 segments in 36 files: within 20 us 82.8%, 5th -10.0, 95th 46.3, largest 279.4 us
+  clock_sync --after: 36 of 36 files ok
+  K1 NOT MET (>= 95 % within 20 us, all within 50 us, every clock file ok)
+
+K2 where tcpdump stamps (server segment: capture stamp - file offset - XS), K3 delay of the device (XS - XQ), per RTT
+  K2: 14581 server segments: within 20 us 79.5%, median -14.7 us, 5th -26.8, 95th -9.8  -> NOT MET (>= 95 %)
+  K3 RTT 5 ms: 302 segments, XS - XQ median 2653.0 us (nominal 2500 us, excess +153.0 us), 5th 2527.5, 95th 4066.3
+  K3 RTT 10 ms: 362 segments, XS - XQ median 5191.1 us (nominal 5000 us, excess +191.1 us), 5th 5050.6, 95th 6497.2
+  K3 RTT 15 ms: 352 segments, XS - XQ median 7690.4 us (nominal 7500 us, excess +190.4 us), 5th 7569.6, 95th 9005.4
+  K3 RTT 20 ms: 349 segments, XS - XQ median 10184.1 us (nominal 10000 us, excess +184.1 us), 5th 10073.5, 95th 11512.8
+  K3 RTT 30 ms: 931 segments, XS - XQ median 15186.8 us (nominal 15000 us, excess +186.8 us), 5th 15075.2, 95th 16628.1
+  K3 RTT 50 ms: 349 segments, XS - XQ median 25184.8 us (nominal 25000 us, excess +184.8 us), 5th 25079.2, 95th 26517.5
+  K3 RTT 100 ms: 1994 segments, XS - XQ median 50227.9 us (nominal 50000 us, excess +227.9 us), 5th 50087.7, 95th 55372.8
+
+K4 the first response segment is queued (XQ) not later than the return of the write that sent it
+  402 of 402 transactions (100.0%)  -> MET (>= 99 %)
+
+K5 late acknowledgments (R1): RX later than the XQ of the first response segment (on the host's own clock they did not precede the response)
+  249 of 249 (100.0%)  -> MET (>= 90 %); earlier reading from the capture: 107 of 117 before the write
+
+K6 share of transactions with at least one ticket segment acknowledged before the response is written (R2)
+  294 transactions (0 skipped for lack of an RX match): clock-safe t_w (XQ) 41%; the capture's t_w, same transactions 63% (first run: 90%)
+  burst of ten segments or less: 115 transactions, clock-safe 79%, capture 79%
+  rule of the text: both at least 50 % -> the sentence is rewritten (the window depends on the order after all)
+
+K7 the 0.049 ms rule on client packets only (R2): burst above ten iff the last ticket acknowledgment comes more than 0.049 ms after the last request segment
+  ML-DSA, MTU below 9000: 180 transactions, burst above ten in 136; the threshold of the first run, 0.049 ms (out of sample): 166 of 180 right (92.2%); the best threshold on these data (in sample, as the first run's was): 176 of 180 at 0.208 to 0.208 ms; first run: 132 of 134 at 0.049 ms

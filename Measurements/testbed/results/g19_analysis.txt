@@ -1,0 +1,5 @@
+G19 (100 cells drawn at random, resumed TLS): 100 cells measured, 0 missing or with fewer than 30 valid transactions
+  R1 early-ticket model wrong by more than half an RTT on 5 of 100 (at most 3)
+  R2 within 2 ms on 85 of 100 (at least 85); R3 mean absolute error 7.99 ms (at most 2)
+  R5 cells where the two ticket models differ: 7; early model wrong on 1, joined model wrong on 6
+  R1 NOT MET  R2 MET  R3 NOT MET  R4 MET  R5 NOT MET

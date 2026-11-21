@@ -19,6 +19,7 @@ The run is resumable: finished configurations (>= n rows) are skipped when the o
 from __future__ import annotations
 
 import argparse
+import hashlib
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import csv
 import itertools
@@ -121,6 +122,10 @@ def write_env(path, args, cpus, openssl):
                nproc=os.cpu_count(), governor=gov, intel_no_turbo=turbo, cpus_client_server_proxy=cpus,
                openssl=read_text([openssl, "version"]), tc=read_text(["tc", "-V"]), ip=read_text(["ip", "-V"]),
                haproxy=read_text(["haproxy", "-v"]).splitlines()[:1], args=vars(args))
+    if os.environ.get("PQC_PROBE"):    # a probe other than the OpenSSL one: which library, which binary (sha256), which version
+        pr = os.environ["PQC_PROBE"]
+        env.update(tls_impl=os.path.basename(pr), tls_probe=pr, tls_probe_version=read_text([pr, "version"]),
+                   tls_probe_sha256=hashlib.sha256(open(pr, "rb").read()).hexdigest() if os.path.exists(pr) else "")
     json.dump(env, open(path, "w"), indent=2)
 
 
@@ -200,6 +205,10 @@ def run_config(c, tb, probe, cpus, work, loopback):
               "--n", str(c["n"]), "--warmup", str(c["warmup"]), "--gap-ms", f"{gap:g}"] + (["--resume"] if c["resume"] else [])
     if c["mtls"]:
         cli_cmd += ["--cert", ch["client"][0], "--key", ch["client"][1]]
+    if tb is not None and getattr(tb, "physical", False):          # G13-lite: the server runs on the other host (SSH), the certificates are copied there
+        tb.sync(work)
+        tb.stop_server()                       # a server left by an earlier run would hold the port
+        srv_cmd = tb.map_cmd(srv_cmd)
     if tb is not None and tb.dry:
         print("  server:", " ".join(srv_cmd))
         print("  client:", " ".join(cli_cmd))
@@ -210,7 +219,7 @@ def run_config(c, tb, probe, cpus, work, loopback):
         for f in ("/dev/shm/sem.pqc_hsm_lat", "/dev/shm/pqc_hsm_stats_lat"):
             if os.path.exists(f):
                 os.unlink(f)
-    srv = subprocess.Popen(srv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=senv)
+    srv = subprocess.Popen(srv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL, text=True, env=senv)
     rows, cerr, out_s, serr = [], "", "", ""
     try:
         if srv.stdout.readline().strip() != "READY":
@@ -223,6 +232,8 @@ def run_config(c, tb, probe, cpus, work, loopback):
     finally:
         if srv.poll() is None:
             srv.send_signal(signal.SIGTERM)
+        if tb is not None and getattr(tb, "physical", False):
+            tb.stop_server()                   # the server runs on the other host: closing the local ssh does not end it
         try:
             out_s, serr = srv.communicate(timeout=5)
         except subprocess.TimeoutExpired:
@@ -324,7 +335,7 @@ def main():
     sudo_uid = int(os.environ.get("SUDO_UID", os.getuid()))
     home = os.path.expanduser("~" + os.environ["SUDO_USER"]) if os.environ.get("SUDO_USER") else os.path.expanduser("~")
     prefix = os.environ.get("PQC_OPENSSL", os.path.join(home, "opt", "openssl-3.5"))
-    probe = os.path.join(HERE, "tls_probe")
+    probe = os.environ.get("PQC_PROBE") or os.path.join(HERE, "tls_probe")   # PQC_PROBE: another implementation with the same command line and CSV (tls_probe_go, scenario G10)
     if not os.path.exists(probe) and not a.dry_run:
         sys.exit("tls_probe not built (run setup_host.sh)")
     openssl = os.path.join(prefix, "bin", "openssl")
@@ -347,7 +358,7 @@ def main():
     if new_file and w:
         w.writeheader()
 
-    tb = tbnet.Testbed(topo, dry_run=a.dry_run, timestamps=a.timestamps) if not loopback else None
+    tb = tbnet.make_testbed(topo, dry_run=a.dry_run, timestamps=a.timestamps) if not loopback else None
     proxy = None
     if tb:
         tb.up()
@@ -356,6 +367,10 @@ def main():
             sys.exit("ping through the veth link failed: check ip/ipv6 support in the kernel")
         if topo == "proxy":
             proxy = start_proxy(tb, work, a.topology == "proxy-inspect", cpus[2])
+    load = None
+    if tb and os.environ.get("PQC_LOAD") and not a.dry_run:        # G17: background load (cross traffic, CPU loops) during the whole call; see bgload.py
+        import bgload
+        load = bgload.start(tb, os.environ["PQC_LOAD"])
     if loopback:
         print("loopback: NO network shaping, every row measures the unshaped path (pipeline self-test only)")
 
@@ -435,6 +450,11 @@ def main():
             print(f"   ok {len(ok)}/{len(rows)}  median {tt[len(tt) // 2]:.1f} ms  ({info})", flush=True)
         print(f"done in {(time.time() - t_start) / 60:.1f} min -> {a.out}")
     finally:
+        if load:
+            import bgload
+            stats = bgload.stop(load)
+            print("background load:", json.dumps(stats), flush=True)
+            open(a.out + ".load.json", "a").write(json.dumps(stats) + "\n")
         if proxy:
             proxy.terminate()
         if tb and not a.keep:

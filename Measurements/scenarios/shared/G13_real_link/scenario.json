@@ -1,0 +1,27 @@
+{
+ "id": "G13-lite",
+ "title": "The window rule (plain TCP) and the ticket tests (TLS, cells of G14) of L1 on a real link between two machines; RTT made with tc netem on the egress of both NICs",
+ "serves": "L1 (objection: emulated link)",
+ "device_classes": [
+  "mint-x86",
+  "gx10"
+ ],
+ "needs_root": true,
+ "needs": [
+  "two machines on a cable or switch",
+  "ssh keys",
+  "sudo -n on the server host",
+  "rsync",
+  "tc netem"
+ ],
+ "tune": "optional",
+ "est_minutes": 110,
+ "predictions": [
+  "results/phase2_predictions.md",
+  "results/g14_predictions_delack_c.csv",
+  "results/g14_predictions_delack_d.csv",
+  "results/g14_cells.json"
+ ],
+ "status": "prepared 20 Nov 2026; criteria F1-F3 of results/phase2_predictions.md APPROVED 2026-11-20 (commit and push them before measuring); the TLS part is evaluated with criteria D1-D5 of G14 (unchanged, approved 2026-11-19)",
+ "notes": "Run preflight_phys.sh first. Never run with the experiments of other machines on the same cable. The server host clock is not fixed (host_tune.sh on only the client host); run host_tune.sh on the server host by hand if you want both fixed."
+}

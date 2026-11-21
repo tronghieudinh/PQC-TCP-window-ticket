@@ -1,0 +1,4 @@
+counterfactual without the NewSessionTicket: request 14500 B, response 12100 B, RTT 100 ms, MTU 1500 (model latency without CPU, ms; measured excess from resume_summary.csv)
+suite                   measured   joined   early   no ticket
+ML-DSA-44|ML-KEM-768      402.3    501.1   401.8      401.8
+ML-DSA-65|ML-KEM-768      402.2    402.5   402.5      303.0

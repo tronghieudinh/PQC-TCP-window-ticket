@@ -12,7 +12,7 @@
 # code=5c0c3ac
 # tuned=1
 # quiet=1
-# command=env PQC_OUTDIR=~/pqc_measurements/gx10/7.0.0-1019-nvidia/wp6-G1/wp6-G1__backlog__3nets_req19460-25220_k16_n10__ossl3.5.4 PQC_BPF=~/PQC-bank-2/Measurements/testbed/ticket_backlog.bt PQC_NO_TCPPROBE=1 python3 trace_run.py race --suites ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768 --reqs 19460,25220 --nets 30:100:1500,100:100:1500,30:100:1280 --ks 16
+# command=env PQC_OUTDIR=~/pqc_measurements/gx10/7.0.0-1019-nvidia/wp6-G1/wp6-G1__backlog__3nets_req19460-25220_k16_n10__ossl3.5.4 PQC_BPF=~/PQC-TCP-window-ticket/Measurements/testbed/ticket_backlog.bt PQC_NO_TCPPROBE=1 python3 trace_run.py race --suites ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768 --reqs 19460,25220 --nets 30:100:1500,100:100:1500,30:100:1280 --ks 16
 # t_start=2026-11-15T06:26:28Z
 # t_end=2026-11-15T06:29:52Z
 # load_before=0.25

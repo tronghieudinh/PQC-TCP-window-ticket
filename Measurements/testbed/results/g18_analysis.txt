@@ -1,0 +1,5 @@
+G18 (Go crypto/tls, new cells): 60 of 60 cells measured (0 missing or with fewer than 30 valid transactions)
+  ML-DSA-87 (48 cells): pipelined variant wrong on 0, pre-registered 'go' model wrong on 48
+  ML-DSA-65 controls (12 cells): pipelined wrong on 0, 'go' wrong on 0
+  largest error of the pipelined variant: ML-DSA-87 0.2 ms, controls 0.4 ms; of the 'go' model on ML-DSA-87: smallest 29.0 ms (all in ms, no criterion)
+  P1 MET  P2 MET  P3 MET  P4 MET
