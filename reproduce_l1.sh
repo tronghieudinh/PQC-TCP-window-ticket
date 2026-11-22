@@ -68,6 +68,10 @@ if [ -f Measurements/testbed/results/r3b_report.txt ] && [ -f Measurements/testb
   $PY Measurements/testbed/r3b_report.py --out "$tmp/r3b_report.txt" >/dev/null
   cmp -s "$tmp/r3b_report.txt" Measurements/testbed/results/r3b_report.txt && echo "round 3b report OK" || { echo "round 3b report DIFF"; exit 1; }
 fi
+if [ -f Measurements/testbed/results/r3c_report.txt ] && [ -f Measurements/testbed/results/r3c_x250_test_ack.csv ]; then
+  $PY Measurements/testbed/r3c_report.py --out "$tmp/r3c_report.txt" >/dev/null
+  cmp -s "$tmp/r3c_report.txt" Measurements/testbed/results/r3c_report.txt && echo "round 3c report OK" || { echo "round 3c report DIFF"; exit 1; }
+fi
 # the direction of the errors of the model over every per-cell test of L1 (supplement, Table 7): rerun from the archived raw files
 $PY Measurements/testbed/one_sided_errors.py --out "$tmp/one_sided.txt" >/dev/null
 cmp -s "$tmp/one_sided.txt" Measurements/testbed/results/one_sided_errors.txt && echo "direction of the errors OK" || { echo "direction of the errors DIFF"; exit 1; }

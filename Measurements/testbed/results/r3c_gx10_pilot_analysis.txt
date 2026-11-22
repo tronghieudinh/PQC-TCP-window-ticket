@@ -1,0 +1,16 @@
+Round 3b analysis, machine GX10-3c-pilot: 1519 resumed transactions, 8668 window events
+B1 the kernel's slow-start rule, ACK by ACK: cwnd after == rule in 8668 of 8668 events (100.00 %)
+   most frequent misses (cwnd before, acked, limited, cwnd after, rule): []
+B3 median shift AK - RX of the ticket ACKs by delta (us): median, 10th-90th percentile spread
+   delta   off: 192 transactions, median    20.2, spread 174
+   delta     0: 191 transactions, median    15.0, spread 171
+   delta    50: 188 transactions, median    35.0 (minus delta 0 minus delta: -30.0), spread 169
+   delta   100: 182 transactions, median    61.5 (minus delta 0 minus delta: -53.5), spread 186
+   delta   200: 192 transactions, median    19.0 (minus delta 0 minus delta: -196.1), spread 157
+   delta   400: 192 transactions, median    34.5 (minus delta 0 minus delta: -380.6), spread 166
+   delta   800: 192 transactions, median    46.2 (minus delta 0 minus delta: -768.8), spread 183
+B4 late share of ML-DSA transactions by delta (%)
+   ML-DSA-65 MTU 1500: off:6  0:6  50:0  100:3  200:0  400:0  800:0
+   ML-DSA-65 MTU 1280: off:3  0:0  50:0  100:0  200:0  400:0  800:0
+   ML-DSA-87 MTU 1500: off:22  0:25  50:9  100:9  200:12  400:3  800:0
+   ML-DSA-87 MTU 1280: off:31  0:16  50:24  100:18  200:19  400:0  800:0

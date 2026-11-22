@@ -61,4 +61,4 @@ done; done
 fi
 chown -R "$U" results
 T=$UH/r3_$(hostname -s)_$(date +%Y%m%d_%H%M)${TAG}.tar.gz
-tar -czf "$T" -C results $(cd results && ls -d trace_r3${TAG}_d* r3_run.log 2>/dev/null) && chown "$U" "$T" && log "packed: $T ($(du -h "$T" | cut -f1)); push_data or copy it to the analysis machine"
+tar -czf "$T" -C results $(cd results && ls -d trace_r3${TAG}_[dw]* r3_run.log 2>/dev/null) && chown "$U" "$T" && log "packed: $T ($(du -h "$T" | cut -f1)); push_data or copy it to the analysis machine"

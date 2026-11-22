@@ -1,0 +1,39 @@
+Round 3c test, machine X250: 1313 resumed transactions
+C1 instrument (the write really is later by D)  -> NOT MET
+   D 100: median deviation +87.9 us (tolerance 154.3), spread 113 (limit 325)  ok
+   D 400: median deviation +89.2 us (tolerance 154.3), spread 110 (limit 412)  ok
+   D 800: median deviation +122.3 us (tolerance 154.3), spread 92 (limit 528)  ok
+   D 1600: median deviation +140.9 us (tolerance 154.3), spread 98 (limit 760)  ok
+   D 3200: median deviation +228.6 us (tolerance 154.3), spread 170 (limit 1224)  OUTSIDE
+C2 the order moves in the predicted direction  -> MET
+   ML-DSA-65 MTU 1280: late share 4 % at D = 0, 0 % at D = 3200: change -4 points (must not rise by more than 19)  ok
+   ML-DSA-65 MTU 1500: late share 0 % at D = 0, 0 % at D = 3200: change +0 points (must not rise by more than 17)  ok
+   ML-DSA-87 MTU 1280: late share 100 % at D = 0, 0 % at D = 3200: 100 % -> 0 % (must end at or below 50 %)  ok
+   ML-DSA-87 MTU 1500: late share 100 % at D = 0, 0 % at D = 3200: 100 % -> 0 % (must end at or below 50 %)  ok
+C3 the late share at each D is predicted by the D = 0 transactions (mean absolute error 2.1 points; of the null 'no dependence on D': 33.1)  -> NOT MET
+   ML-DSA-65 MTU 1280 D 0: measured 4 %, predicted 4 %, error +0 (band 19)  ok
+   ML-DSA-65 MTU 1280 D 100: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1280 D 400: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1280 D 800: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1280 D 1600: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1280 D 3200: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1500 D 0: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1500 D 100: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1500 D 400: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1500 D 800: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1500 D 1600: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-65 MTU 1500 D 3200: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1280 D 0: measured 100 %, predicted 100 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1280 D 100: measured 100 %, predicted 100 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1280 D 400: measured 16 %, predicted 3 %, error +12 (band 17)  ok
+   ML-DSA-87 MTU 1280 D 800: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1280 D 1600: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1280 D 3200: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1500 D 0: measured 100 %, predicted 100 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1500 D 100: measured 100 %, predicted 100 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1500 D 400: measured 9 %, predicted 47 %, error -38 (band 17)  OUTSIDE
+   ML-DSA-87 MTU 1500 D 800: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1500 D 1600: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+   ML-DSA-87 MTU 1500 D 3200: measured 0 %, predicted 0 %, error +0 (band 17)  ok
+C4 the rule and the accounting under the delayed write: B1 100.000 % of 7195 events (threshold 99.914), B2 99.92 % of 1313 transactions (threshold 99.60)  -> MET
+Reading (as registered): C1 not met: the instrument failed, nothing else is concluded.

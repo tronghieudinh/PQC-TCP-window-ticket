@@ -1,0 +1,86 @@
+{
+ "C1": {
+  "median_deviations_us": {
+   "25": 47.1,
+   "50": 77.1,
+   "100": 55.8,
+   "200": 37.6,
+   "400": 56.6,
+   "800": 65.2
+  },
+  "tolerance_us": 154.3,
+  "spread_at_0_us": 296,
+  "spread_slope_limit": 0.29,
+  "slopes": {
+   "25": 0.024,
+   "50": -0.674,
+   "100": 0.193,
+   "200": -0.147,
+   "400": -0.051,
+   "800": -0.048
+  }
+ },
+ "C2": {
+  "pilot": {
+   "ML-DSA-65 MTU 1280": {
+    "late_at_0": 0.0,
+    "late_at_max": 0.0,
+    "decrease": 0.0
+   },
+   "ML-DSA-65 MTU 1500": {
+    "late_at_0": 6.2,
+    "late_at_max": 0.0,
+    "decrease": 6.2
+   },
+   "ML-DSA-87 MTU 1280": {
+    "late_at_0": 15.6,
+    "late_at_max": 0.0,
+    "decrease": 15.6
+   },
+   "ML-DSA-87 MTU 1500": {
+    "late_at_0": 25.0,
+    "late_at_max": 0.0,
+    "decrease": 25.0
+   }
+  },
+  "mover_min_late_at_0": 10.0,
+  "max_late_at_max_fraction": 0.5,
+  "note": "a series whose late share at D = 0 is at least 10 % must end at the largest D with at most half of it (the pilot: every such series ends at 0 %); a series below 10 % must not rise by more than the binomial 95 % band. FIXED ON THE PILOT: the design asked for series with at least 50 % at D = 0, and the GX10 has none (0 to 25 %); the fractions 10 % and one half are judgments"
+ },
+ "C3": {
+  "rule": "band = 1.96 x sqrt(0.25 / n) x 100 points at the n of the series (a rule with no data in it); n = 30 gives 17.9",
+  "pilot_errors": {
+   "ML-DSA-65 MTU 1280 D 0": 0.0,
+   "ML-DSA-65 MTU 1280 D 25": 3.3,
+   "ML-DSA-65 MTU 1280 D 50": 0.0,
+   "ML-DSA-65 MTU 1280 D 100": 0.0,
+   "ML-DSA-65 MTU 1280 D 200": 0.0,
+   "ML-DSA-65 MTU 1280 D 400": 0.0,
+   "ML-DSA-65 MTU 1280 D 800": 0.0,
+   "ML-DSA-65 MTU 1500 D 0": 0.0,
+   "ML-DSA-65 MTU 1500 D 25": -3.1,
+   "ML-DSA-65 MTU 1500 D 50": 0.0,
+   "ML-DSA-65 MTU 1500 D 100": 3.1,
+   "ML-DSA-65 MTU 1500 D 200": 0.0,
+   "ML-DSA-65 MTU 1500 D 400": 0.0,
+   "ML-DSA-65 MTU 1500 D 800": 0.0,
+   "ML-DSA-87 MTU 1280 D 0": 0.0,
+   "ML-DSA-87 MTU 1280 D 25": -3.1,
+   "ML-DSA-87 MTU 1280 D 50": 8.5,
+   "ML-DSA-87 MTU 1280 D 100": 2.6,
+   "ML-DSA-87 MTU 1280 D 200": 3.1,
+   "ML-DSA-87 MTU 1280 D 400": -9.4,
+   "ML-DSA-87 MTU 1280 D 800": 0.0,
+   "ML-DSA-87 MTU 1500 D 0": 0.0,
+   "ML-DSA-87 MTU 1500 D 25": -3.1,
+   "ML-DSA-87 MTU 1500 D 50": -3.1,
+   "ML-DSA-87 MTU 1500 D 100": -3.1,
+   "ML-DSA-87 MTU 1500 D 200": 3.1,
+   "ML-DSA-87 MTU 1500 D 400": 0.0,
+   "ML-DSA-87 MTU 1500 D 800": 0.0
+  }
+ },
+ "C4": {
+  "note": "inherited: B1 >= 99.914 % and B2 >= 99.6 % of r3b_thresholds.json"
+ }
+}

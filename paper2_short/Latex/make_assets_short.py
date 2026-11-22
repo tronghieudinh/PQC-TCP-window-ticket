@@ -403,11 +403,12 @@ _g23()
 
 # ---- round 3 and 3b (the kernel's rule read ACK by ACK), results/r3b_report.txt (key value lines from r3b_report.py)
 def _rb():
-    pth = os.path.join(RES, "r3b_report.txt")
-    if not os.path.exists(pth): return
-    for ln in open(pth):
-        k, _, v = ln.strip().partition(" ")
-        if k: num(k, v)
+    for fn in ("r3b_report.txt", "r3c_report.txt"):
+        pth = os.path.join(RES, fn)
+        if not os.path.exists(pth): continue
+        for ln in open(pth):
+            k, _, v = ln.strip().partition(" ")
+            if k: num(k, v)
 _rb()
 
 # ---- tables of the details that the paper summarises (supplement): the 13 configurations of stage A, the cells off by a few ms, the tails

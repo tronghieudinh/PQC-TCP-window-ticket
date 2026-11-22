@@ -1,0 +1,16 @@
+Round 3b analysis, machine X250-3c: 1313 resumed transactions, 7195 window events
+B1 the kernel's slow-start rule, ACK by ACK: cwnd after == rule in 7195 of 7195 events (100.00 %)
+   most frequent misses (cwnd before, acked, limited, cwnd after, rule): []
+B3 median shift AK - RX of the ticket ACKs by delta (us): median, 10th-90th percentile spread
+   delta   off: 191 transactions, median    19.3, spread 16
+   delta     0: 186 transactions, median    19.3, spread 16
+   delta   100: 168 transactions, median    19.2 (minus delta 0 minus delta: -100.0), spread 18
+   delta   400: 192 transactions, median    19.2 (minus delta 0 minus delta: -400.1), spread 20
+   delta   800: 192 transactions, median    19.1 (minus delta 0 minus delta: -800.2), spread 20
+   delta  1600: 192 transactions, median    19.0 (minus delta 0 minus delta: -1600.3), spread 21
+   delta  3200: 192 transactions, median    19.1 (minus delta 0 minus delta: -3200.2), spread 20
+B4 late share of ML-DSA transactions by delta (%)
+   ML-DSA-65 MTU 1500: off:0  0:0  100:0  400:0  800:0  1600:0  3200:0
+   ML-DSA-65 MTU 1280: off:0  0:4  100:0  400:0  800:0  1600:0  3200:0
+   ML-DSA-87 MTU 1500: off:100  0:100  100:100  400:9  800:0  1600:0  3200:0
+   ML-DSA-87 MTU 1280: off:100  0:100  100:100  400:16  800:0  1600:0  3200:0
