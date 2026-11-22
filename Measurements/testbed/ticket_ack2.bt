@@ -1,0 +1,83 @@
+#!/usr/bin/env bpftrace
+/*
+ * Round 3b probe v2 (results/r3b_design.md; v1 is ticket_ack.bt): ticket_xmit.bt plus the moment the server's TCP PROCESSES each acknowledgment, on the same clock (nsecs).
+ *   XQ, XS, RX, SEND  as in ticket_xmit.bt
+ *   AK  ns cpu cport snd_una packets_out snd_cwnd max_packets_out snd_ssthresh is_cwnd_limited   entry of tcp_ack on a socket of the server (state BEFORE the acknowledgment is processed)
+ *   AKR ns cpu cport snd_una packets_out snd_cwnd max_packets_out snd_ssthresh is_cwnd_limited   return of tcp_ack (state AFTER it): snd_una after = the cumulative acknowledgment just processed
+ * The order of a transaction is read from AK against the XQ of the first response segment. $1 = port of the server (as ticket_xmit.bt).
+ * Written 22 Nov 2026; NOT yet run: smoke it with  sudo bash run_r3.sh smoke  before any measurement.
+ */
+BEGIN { printf("READY\n"); }
+tracepoint:net:net_dev_queue
+{
+  $skb = (struct sk_buff *)args->skbaddr;
+  $n = (uint8 *)($skb->head + $skb->network_header);
+  if ((*$n >> 4) == 6 && *($n + 6) == 6) {
+    $sp = ((uint16)*($n + 40) << 8) | (uint16)*($n + 41); $dp = ((uint16)*($n + 42) << 8) | (uint16)*($n + 43);
+    if ($sp == $1 || $dp == $1) {
+      $seq = ((uint32)*($n + 44) << 24) | ((uint32)*($n + 45) << 16) | ((uint32)*($n + 46) << 8) | (uint32)*($n + 47);
+      $pl = (((uint16)*($n + 4) << 8) | (uint16)*($n + 5)) - ((*($n + 52) >> 4) * 4);
+      printf("XQ %llu %d %u %u %u %u\n", nsecs, cpu, $sp, $dp, $seq, $pl);
+    }
+  }
+}
+
+tracepoint:net:net_dev_start_xmit
+{
+  $skb = (struct sk_buff *)args->skbaddr;
+  $n = (uint8 *)($skb->head + $skb->network_header);
+  if ((*$n >> 4) == 6 && *($n + 6) == 6) {
+    $sp = ((uint16)*($n + 40) << 8) | (uint16)*($n + 41); $dp = ((uint16)*($n + 42) << 8) | (uint16)*($n + 43);
+    if ($sp == $1 || $dp == $1) {
+      $seq = ((uint32)*($n + 44) << 24) | ((uint32)*($n + 45) << 16) | ((uint32)*($n + 46) << 8) | (uint32)*($n + 47);
+      $pl = (((uint16)*($n + 4) << 8) | (uint16)*($n + 5)) - ((*($n + 52) >> 4) * 4);
+      printf("XS %llu %d %u %u %u %u\n", nsecs, cpu, $sp, $dp, $seq, $pl);
+    }
+  }
+}
+
+tracepoint:net:netif_rx
+{
+  $skb = (struct sk_buff *)args->skbaddr;
+  $n = (uint8 *)($skb->head + $skb->network_header);
+  if ((*$n >> 4) == 6 && *($n + 6) == 6) {
+    $sp = ((uint16)*($n + 40) << 8) | (uint16)*($n + 41); $dp = ((uint16)*($n + 42) << 8) | (uint16)*($n + 43);
+    if ($sp == $1 || $dp == $1) {
+      $seq = ((uint32)*($n + 44) << 24) | ((uint32)*($n + 45) << 16) | ((uint32)*($n + 46) << 8) | (uint32)*($n + 47);
+      $ack = ((uint32)*($n + 48) << 24) | ((uint32)*($n + 49) << 16) | ((uint32)*($n + 50) << 8) | (uint32)*($n + 51);
+      $pl = (((uint16)*($n + 4) << 8) | (uint16)*($n + 5)) - ((*($n + 52) >> 4) * 4);
+      printf("RX %llu %d %u %u %u %u %u\n", nsecs, cpu, $sp, $dp, $seq, $ack, $pl);
+    }
+  }
+}
+
+kprobe:tcp_sendmsg
+{
+  $sk = (struct sock *)arg0;
+  if ($sk->__sk_common.skc_num == $1) { $tp = (struct tcp_sock *)arg0; @ssk[tid] = arg0; @sws[tid] = $tp->write_seq; }
+}
+kretprobe:tcp_sendmsg
+/@ssk[tid] != 0/
+{
+  $sk = (struct sock *)@ssk[tid]; $tp = (struct tcp_sock *)@ssk[tid];
+  printf("SEND %llu %d %u %u %u\n", nsecs, tid, bswap($sk->__sk_common.skc_dport), @sws[tid], $tp->write_seq);
+  delete(@ssk[tid]); delete(@sws[tid]);
+}
+
+kprobe:tcp_ack
+{
+  $sk = (struct sock *)arg0;
+  if ($sk->__sk_common.skc_num == $1) {
+    $tp = (struct tcp_sock *)arg0;
+    @ask[tid] = arg0;
+    printf("AK %llu %d %u %u %u %u %u %u %u\n", nsecs, cpu, bswap($sk->__sk_common.skc_dport), $tp->snd_una, $tp->packets_out, $tp->snd_cwnd, $tp->max_packets_out, $tp->snd_ssthresh, $tp->is_cwnd_limited);
+  }
+}
+kretprobe:tcp_ack
+/@ask[tid] != 0/
+{
+  $sk = (struct sock *)@ask[tid]; $tp = (struct tcp_sock *)@ask[tid];
+  printf("AKR %llu %d %u %u %u %u %u %u %u\n", nsecs, cpu, bswap($sk->__sk_common.skc_dport), $tp->snd_una, $tp->packets_out, $tp->snd_cwnd, $tp->max_packets_out, $tp->snd_ssthresh, $tp->is_cwnd_limited);
+  delete(@ask[tid]);
+}
+END { clear(@ssk); clear(@sws); clear(@ask); }

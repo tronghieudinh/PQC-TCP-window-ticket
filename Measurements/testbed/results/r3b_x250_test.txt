@@ -1,0 +1,17 @@
+Round 3b test, machine X250: 1339 resumed transactions, 5940 window events (thresholds of the pilot: results/r3b_thresholds.json)
+B1 kernel rule per window event: 5940 of 5940 (100.000 %), threshold 99.914 %  -> MET
+B2 burst = min(cwnd, response segments): 1339 of 1339 (100.00 %), threshold 99.60 %  -> MET   (ML-DSA only: 100.00 %)
+B3 instrument (median and spread of AK - RX of the ticket's ACKs)  -> NOT MET
+   delta   200: median deviation    +7.4 us (tolerance 47.1), spread 120 (limit 309)  ok
+   delta   800: median deviation  -581.1 us (tolerance 47.1), spread 705 (limit 1128)  OUTSIDE
+   delta  1600: median deviation -1381.8 us (tolerance 47.1), spread 1494 (limit 2219)  OUTSIDE
+   delta  3200: median deviation -2981.2 us (tolerance 47.1), spread 3117 (limit 4401)  OUTSIDE
+   delta  6400: median deviation -6182.5 us (tolerance 47.1), spread 6312 (limit 8766)  OUTSIDE
+B4 the order moves  -> NOT MET
+   ML-DSA-65 MTU 1500: late share 0 % at delta 0, 0 % at 6400 us: +0 points (threshold 23.4)  NOT
+   ML-DSA-65 MTU 1280: late share 0 % at delta 0, 3 % at 6400 us: +3 points (threshold 23.4)  NOT
+   ML-DSA-87 MTU 1500: late share 100 % at delta 0, 100 % at 6400 us: +0 points (threshold 23.4)  NOT
+   ML-DSA-87 MTU 1280: late share 100 % at delta 0, 100 % at 6400 us: +0 points (threshold 23.4)  NOT
+B5 ECDSA-P256 with the accounting of B2: 448 of 448 (100.00 %)  -> MET
+B6 machines: B1 and B2 hold here and the B2 share differs from the pilot's (100.0 %) by 0.0 points (at most 10)  -> MET
+Reading (as registered): B4 not met: the range of delta did not reach the transition on this machine; nothing about the order is concluded for it.

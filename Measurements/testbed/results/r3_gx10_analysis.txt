@@ -1,0 +1,15 @@
+Round 3 (G-R3), machine GX10: 1511 resumed transactions in 16 run directories
+R1 shift of the ticket ACKs (AK - RX, us): at delta = 0 with the ifb path: MTU 1500: median 50.2, MTU 1280: median 49.9
+   811 of 5153 ticket ACKs shifted by delta +- 20 us (15.7 %); by delta: 50: 26%, 100: 18%, 200: 10%, 400: 14%, 800: 12%, 1600: 15%  -> R1 NOT MET (>= 95 %)
+R2 burst equals the model value of the transaction's own order (n >= 4): 884 of 1023 (86.4 %)  -> R2 NOT MET (>= 90 %)
+   early: 411 of 481 (85.4 %)
+   late: 473 of 542 (87.3 %)
+R3 dose response (late share and share of bursts equal to the late value, by delta; ML-DSA only)
+   ML-DSA-65 MTU 1500 (late % / burst = late value %): off:3/3  0:6/6  50:19/12  100:52/23  200:44/38  400:56/56  800:59/59  1600:53/53   <- outside the band
+   ML-DSA-65 MTU 1280 (late % / burst = late value %): off:6/6  0:12/3  50:16/9  100:31/12  200:59/53  400:59/53  800:75/75  1600:78/78   <- outside the band
+   ML-DSA-87 MTU 1500 (late % / burst = late value %): off:22/19  0:38/38  50:38/28  100:59/28  200:81/72  400:97/97  800:97/97  1600:100/100   <- outside the band
+   ML-DSA-87 MTU 1280 (late % / burst = late value %): off:28/25  0:34/22  50:12/6  100:72/41  200:91/75  400:100/100  800:100/100  1600:97/97   <- outside the band
+   -> R3 NOT MET
+R4 ECDSA-P256 (n = 1): largest burst 12 over 488 transactions  -> R4 NOT MET (at most 11)
+R6 delta = 0 without / with the ifb path (ML-DSA): bursts above ten 76 % / 77 %, late 15 % / 23 %  -> R6 MET (each within 10 points)
+R5: the R2 share of this machine is 86.4 %; compare with the other machine (at most 10 points apart)

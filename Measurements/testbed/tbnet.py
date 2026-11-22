@@ -170,6 +170,23 @@ class Testbed:
             self.run(route, ns=ns)
             self.run(["ip", "tcp_metrics", "flush"], ns=ns, check=False, capture=True)
 
+    def ack_delay(self, delay_us: float, redirect: bool = True):
+        """Round 3 (results/r3_design.md): delay the PURE ACKs of the client by `delay_us` microseconds on their way into the server's stack, nothing else.
+        On the server's veth an ingress filter redirects the packets that are IPv6/TCP with a payload of 20 bytes (a TCP header without options: no data; timestamps are off in this testbed) to an
+        ifb device whose egress is a netem qdisc with the delay; the packet re-enters the stack of the server after it. redirect=False removes the filter (the control without the ifb path).
+        Idempotent: the ifb device and the qdiscs are replaced, so it can be called again for another delay."""
+        ns, ifc, ifb = NS_S, "vs0", "ifbr3"
+        self.run(["modprobe", "ifb", "numifbs=0"], check=False, capture=True)
+        self.run(["tc", "qdisc", "del", "dev", ifc, "ingress"], ns=ns, check=False, capture=True)
+        if not redirect:
+            return
+        self.run(["ip", "link", "add", ifb, "type", "ifb"], ns=ns, check=False, capture=True)
+        self.run(["ip", "link", "set", "dev", ifb, "up"], ns=ns)
+        self.run(["tc", "qdisc", "replace", "dev", ifb, "root", "netem", "limit", "100000", "delay", f"{delay_us:g}us"], ns=ns)
+        self.run(["tc", "qdisc", "add", "dev", ifc, "handle", "ffff:", "ingress"], ns=ns)
+        self.run(["tc", "filter", "add", "dev", ifc, "parent", "ffff:", "protocol", "ipv6", "prio", "1", "u32", "match", "u8", "6", "0xff", "at", "6", "match", "u16", "20", "0xffff", "at", "4",
+                  "action", "mirred", "egress", "redirect", "dev", ifb], ns=ns)
+
     def smoke_test(self) -> bool:
         """Ping the peer through the client link (needs the configuration to be applied)."""
         r = self.run((["ping"] if IPV4 else ["ping", "-6"]) + ["-c", "2", "-W", "3", A_P1], ns=NS_C, check=False, capture=True)

@@ -161,6 +161,8 @@ def main():
             for (r_, rt_, m_) in nets:
                 m_ = int(m_)
                 tb.shape(r_, rt_, 0.0, m_, 10, "reno", quickack=True)
+                if os.environ.get("PQC_ACK_DELAY_US", "") not in ("", "off"):          # round 3: the pure ACKs of the client are delayed by this many microseconds (0 = through the ifb path with no delay)
+                    tb.ack_delay(float(os.environ["PQC_ACK_DELAY_US"]))
                 for su in suites:
                     for rq in reqs:
                         for k in ks:

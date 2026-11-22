@@ -1,0 +1,67 @@
+{
+ "B1": {
+  "pilot": "7258/7258",
+  "p_lo": 0.999587,
+  "n_test": 7000,
+  "max_failures": 6,
+  "threshold_share": 0.99914
+ },
+ "B2": {
+  "accounting": "burst = min(cwnd after the last window event before the first response ACK can return, segments of the response)",
+  "pilot": "1504/1504",
+  "p_lo": 0.99801,
+  "n_test": 1500,
+  "max_failures": 6,
+  "threshold_share": 0.996
+ },
+ "B5": {
+  "pilot": "512/512",
+  "threshold_share": 0.996,
+  "note": "ECDSA-P256 read with the accounting of B2"
+ },
+ "B3": {
+  "median_deviations_us": {
+   "100": -7.5,
+   "1600": -15.5,
+   "200": -22.2,
+   "400": -23.6,
+   "50": -6.5,
+   "800": -20.2
+  },
+  "tolerance_us": 47.1,
+  "spread_us": {
+   "0": 195,
+   "100": 172,
+   "1600": 1650,
+   "200": 214,
+   "400": 440,
+   "50": 175,
+   "800": 810,
+   "off": 173
+  },
+  "slopes": {
+   "100": -0.229,
+   "1600": 0.91,
+   "200": 0.093,
+   "400": 0.612,
+   "50": -0.4,
+   "800": 0.768
+  },
+  "spread_slope_limit": 1.364,
+  "spread_at_delta0_us": 195
+ },
+ "B4": {
+  "pilot_differences_points": {
+   "ML-DSA-65 MTU 1500": 46.9,
+   "ML-DSA-65 MTU 1280": 62.5,
+   "ML-DSA-87 MTU 1500": 75.0,
+   "ML-DSA-87 MTU 1280": 87.0
+  },
+  "threshold_points": 23.4,
+  "note": "half of the smallest pilot difference (the fraction one half is a judgment)"
+ },
+ "B6": {
+  "shares_apart_points": 10,
+  "note": "judgment, as R5 of round 3 (met at 1.6 points)"
+ }
+}

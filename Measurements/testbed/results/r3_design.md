@@ -1,0 +1,51 @@
+# Round 3 of the iterative method: what sets the server's window after the ticket? Design (22 Nov 2026; criteria R1-R6 of section 7 APPROVED by the authors on 22 Nov 2026 before any new measurement; step 1 done, see r3_explore.md)
+
+Written for: the authors. Method: `METHOD_ITERATIVE.md` (rules 3, 3A, 4A). Aim: the principle behind the server's window after the ticket, tested by an INTERVENTION on the order of the ticket's acknowledgments and the response, not by another sweep of cells. The outputs go to the supplement of L1 (at most one sentence in its Limits) and, in full, to the extended paper.
+
+## 1. What is known (from the archive, before round 3)
+- L1: without the ticket the burst of the response is at most ten (18 of 18); with it the server's window is sometimes larger, and the model (window ten after the ticket) is then too slow, never too fast.
+- G22 (round 2): the replay model `ticket_ackorder_sim.py` with machine parameters `c_ack`, `p_t`, `p_w`, fitted on race classes, did not carry over to random cells (NOT SUPPORTED on both machines): its parameters are level D.
+- Exploratory runs r2x and r2y (GX10, request 25 000 B, race design): the burst is above ten in 100 % of the transactions with a ticket of 7 segments (ML-DSA-87), in 0 to 7 % with 4 to 5 segments; at MTU 1 280 a ticket of 6 segments enlarges it. Rule (1) applied to the ticket flight, `w = max(10, min(10 + n, 2n))`, gives 10 for n <= 5 and 14 for n = 7: the same threshold.
+- G23 (GnuTLS, two machines): with a small request the latency follows the model for ticket data from 0 to 18 segments (the ticket's size alone does not set the window); every wrong cell of the model has a request that needs another round trip (all 12 and 14 GnuTLS cells; 11 of 15 OpenSSL cell-runs), and the two machines agree on 255 of 257 cells. H_ack (window = rule (1) on the ticket flight when the ticket has been acknowledged before the response) fixes 11 of the 12 wrong cells of the Arm machine and breaks the three ML-DSA-87 cells where the measured window is about 18, not 22.
+- The race: with a request that needs a second round trip, the client's second batch of request segments and the acknowledgments of the ticket leave the client together (both 1.5 RTT after its first send) and reach the server within microseconds of each other; the response is written `p_w` after the last request segment. The 0.049 ms rule (burst above ten iff the last ticket ACK comes more than 0.049 ms after the last request segment) is a proxy of this order; it classified 75 % of the transactions of r2y and not the ones with the 7-segment ticket.
+
+## 2. Question and competing explanations
+Q: for one transaction, is the window the response gets a function of WHICH ticket acknowledgments the server has processed when it writes the response?
+- M0 (L1): ten, whatever the order. Predicted by M0: the burst does not depend on the order.
+- M3 (the kernel rules replayed on measured times; level A): the server's `cwnd` grows by one per processed ticket ACK while `tcp_is_cwnd_limited` holds (`tcp_slow_start`, `tcp_reno_cong_avoid`), capped by 2 x `max_packets_out` (`tcp_is_cwnd_limited`), so the burst is 10 + k (up to the cap) with k the number of ticket ACKs processed before the write, and the ACKs that come after the write release segments one by one. With the machine's times measured, not fitted: k from the stamps of the transaction itself (level B), n from the ticket segments (level A).
+- M_late: the order does not matter but the ticket's size does (rule (1) always applied): refuted at a small request by G23, kept as the null for the large request.
+The intervention separates them: delay the ticket's acknowledgments by a known delta (milliseconds fractions) and see whether the burst follows k.
+
+## 3. Parameters (3A)
+| parameter | meaning | level | source or measurement |
+|---|---|---|---|
+| `w0` = 10, rule (1) | window growth | A | `tcp_slow_start`, `tcp_cwnd_validate`, `window_from_kernel.py` |
+| `n` | ticket segments | A | calibration of the library (OpenSSL, GnuTLS) |
+| serialization time of one segment `tau` | spacing of the ticket's ACKs at the server | A | MTU and rate (0.12 ms at 1 500 B and 100 Mbit/s) |
+| `delta` | the delay added to the ticket's ACKs | B (set by us) | `tc netem` on an ifb device, checked on the stamps |
+| times of each ACK and of the response write | the order | B | `ticket_ack.bt`: kprobe `tcp_ack` (AK ns cport ack_seq) and the existing XQ, XS, SEND, on one clock (`clock_sync.py`) |
+| `c_ack`, `p_t`, `p_w` of the replay model | machine times | D in G22; here B | read from the stamps of the same transaction, not fitted |
+No parameter is fitted in round 3. A model that needs one would be IMPROVEMENT ONLY.
+
+## 4. Steps
+1. EXPLORE (no new data): on the archived race traces (clock-safe repeats; r2x, r2y; GX10, X250, Optiplex) compute for every resumed transaction k (the ticket ACKs whose RX comes before the first response segment's XQ, with RX as the stand-in for `tcp_ack` until the new probe exists), the observed burst (capture), n, and compare the burst with 10 + k capped by 2 x max_packets_out. This is a description of the old data (no criterion); it tells whether M3 can survive. Output `rounds`-style note `r3_explore.md`.
+2. CRITERIA (written after step 1, approved before step 4): the per-transaction agreement of the burst with M3 on the new data, the dose response, the control, and the bands from the references; thresholds from the step-1 agreement and from the noise of repeated identical runs, by the rule of `g23_gnutls_predictions.md` (smallest k for which a library like the reference passes with probability 95 %).
+3. INSTRUMENT: `ticket_ack.bt` (kprobe `tcp_ack` on the server, on the same clock); the delay: on the server's veth an ingress filter that redirects the PURE ACKs of the client (IPv6 payload length of a pure ACK, 20 or 32 bytes) to an `ifb` device with a `netem delay` of delta, nothing else redirected; manipulation check: the AK stamps of the ticket ACKs move by delta (+-0.02 ms) and the data segments do not. Controls: delta = 0 with and without the redirect (the cost of the ifb path).
+4. RUN (both machines, CPU clock fixed, NTP off, `run_clock_repeat.sh`-style): the race design with a request of 25 000 B (it overflows every client window), RTT 100 ms, 100 Mbit/s, MTU 1 500 and 1 280, suites ECDSA-P256 (n = 1: negative control), ML-DSA-65 (n = 5; 6 at MTU 1 280), ML-DSA-87 (n = 7); delta in {0 without ifb, 0 with ifb, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6 ms}; 30 transactions per cell: 48 cells, about 1 400 transactions, 20 to 30 minutes per machine. A declared repeat on one machine for the noise floor.
+5. ANALYSE and write `r3_decision.md`: M3 KEPT (all parameters A to C and the criteria met), IMPROVEMENT ONLY, or NOT SUPPORTED, with the reading registered beforehand: the burst follows k (M3), follows delta without following k (a different mechanism: the arrival time itself), or does not follow either (M0 and the order does not matter).
+
+## 5. Feasibility checked so far
+GX10: the `ifb` module is present (7.0.0-1025-nvidia) and `tcp_ack` is a kprobe-able symbol; X250 and Optiplex to be checked by `modinfo ifb` and `bpftrace -l 'kprobe:tcp_ack'`. Open: the ifb path adds a few microseconds even at delta = 0 (the control measures it); a pure-ACK filter delays also the ACKs of the server's first flight (before the ticket) by delta: the transactions then start delta later, which does not touch the order of the ticket's ACKs and the response (it shifts both), and is reported.
+
+## 6. What goes to the papers
+L1: at most one sentence in the Limits and one paragraph in the supplement, and only if step 4 gives a clear reading before 1 Dec; otherwise nothing changes in L1 (it already states that the cause is open). The extended paper: the whole round (the model table of rounds, METHOD_ITERATIVE.md section 5).
+
+## 7. Criteria (PROPOSED after step 1; to be APPROVED before step 4; thresholds from the step-1 agreement of `r3_explore.md` and the noise of repeated runs, never changed after the data)
+Definitions: the order of a transaction is read on the kernel's clock (`tcp_ack` stamps of the ticket's ACKs against the SEND of the response); `late` = at least one ticket ACK processed after the write, `early` = none. The model value of the burst: `early`: `max(10, min(10 + n, 2n))`; `late`: the replay of `ticket_ackorder_sim.py` with the ticket's ACKs late (11 for n = 1, 13 for n = 4 to 7 at 100 Mbit/s and MTU 1 500). No fitted parameter.
+- R1 (manipulation): at delta > 0 the `tcp_ack` stamps of at least 95 % of the ticket's ACKs are later than at delta = 0 by delta +- 0.02 ms, and the stamps of the request's data segments are not moved.
+- R2 (the order carries the burst): in at least 90 % of the transactions with n >= 4 (ML-DSA-65, -87) the burst equals the model value of the transaction's own order (step 1, on the capture's clock: 84 % overall, 93 to 100 % in the late regime).
+- R3 (dose response): the share of `late` transactions rises with delta (non-decreasing in delta up to the noise of 10 points) and, at every delta, the share of transactions with the late burst differs from the share of `late` by at most 10 points.
+- R4 (negative control): ECDSA-P256 (n = 1) shows a burst of ten or eleven at every delta (never above 11).
+- R5 (machines): R2 holds on both machines and the shares of R2 differ between them by at most 10 points.
+- R6 (the cost of the redirect): delta = 0 with the ifb redirect and without it differ in the share of bursts above ten by at most 10 points, and in the `late` share by at most 10 points; if not, the redirect is a confound and the intervention is read relative to the redirect at zero.
+Readings (written beforehand): R2 and R3 met: M3 holds, the order of the acknowledgments sets the window by the kernel's rules (a causal result, level A and B only: KEPT). R2 not met but the burst moves with delta without following the order: the arrival time itself, a mechanism the replay does not have (IMPROVEMENT ONLY at best); neither: the order does not matter (M0), the earlier association was the capture's clock. R1 not met: the instrument failed, nothing is concluded.

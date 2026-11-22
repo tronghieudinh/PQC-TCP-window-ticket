@@ -63,6 +63,11 @@ if [ -n "$g23a" ] && [ -n "$g23x" ] && [ -f Measurements/testbed/results/g23_rep
   $PY Measurements/testbed/g23_report.py --gx10 "$g23a" --x250 "$g23x" --out "$tmp/g23_report.txt" >/dev/null
   cmp -s "$tmp/g23_report.txt" Measurements/testbed/results/g23_report.txt && echo "G23 report OK" || { echo "G23 report DIFF"; exit 1; }
 fi
+# rounds 3 and 3b: the numbers of the paper's sentence from the derived CSV files (the raw traces of the two rounds are in the data archive)
+if [ -f Measurements/testbed/results/r3b_report.txt ] && [ -f Measurements/testbed/results/r3b_gx10_pilot_ack.csv ]; then
+  $PY Measurements/testbed/r3b_report.py --out "$tmp/r3b_report.txt" >/dev/null
+  cmp -s "$tmp/r3b_report.txt" Measurements/testbed/results/r3b_report.txt && echo "round 3b report OK" || { echo "round 3b report DIFF"; exit 1; }
+fi
 # the direction of the errors of the model over every per-cell test of L1 (supplement, Table 7): rerun from the archived raw files
 $PY Measurements/testbed/one_sided_errors.py --out "$tmp/one_sided.txt" >/dev/null
 cmp -s "$tmp/one_sided.txt" Measurements/testbed/results/one_sided_errors.txt && echo "direction of the errors OK" || { echo "direction of the errors DIFF"; exit 1; }
