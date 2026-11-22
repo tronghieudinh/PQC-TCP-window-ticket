@@ -375,6 +375,23 @@ def _g22():
         if a and b and c: num("GttXRunTwoWrong", a.group(1)); num("GttXRunTwoMae", b.group(1)); num("GttXNoise", c.group(1))
 _g22()
 
+# ---- where the model is wrong: by size of the request, over the four runs of the first random draw (g19 cell files), threshold 13 000 B (a request flight that needs another round trip)
+def _domain():
+    rx = _re.compile(r"^\s*(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)")
+    big = [0, 0]; rest = [0, 0]
+    for fn, col in (("g19_x250_run2_cells.txt", 9), ("g19_x250_run2_cells.txt", 8), ("g19_gx10_cells.txt", 8), ("g19_optiplex_cells.txt", 8)):
+        pth = os.path.join(RES, fn)
+        if not os.path.exists(pth): return
+        for ln in open(pth):
+            m = rx.match(ln)
+            if not m: continue
+            wrong = abs(float(m.group(10)) - float(m.group(col))) > float(m.group(5)) / 2
+            t = big if int(m.group(3)) > 13000 else rest
+            t[0] += 1; t[1] += wrong
+    num("DomLargeN", big[0]); num("DomLargeWrong", big[1]); num("DomRestN", rest[0]); num("DomRestWrong", rest[1]); num("DomWrongTotal", big[1] + rest[1])
+    num("DomLargePct", f"{100 * big[1] / big[0]:.1f}"); num("DomRestPct", f"{100 * rest[1] / rest[0]:.1f}")
+_domain()
+
 # ---- G23, the third TLS library (GnuTLS), results/g23_report.txt (key value lines from g23_report.py)
 def _g23():
     pth = os.path.join(RES, "g23_report.txt")
