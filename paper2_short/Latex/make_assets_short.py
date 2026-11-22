@@ -265,6 +265,7 @@ _clk("Ro", "wp6_clock_repeat_optiplex_analysis.txt")
 _clk("Rq", "wp6_clock_repeat_tuned2_analysis.txt")
 _clk("Ra", "wp6_clock_repeat_isolA_analysis.txt")
 _clk("Rb", "wp6_clock_repeat_isolB_analysis.txt")
+_clk("Rg", "wp6_clock_repeat_gx10_analysis.txt")
 _bu = os.path.join(RES, "wp6_clock_repeat_bursts.txt")
 if os.path.exists(_bu):
     for _ln in open(_bu):
@@ -282,7 +283,7 @@ def _g19_cells_table():
         for ln in open(pth):
             m = rx.match(ln)
             if m:
-                c = int(m.group(1)); d = data.setdefault(c, dict(suite=m.group(2).split("|")[0], rtt=int(m.group(5)), req=int(m.group(3)), resp=int(m.group(4)), model=float(m.group(10)), runs={}))
+                c = int(m.group(1)); d = data.setdefault(c, dict(suite=m.group(2).split("|")[0], rtt=int(m.group(5)), req=int(m.group(3)), resp=int(m.group(4)), mtu=int(m.group(7)), model=float(m.group(10)), runs={}))
                 d["runs"][name] = float(m.group(8)); d["runs"].setdefault("X250 run 1", float(m.group(9)))
     def wrong(d, v): return abs(d["model"] - v) > 0.5 * d["rtt"]
     bad = sorted(c for c, d in data.items() if any(wrong(d, v) for v in d["runs"].values()))
@@ -299,8 +300,152 @@ def _g19_cells_table():
     for n, k in zip(order, ["XOne", "XTwo", "Gx", "Op"]): num("GnineCellsWrong" + k, nw[n])
     num("GnineCellsEvery", sum(all(wrong(d, d["runs"][n]) for n in order if n in d["runs"]) for d in data.values()))
     num("GnineCellsUnion", len(bad))
+    if True:                                                                      # supplement figure: error of the model in round trips against the segments of the response, one mark per cell and run
+        fig, ax = plt.subplots(figsize=(3.4, 2.2))
+        mk = {"X250 run 1": "o", "X250 run 2": "s", "GX10": "^", "Optiplex": "D"}
+        seg = lambda d: -(-d["resp"] // (d["mtu"] - S.IP_TCP_HDR))
+        for n in order:
+            xs = [seg(d) for d in data.values() if n in d["runs"] and not wrong(d, d["runs"][n])]
+            ys = [(d["runs"][n] - d["model"]) / d["rtt"] for d in data.values() if n in d["runs"] and not wrong(d, d["runs"][n])]
+            ax.plot(xs, ys, mk[n], color=GREY, ms=2.2, mew=0, alpha=0.55)
+        for n in order:
+            pts = [(seg(d), (d["runs"][n] - d["model"]) / d["rtt"]) for d in data.values() if n in d["runs"] and wrong(d, d["runs"][n])]
+            ax.plot([x for x, _ in pts], [y for _, y in pts], mk[n], color=ACC, ms=3.4, mew=0, label=n)
+        ax.axhline(0, color=INK, lw=0.5); ax.axhline(-0.5, color=INK, lw=0.5, ls=":")
+        ax.text(0.5, -0.53, "wrong below this line (half an RTT)", fontsize=5.5, va="top")
+        for c in bad:
+            d = data[c]; k = sum(wrong(d, d["runs"][n]) for n in order if n in d["runs"])
+            if k == len([n for n in order if n in d["runs"]]):
+                ax.annotate(str(c), (seg(d), (d["runs"]["X250 run 1"] - d["model"]) / d["rtt"]), xytext=(3, 2), textcoords="offset points", fontsize=5.5)
+        ax.set_xlabel("segments of the response"); ax.set_ylabel("measured minus model (RTT)")
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.legend(frameon=False, fontsize=6, loc="lower left", bbox_to_anchor=(0.0, 0.0), ncol=2, handletextpad=0.1, columnspacing=0.8, title="grey: right; colour: wrong", title_fontsize=6)
+        fig.tight_layout(pad=0.4); fig.savefig(os.path.join(HERE, "figures", "fig_cells_map.pdf")); plt.close(fig)
 HERE_TEX = os.path.dirname(os.path.abspath(__file__))
 _g19_cells_table()
+
+# ---- direction of the errors of the model (one_sided_errors.py -> results/one_sided_errors.txt)
+def _one_sided():
+    pth = os.path.join(RES, "one_sided_errors.txt")
+    if not os.path.exists(pth): return
+    t = open(pth).read()
+    m = _re.search(r"TOTAL without the BBR arm.*?: (\d+) cell-runs \((\d+) distinct cells.*?wrong and optimistic (\d+); wrong and pessimistic (\d+); the measured excess exceeded the prediction by at most \+?(-?[\d.]+) ms", t)
+    if not m: return
+    for k, v in zip(["OsRuns", "OsCells", "OsFast", "OsSlow", "OsMaxAny"], m.groups()): num(k, v)
+    m2 = _re.search(r"largest underestimate outside the delayed-ACK and BBR tests: \+?(-?[\d.]+) ms", t)
+    if m2: num("OsMaxElse", m2.group(1))
+    dl = [float(x) for x in _re.findall(r"delayed ACK \(G14\) \| [^|]+ \| \d+ \| \d+ \| \d+ \| \+?(-?[\d.]+) \|", t)]
+    if dl: num("OsMaxDelack", f"{max(dl):.0f}")
+    if int(m.group(3)) != 0: print("WARNING: one_sided_errors.txt has optimistic errors: the sentences 'never too fast' of the paper and the supplement are no longer true")
+    rows = []
+    for g in _re.findall(r"^GROUP \| (.+?) \| (\d+) \| (\d+) \| (\d+) \| (\d+)$", t, _re.M):
+        name, runs, cr, fast, slow = g
+        if "BBR" in name: name += " (not in the total)"
+        rows.append(f"{name} & {runs} & {int(cr):,} & {fast} & {slow}\\\\".replace(f"{int(cr):,}", f"{int(cr):,}".replace(",", "\\,")))
+    open(os.path.join(HERE_TEX, "os_table.tex"), "w").write("\\newcommand{\\OsRows}{" + "\n".join(rows) + "}\n")
+_one_sided()
+
+# ---- G22, second random draw (results/g22_x250_analysis.txt, g22_gx10_analysis.txt, one_sided_errors_g22.txt)
+def _g22():
+    for tag, fn in (("X", "g22_x250_analysis.txt"), ("A", "g22_gx10_analysis.txt")):
+        pth = os.path.join(RES, fn)
+        if not os.path.exists(pth): return
+        t = open(pth).read()
+        m1 = _re.search(r"measured, .*?\n\s+C1 r2 wrong .*? on (\d+) of (\d+) random cells \(at most 2\)\s+\[r1: (\d+)\]", t, _re.S)
+        m2 = _re.search(r"C2 r2 mean absolute error over the random cells ([\d.]+) ms \(at most 2\)\s+\[r1: ([\d.]+)\]", t)
+        m3 = _re.search(r"C4 focus cells: r2 wrong on (\d+) of (\d+), r1 wrong on (\d+)", t)
+        m4 = _re.search(r"within 2 ms of the measurement on (\d+) of (\d+) random cells for r1", t)
+        if not (m1 and m2 and m3 and m4): return
+        num(f"Gtt{tag}RN", m1.group(2)); num(f"Gtt{tag}RWrong", m1.group(3)); num(f"Gtt{tag}RMae", m2.group(2)); num(f"Gtt{tag}RTwo", m4.group(1))
+        num(f"Gtt{tag}FN", m3.group(2)); num(f"Gtt{tag}FWrong", m3.group(3))
+    pth = os.path.join(RES, "one_sided_errors_g22.txt")
+    if os.path.exists(pth):
+        t = open(pth).read()
+        m = _re.search(r"TOTAL without the BBR arm.*?: (\d+) cell-runs .*?wrong and optimistic (\d+); wrong and pessimistic (\d+); the measured excess exceeded the prediction by at most \+?(-?[\d.]+) ms", t)
+        if m:
+            for k, v in zip(["GttDirRuns", "GttDirFast", "GttDirSlow", "GttDirMax"], m.groups()): num(k, v)
+        for tag, mach in (("X", "X250"), ("A", "GX10")):
+            m = _re.search(r"G22: [^|]+ \| " + mach + r" \| \d+ \| \d+ \| \d+ \| \+?(-?[\d.]+) \|", t)
+            if m: num(f"GttDirMax{tag}", m.group(1))
+    p2 = os.path.join(RES, "g22_x250_run2_analysis.txt"); pn = os.path.join(RES, "g22_x250_noisefloor.txt")
+    if os.path.exists(p2) and os.path.exists(pn):
+        t2 = open(p2).read(); tn = open(pn).read()
+        a = _re.search(r"C1 r2 wrong .*?\[r1: (\d+)\]", t2); b = _re.search(r"C2 .*?\[r1: ([\d.]+)\]", t2)
+        c = _re.search(r"differs by more than half an RTT between the two runs: (\d+) \[", tn)
+        if a and b and c: num("GttXRunTwoWrong", a.group(1)); num("GttXRunTwoMae", b.group(1)); num("GttXNoise", c.group(1))
+_g22()
+
+# ---- tables of the details that the paper summarises (supplement): the 13 configurations of stage A, the cells off by a few ms, the tails
+def _details_tables():
+    out = []
+    # stage A: per configuration, the flight sizes whose median window equals rule (1)
+    pth = os.path.join(RES, "slack_tcp.csv")
+    if os.path.exists(pth):
+        cfg = collections.OrderedDict()
+        for r in rd(pth):
+            if r["stage"] != "A" or r["err"] != "": continue
+            c = cfg.setdefault(r["cfg"], dict(icw=int(r["icw"]), n=collections.defaultdict(list), rows=0))
+            c["n"][int(r["n1"])].append(int(r["cwnd_pre2"])); c["rows"] += 1
+        desc = {"base": "base (the reference configuration)", "rtt5": "RTT 5 ms", "rtt30": "RTT 30 ms", "rate10": "10 Mbit/s", "rate1000": "1 Gbit/s", "mtu1280": "MTU 1\\,280",
+                "mtu9000": "MTU 9\\,000", "icw4": "initial window 4", "icw20": "initial window 20", "delack": "delayed ACK", "cubic": "Cubic", "ts": "TCP timestamps", "offload": "offload (TSO, GSO, GRO)"}
+        rows = []
+        for k, c in cfg.items():
+            hit = sum(int(st.median(v)) == closed(c["icw"], n) for n, v in c["n"].items())
+            rows.append(f"{desc.get(k, k)} & {c['icw']} & {len(c['n'])} & {c['rows']} & {hit}\\\\")
+        out.append("\\newcommand{\\StageARows}{" + "\n".join(rows) + "}")
+    # the cells off by more than 2 ms but by less than half an RTT (random draw, first X250 run)
+    pth = os.path.join(RES, "g19_x250_run2_cells.txt")
+    if os.path.exists(pth):
+        rx = _re.compile(r"^\s*(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)")
+        rows = []
+        for ln in open(pth):
+            m = rx.match(ln)
+            if not m: continue
+            e = float(m.group(10)) - float(m.group(9))
+            if 2 < abs(e) <= 0.5 * int(m.group(5)):
+                es = f"{e:+.1f}".replace("-", "$-$")
+                rows.append((abs(e), (f"{m.group(1)} & {m.group(2).split('|')[0]} & {int(m.group(5))} & {int(m.group(6))} & {int(m.group(7)):,} & {int(m.group(3)):,} / {int(m.group(4)):,} & ").replace(",", "\\,") + es + "\\\\"))
+        rows.sort(key=lambda t: -t[0])
+        out.append("\\newcommand{\\OffRows}{" + "\n".join(r for _, r in rows) + "}")
+    # tails of the six cells
+    pth = os.path.join(RES, "g21_analysis.txt")
+    if os.path.exists(pth):
+        rx = _re.compile(r"^\s+(\S+?)\|?\s+req\s+(\d+)\s+resp\s+(\d+)\s+(\d+)\s+([\d.]+)\s+[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+) %")
+        rows = []
+        for ln in open(pth):
+            m = rx.match(ln)
+            if m:
+                su, rq, rs, n, med, p99, p999, mx, sh = m.groups()
+                rows.append(f"{su} & {int(rq):,} / {int(rs):,} & {int(n):,} & {med} & {p99} & {p999} & {mx} & {sh}\\\\".replace(f"{int(rq):,} / {int(rs):,}", f"{int(rq):,} / {int(rs):,}".replace(",", "\\,")).replace(f"& {int(n):,} &", f"& {int(n):,} &".replace(",", "\\,")))
+        out.append("\\newcommand{\\TailRows}{" + "\n".join(rows) + "}")
+    open(os.path.join(HERE_TEX, "details_tables.tex"), "w").write("\n".join(out) + "\n")
+_details_tables()
+
+# ---- Supplement figure: the last ticket acknowledgment against the last request segment, one row per run (K7)
+def _fig_k7_points():
+    runs = [("wp6_k7_points_x250_fixed.csv", "X250, clock fixed"), ("wp6_k7_points_optiplex_fixed.csv", "Optiplex, clock fixed"),
+            ("wp6_k7_points_x250_isolA.csv", "X250, turbo on"), ("wp6_k7_points_x250_isolB.csv", "X250, turbo off"), ("wp6_k7_points_x250_asleft.csv", "X250, clock as left"), ("wp6_k7_points_gx10_fixed.csv", "GX10 (Arm), clock fixed")]
+    if not all(os.path.exists(os.path.join(RES, f)) for f, _ in runs): return
+    fig, axs = plt.subplots(len(runs), 1, figsize=(3.4, 4.0), sharex=True)
+    rng = __import__("random").Random(7)
+    for ax, (fn, lab) in zip(axs, runs):
+        rows = [r for r in rd(os.path.join(RES, fn)) if r["suite"].startswith("ML-DSA") and r["mtu"] != "9000"]
+        for big, mk, col in ((False, "o", GREY), (True, "o", ACC)):
+            xs = [float(r["last_ticket_ack_minus_last_request_ms"]) for r in rows if (int(r["burst_segments"]) > 10) == big]
+            ax.plot(xs, [rng.uniform(-0.4, 0.4) for _ in xs], mk, ms=1.8, mew=0, color=col, alpha=0.7, label=("burst above ten" if big else "burst of ten or less"))
+        ax.axvline(0.049, color=INK, lw=0.6)
+        ax.set_xscale("symlog", linthresh=0.1); ax.set_ylim(-0.6, 1.5); ax.set_yticks([])
+        ax.text(0.01, 0.97, lab, transform=ax.transAxes, ha="left", va="top", fontsize=6.5)
+        ax.spines[["top", "right", "left"]].set_visible(False)
+        ax.tick_params(axis="x", labelsize=6.5)
+    h, l = axs[0].get_legend_handles_labels()
+    axs[0].text(0.049, 1.0, " 0.049", fontsize=6, ha="left", va="center")
+    axs[-1].set_xlim(-4, 2.5); axs[-1].set_xticks([-3, -1, -0.1, 0, 0.049, 0.1, 1])
+    axs[-1].set_xticklabels(["$-3$", "$-1$", "$-0.1$", "0", "", "0.1", "1"])
+    axs[-1].set_xlabel("last ticket acknowledgment minus last request segment (ms)", fontsize=6.5)
+    fig.legend(h, l, loc="lower center", ncol=2, frameon=False, fontsize=6, markerscale=2.2, handletextpad=0.2, columnspacing=1.0)
+    fig.tight_layout(pad=0.4, h_pad=0.2, rect=(0, 0.05, 1, 1)); fig.savefig(os.path.join(HERE, "figures", "fig_k7_points.pdf")); plt.close(fig)
+_fig_k7_points()
 def _count_met(files, rx):
     k = n = 0
     for fn in files:

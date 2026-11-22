@@ -1,0 +1,35 @@
+{
+ "scenario": "G22",
+ "device_fingerprint": "9191a226e61f",
+ "preflight_before": "warn",
+ "dry_run": false,
+ "n": "",
+ "no_tune": false,
+ "args": "",
+ "started": "2026-11-22T04:46:29+07:00",
+ "finished": "2026-11-22T06:09:26+07:00",
+ "failed_commands": 0,
+ "fingerprint_same_after": true,
+ "state_change": {
+  "load": [
+   [
+    0.04,
+    0.16,
+    0.09
+   ],
+   [
+    0.01,
+    0.0,
+    0.0
+   ]
+  ],
+  "temp_max_c": [
+   39.0,
+   41.0
+  ],
+  "freq_ratio_median": [
+   0.97,
+   0.25
+  ]
+ }
+}

@@ -1,0 +1,8 @@
+test | run | cells | wrong, optimistic (measured slower) | wrong, pessimistic (model slower) | largest measured-minus-prediction (ms) | largest prediction-minus-measured (ms)
+G22: 100 new random + 30 focus cells | GX10 | 130 | 0 | 10 | +6.3 | +196.0
+G22: 100 new random + 30 focus cells | X250 | 130 | 0 | 23 | +2.5 | +196.7
+TOTAL, all tests: 260 cell-runs; wrong and optimistic 0; wrong and pessimistic 33
+TOTAL without the BBR arm (outside the model of L1): 260 cell-runs (130 distinct cells, a cell counted once across runs and machines); wrong and optimistic 0; wrong and pessimistic 33; the measured excess exceeded the prediction by at most +6.3 ms (any cell), the prediction exceeded the measured excess by at most +196.7 ms
+the largest underestimate outside the delayed-ACK and BBR tests: +6.3 ms
+GROUP | G22: 100 new random + 30 focus cells | 2 | 260 | 0 | 33
+Notes: a cell-run is one cell in one run; the same cell appears in several runs (three OpenSSL releases, three machines), so the count is not a count of independent cells. With delayed ACKs the largest underestimate is 40 to 43 ms (the 40 ms delayed-ACK timer, which the model leaves out), below half an RTT. The two optimistic cells under BBR are the two ML-DSA-87 cells that the paper reports between the BBR and the Reno prediction.

@@ -1,0 +1,17 @@
+G22 round 2, machine X250 (g22.csv): 100 random and 30 focus cells measured, 0 missing or with fewer than 30 valid transactions
+  C1 r2 wrong by more than half an RTT on 5 of 100 random cells (at most 2)  [r1: 1]
+  C2 r2 mean absolute error over the random cells 5.61 ms (at most 2)  [r1: 2.02]
+  C3 r2 error / r1 error = 2.78 (at most 0.70) and r2 wrong 5 <= r1 wrong 1
+  C4 focus cells: r2 wrong on 7 of 30, r1 wrong on 22 (r2 at most r1)  [mean absolute error r2 7.20 ms, r1 64.12 ms]
+  C5 data: 0 cells missing (none allowed)
+  met: C1 NO, C2 NO, C3 NO, C4 yes, C5 yes
+  (reported) within 2 ms of the measurement on 91 of 100 random cells for r1, 87 for r2
+
+Decision on this machine (METHOD_ITERATIVE.md 2 and 4A): C3 failed on the complete data (r2 worse than r1 on the random cells), C4 met: the round stays NOT SUPPORTED (already so after the GX10 run). Runs not yet started (Optiplex) are not started; the X250 run 2 is the declared exploratory run.
+Data: PQC-data-repo x250/scenarios/G22/20261122-044628-X250 (82.9 min, 0 failed commands; the preflight "warn" is the usual one of the runs of the lab machines).
+
+EXPLORATORY reading (not part of the criteria):
+  random cells (100): r1 wrong on 1, too slow; within 2 ms on 91; mean absolute error 2.02 ms; r2 wrong on 5, mean absolute error 5.61 ms. On this machine the model of L1 meets the two numeric thresholds of the old G19 criteria (R1: at most 3 wrong; R3: mean absolute error about 2 ms) on a draw it had not seen.
+  focus cells (30, chosen where a competing replay model of the ticket ACKs disagreed with r1): r1 wrong on 22, all too slow, and r2 wrong on 7. The focus cells are selected: they are where the server's window after the ticket is enlarged (ML-DSA tickets of 4 to 7 segments), the region that rule (1) and a window of ten do not predict.
+  direction: 0 of 260 cell-runs (G22, both machines) are too fast by half an RTT; 33 are too slow (23 on the X250, 10 on the GX10); the largest underestimate is +2.5 ms on the X250 and +6.3 ms on the GX10.
+  The enlargement of the server's window is common on the X250 for tickets of 4 to 7 segments (r1 wrong on 5 of 8 ML-DSA-44 focus cells, 5 of 5 and 5 of 5 ML-DSA-65, 6 of 7 ML-DSA-87) and rare on the GX10 (1 of 8, 1 of 5, 2 of 5, 6 of 7): the machine dependence of the region where the model fails, as in G19.

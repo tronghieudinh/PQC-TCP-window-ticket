@@ -7,12 +7,14 @@
 #   sudo bash run_clock_repeat.sh r1 | r2      # one of them
 #   sudo bash run_clock_repeat.sh tuned [TAG]  # (TAG, e.g. 2, ends the directory names: _t2, so that a second run does not overwrite the first)  # C1, R1 and R2 with the CPU clock FIXED (host_tune.sh on: performance governor, no turbo), about 15 minutes; output directories end in _t
 #   sudo bash run_clock_repeat.sh isolA | isolB  # R2 only (about 6 minutes) to separate the factors of the CPU clock: A = performance governor WITH turbo, B = the system's own governor with turbo OFF; directories _isolA, _isolB
+#   sudo bash run_clock_repeat.sh r2x          # EXPLORATORY: R2 with the fourth suite ML-DSA-87 too (about 8 minutes)
+#   sudo bash run_clock_repeat.sh r2y          # EXPLORATORY: R2 with a request of 25 000 B and all four suites (about 10 minutes)
 #   sudo bash run_clock_repeat.sh ctrl         # controls C1 (the race design with the instruments of the FIRST run: capture and tcp_probe, no bpftrace) and C2 (R2 again), about 15 minutes
 # From 21 Nov 2026 (evening) every step fixes the CPU clock like the first traces did (PQC_NO_TUNE=1 leaves it as it is; the runs of 15:08-16:14 on 21 Nov were made without it).
 # Output: results/trace_clock_smoke, trace_clock_softirq, trace_clock_race (+ _t when the CPU clock is fixed; a tar.gz in the user's home to copy to the analysis machine). NTP is switched off for the run and restored.
 set -uo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; PY=${PY:-python3}
-STEP=${1:-}; TAG=${2:-}; case "$STEP" in smoke|all|r1|r2|ctrl|tuned|isolA|isolB) ;; *) echo "usage: sudo bash run_clock_repeat.sh smoke|all|r1|r2|ctrl|tuned|isolA|isolB"; exit 1;; esac
+STEP=${1:-}; TAG=${2:-}; case "$STEP" in smoke|all|r1|r2|r2x|r2y|ctrl|tuned|isolA|isolB) ;; *) echo "usage: sudo bash run_clock_repeat.sh smoke|all|r1|r2|r2x|r2y|ctrl|tuned|isolA|isolB"; exit 1;; esac
 [ "$(id -u)" = 0 ] || { echo "run with sudo"; exit 1; }
 U=${SUDO_USER:?run through sudo from your normal user}; UH=$(getent passwd "$U" | cut -d: -f6)
 if [ -z "${WD_INHIBITED:-}" ] && command -v systemd-inhibit >/dev/null; then exec env WD_INHIBITED=1 systemd-inhibit --what=sleep:idle:handle-lid-switch --who=clockrepeat --why="clock-safe trace repeat" bash "$0" "$@"; fi
@@ -36,7 +38,7 @@ timedatectl set-ntp false && log "NTP switched off (was: $NTP0)"
 if [ "${PQC_NO_TUNE:-0}" != 1 ]; then
   ./host_tune.sh on >>"$LOG" 2>&1; TUNED=1
   gov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor); nt=$(cat /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || echo n/a)
-  [ "$gov" = performance ] && [ "$nt" = 1 ] || { log "ERROR: CPU clock not fixed (governor=$gov no_turbo=$nt)"; exit 1; }
+  [ "$gov" = performance ] && { [ "$nt" = 1 ] || [ "$nt" = n/a ]; } || { log "ERROR: CPU clock not fixed (governor=$gov no_turbo=$nt)"; exit 1; }      # n/a: no intel_pstate (the Arm machine: cppc_cpufreq, governor performance, cpufreq/boost 0)
   log "CPU clock fixed (governor $gov, no_turbo $nt); output directories end in _t$TAG"; SFX=_t$TAG
   G=/sys/devices/system/cpu
   if [ "$STEP" = isolA ]; then echo 0 > $G/intel_pstate/no_turbo; SFX=_isolA; fi
@@ -74,6 +76,16 @@ if [ "$STEP" = r2 ] || [ "$STEP" = all ] || [ "$STEP" = tuned ] || [ "$STEP" = i
   log "R2 race design again"; rm -rf results/trace_clock_race$SFX
   run_trace trace_clock_race$SFX ticket_xmit.bt --n 8 || exit 1
   check_out trace_clock_race$SFX || log "R2: probe lines missing"
+fi
+if [ "$STEP" = r2x ]; then       # EXPLORATORY (22 Nov 2026): the race design with the fourth suite, ML-DSA-87 (ticket of 7 segments), to see the burst and the ACK gap by ticket size; see results/wp6_explore_ticketsize.md
+  log "R2x race design with the four suites (exploratory)"; rm -rf results/trace_clock_race_x$SFX
+  run_trace trace_clock_race_x$SFX ticket_xmit.bt --suites "ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768,ML-DSA-87|ML-KEM-1024" --n 8 || exit 1
+  check_out trace_clock_race_x$SFX || log "R2x: probe lines missing"
+fi
+if [ "$STEP" = r2y ]; then       # EXPLORATORY (22 Nov 2026): race design with a request of 25 000 B, which overflows the client window of every suite (16 segments for ML-DSA-87); see results/wp6_explore_ticketsize_2.md
+  log "R2y race design, request 25 000 B, four suites (exploratory)"; rm -rf results/trace_clock_race_y$SFX
+  run_trace trace_clock_race_y$SFX ticket_xmit.bt --suites "ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768,ML-DSA-87|ML-KEM-1024" --reqs 25000 --n 8 || exit 1
+  check_out trace_clock_race_y$SFX || log "R2y: probe lines missing"
 fi
 if [ "$STEP" = ctrl ] || [ "$STEP" = tuned ]; then
   log "C1 race design with the instruments of the first run (capture + tcp_probe, no bpftrace, no clock_sync)"; rm -rf results/trace_clock_ctrl1$SFX

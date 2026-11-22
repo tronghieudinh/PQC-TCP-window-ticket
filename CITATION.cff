@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software or data, please cite it as below."
-title: "Code, data and predictions for: How Linux grows the TCP window after a short flight, and what it costs post-quantum TLS"
+title: "Code, data and predictions for: How Linux grows the TCP window after a short flight, and what it costs post-quantum TLS in round trips"
 type: software
 authors:
   - family-names: "Dinh"

@@ -63,7 +63,7 @@ def offsets(fl):
     med = st.median(offs); return med, [(o - med) * 1e6 for o in offs]
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--softirq", default=""); ap.add_argument("--race", default=""); ap.add_argument("--out", default="")
+    ap = argparse.ArgumentParser(); ap.add_argument("--softirq", default=""); ap.add_argument("--race", default=""); ap.add_argument("--out", default=""); ap.add_argument("--k7csv", default="")
     a = ap.parse_args()
     sets = {n: load(d) for n, d in (("R1 softirq", a.softirq), ("R2 race", a.race)) if d}
     say(f"clock-safe repeat: {', '.join(f'{n}: {len(v)} files' for n, v in sets.items())}")
@@ -167,6 +167,11 @@ def main():
         say(f"  ML-DSA, MTU below 9000: {len(ml)} transactions, burst above ten in {pos}; the threshold of the first run, 0.049 ms (out of sample): {right} of {len(ml)} right ({100 * right / len(ml):.1f}%); the best threshold on these data (in sample, as the first run's was): {top} of {len(ml)} at {min(ths):.3f} to {max(ths):.3f} ms; first run: 132 of 134 at 0.049 ms")
     else:
         say("  not computed")
+    if a.k7csv:                                                                   # one row per resumed transaction of R2 (the points behind K7), for the figure of the supplement
+        with open(a.k7csv, "w") as f:
+            f.write("suite,mtu,rtt_ms,burst_segments,last_ticket_ack_minus_last_request_ms\n")
+            for x in k6:
+                if x["rel_req"] is not None: f.write(f"{x['suite']},{x['mtu']},{x['rtt']},{x['burst']},{x['rel_req']:.4f}\n")
     if a.out:
         open(a.out, "w").write("\n".join(OUT) + "\n")
 

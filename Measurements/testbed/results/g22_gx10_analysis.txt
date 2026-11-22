@@ -1,0 +1,16 @@
+G22 round 2, machine GX10 (g22.csv): 100 random and 30 focus cells measured, 0 missing or with fewer than 30 valid transactions
+  C1 r2 wrong by more than half an RTT on 3 of 100 random cells (at most 2)  [r1: 0]
+  C2 r2 mean absolute error over the random cells 5.89 ms (at most 2)  [r1: 3.30]
+  C3 r2 error / r1 error = 1.79 (at most 0.70) and r2 wrong 3 <= r1 wrong 0
+  C4 focus cells: r2 wrong on 16 of 30, r1 wrong on 10 (r2 at most r1)  [mean absolute error r2 41.63 ms, r1 32.49 ms]
+  C5 data: 0 cells missing (none allowed)
+  met: C1 NO, C2 NO, C3 NO, C4 NO, C5 yes
+  (reported) within 2 ms of the measurement on 21 of 100 random cells for r1, 21 for r2
+
+Decision on this machine (METHOD_ITERATIVE.md 2 and 4A): C3 and C4 failed on the complete data, so KEPT and IMPROVEMENT ONLY are both impossible: the round is NOT SUPPORTED. Runs not yet started are not started (section 4A); runs in progress finish and are recorded.
+
+EXPLORATORY reading (not part of the criteria; the data of this run go to the exploration set of round 3):
+  random cells: r1 wrong on 0 of 100 (mean absolute error 3.30 ms), r2 wrong on 3 (5.89 ms): on cells nobody chose the model of L1 did better here than on G19 (4 wrong on this machine).
+  focus cells (30, chosen where r1 and r2 differ): r1 wrong on 10, r2 wrong on 16; r1 right and r2 wrong on 15, r1 wrong and r2 right on 9, both wrong on 1.
+  of the 28 cells where r2 differs from r1 by more than half an RTT, the measurement lies close to r1 on 19 and close to r2 on 10; BY TICKET SIZE: ticket of 1 to 6 segments (ECDSA-P256, ML-DSA-44, -65): 18 cells close to r1, 3 close to r2 (r2 predicted an enlarged server window that the machine did not show); ticket of 7 segments (ML-DSA-87): 7 cells, 7 close to r2 (the window was enlarged, as r2 predicted).
+  So on the GX10 the window after the ticket is enlarged only for the largest ticket in these cells. The replay with d_tkt = 125 us and p_w = 75 us (fitted on race classes with tickets of 1 to 6 segments, 100 Mbit/s) over-predicts the enlargement for the smaller tickets: the two parameters (level D, METHOD_ITERATIVE.md 3A) did not transfer. A candidate for round 3 (to be stated with a mechanism and a range before any fit): the number of ticket acknowledgments processed before the write depends on the ticket's size and on the machine, and the enlargement starts at a machine-dependent number of ticket segments.

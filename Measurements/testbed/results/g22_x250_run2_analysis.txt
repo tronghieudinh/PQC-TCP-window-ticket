@@ -1,0 +1,8 @@
+G22 round 2, machine X250 (g22.csv): 100 random and 30 focus cells measured, 0 missing or with fewer than 30 valid transactions
+  C1 r2 wrong by more than half an RTT on 2 of 100 random cells (at most 2)  [r1: 4]
+  C2 r2 mean absolute error over the random cells 3.01 ms (at most 2)  [r1: 4.58]
+  C3 r2 error / r1 error = 0.66 (at most 0.70) and r2 wrong 2 <= r1 wrong 4
+  C4 focus cells: r2 wrong on 8 of 30, r1 wrong on 21 (r2 at most r1)  [mean absolute error r2 12.05 ms, r1 59.33 ms]
+  C5 data: 0 cells missing (none allowed)
+  met: C1 yes, C2 NO, C3 yes, C4 yes, C5 yes
+  (reported) within 2 ms of the measurement on 88 of 100 random cells for r1, 90 for r2

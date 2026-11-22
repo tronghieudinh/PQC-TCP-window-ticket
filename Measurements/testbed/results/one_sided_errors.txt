@@ -1,0 +1,46 @@
+test | run | cells | wrong, optimistic (measured slower) | wrong, pessimistic (model slower) | largest measured-minus-prediction (ms) | largest prediction-minus-measured (ms)
+client window (rule 1), 28 cells | X250, OpenSSL 3.5 (original) | 28 | 0 | 0 | +0.7 | +0.5
+ticket timing, 80 cells | X250, OpenSSL 3.5 (original) | 80 | 0 | 4 | +1.1 | +98.6
+client window (rule 1), 28 cells | X250, OpenSSL 3.6.5 (G9) | 28 | 0 | 0 | +0.6 | +0.5
+ticket timing, 80 cells | X250, OpenSSL 3.6.5 (G9) | 80 | 0 | 4 | +1.1 | +98.6
+client window (rule 1), 28 cells | X250, OpenSSL 4.1.0 (G9) | 28 | 0 | 0 | +0.6 | +0.5
+ticket timing, 80 cells | X250, OpenSSL 4.1.0 (G9) | 80 | 0 | 4 | +1.1 | +98.6
+ticket timing on new cells (G12, RTT 30 and 200) | X250 | 76 | 0 | 2 | +1.0 | +198.4
+ticket timing on new cells (G12, RTT 30 and 200) | GX10 | 76 | 0 | 1 | +3.5 | +27.9
+ticket timing on new cells (G12, RTT 30 and 200) | Optiplex | 76 | 0 | 0 | +3.2 | -0.4
+client window, delayed ACK (G14) | X250 | 28 | 0 | 0 | +0.9 | +0.5
+ticket timing, delayed ACK (G14) | X250 | 32 | 0 | 0 | +40.2 | +0.7
+client window, delayed ACK (G14) | GX10 | 28 | 0 | 0 | +2.3 | -0.2
+ticket timing, delayed ACK (G14) | GX10 | 32 | 0 | 0 | +41.0 | -0.2
+client window, delayed ACK (G14) | Optiplex | 28 | 0 | 0 | +2.8 | -0.3
+ticket timing, delayed ACK (G14) | Optiplex | 32 | 0 | 0 | +42.7 | -0.5
+ticket timing under BBR (G14) | X250 | 41 | 2 | 1 | +54.3 | +81.6
+    OPTIMISTIC cell ML-DSA-87 req 19460 k 5: measured exceeds the prediction by 54.2 ms
+    OPTIMISTIC cell ML-DSA-87 req 19460 k 6: measured exceeds the prediction by 54.3 ms
+client window (rule 1), real link (G13-lite) | Optiplex-X250 cable | 28 | 0 | 0 | +3.1 | +0.3
+ticket timing, real link (G13-lite) | Optiplex-X250 cable | 32 | 0 | 0 | +2.8 | +0.3
+background load L0 (G17) | X250 | 22 | 0 | 0 | +1.0 | +0.5
+background load L1 (G17) | X250 | 22 | 0 | 0 | +1.6 | +0.6
+background load L2 (G17) | X250 | 22 | 0 | 0 | -0.3 | +1.8
+background load L3 (G17) | X250 | 22 | 0 | 0 | +2.2 | +0.6
+100 random cells (G19) | X250 run 1 (reference) | 100 | 0 | 5 | +4.9 | +198.4
+100 random cells (G19) | X250 run 2 | 100 | 0 | 4 | +4.9 | +198.4
+100 random cells (G19) | GX10 | 100 | 0 | 4 | +4.9 | +197.7
+100 random cells (G19) | Optiplex | 100 | 0 | 2 | +6.0 | +196.8
+TOTAL, all tests: 1321 cell-runs; wrong and optimistic 2; wrong and pessimistic 31
+TOTAL without the BBR arm (outside the model of L1): 1280 cell-runs (400 distinct cells, a cell counted once across runs and machines); wrong and optimistic 0; wrong and pessimistic 30; the measured excess exceeded the prediction by at most +42.7 ms (any cell), the prediction exceeded the measured excess by at most +198.4 ms
+the largest underestimate outside the delayed-ACK and BBR tests: +6.0 ms
+GROUP | client window (rule 1), 28 cells | 3 | 84 | 0 | 0
+GROUP | ticket timing, 80 cells | 3 | 240 | 0 | 12
+GROUP | ticket timing on new cells (G12, RTT 30 and 200) | 3 | 228 | 0 | 3
+GROUP | client window, delayed ACK (G14) | 3 | 84 | 0 | 0
+GROUP | ticket timing, delayed ACK (G14) | 3 | 96 | 0 | 0
+GROUP | ticket timing under BBR (G14) | 1 | 41 | 2 | 1
+GROUP | client window (rule 1), real link (G13-lite) | 1 | 28 | 0 | 0
+GROUP | ticket timing, real link (G13-lite) | 1 | 32 | 0 | 0
+GROUP | background load L0 (G17) | 1 | 22 | 0 | 0
+GROUP | background load L1 (G17) | 1 | 22 | 0 | 0
+GROUP | background load L2 (G17) | 1 | 22 | 0 | 0
+GROUP | background load L3 (G17) | 1 | 22 | 0 | 0
+GROUP | 100 random cells (G19) | 4 | 400 | 0 | 15
+Notes: a cell-run is one cell in one run; the same cell appears in several runs (three OpenSSL releases, three machines), so the count is not a count of independent cells. With delayed ACKs the largest underestimate is 40 to 43 ms (the 40 ms delayed-ACK timer, which the model leaves out), below half an RTT. The two optimistic cells under BBR are the two ML-DSA-87 cells that the paper reports between the BBR and the Reno prediction.

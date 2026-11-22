@@ -37,6 +37,29 @@ if [ -f Measurements/testbed/results/g19/X250/g19.csv ]; then
   $PY Measurements/testbed/analyze_g19_posthoc.py --run Measurements/testbed/results/g19/X250/g19.csv --out "$tmp/g19_posthoc.txt" >/dev/null
   cmp -s "$tmp/g19_posthoc.txt" Measurements/testbed/results/g19_posthoc.txt && echo "G19 post hoc OK" || { echo "G19 post hoc DIFF"; exit 1; }
 fi
+# G22 (second random draw): the analysis of the X250 run rerun from the archived data (the head of the shipped file: the decision text after it is the authors')
+g22x=$(ls data/x250/scenarios/G22/*/data/g22.csv 2>/dev/null | grep -v -- '-run2' | tail -1 || true)
+g22x2=$(ls data/x250/scenarios/G22/*-run2/data/g22.csv 2>/dev/null | tail -1 || true)   # the declared exploratory repeat (noise floor)
+if [ -n "$g22x" ]; then
+  $PY Measurements/testbed/analyze_g22.py --run "$g22x" --machine X250 --out "$tmp/g22x.txt" >/dev/null
+  head -n "$(wc -l < "$tmp/g22x.txt")" Measurements/testbed/results/g22_x250_analysis.txt | cmp -s - "$tmp/g22x.txt" && echo "G22 X250 analysis OK" || { echo "G22 X250 analysis DIFF"; exit 1; }
+fi
+if [ -n "$g22x2" ] && [ -n "$g22x" ]; then
+  $PY Measurements/testbed/analyze_g22.py --run "$g22x2" --machine X250 --out "$tmp/g22x2.txt" >/dev/null
+  head -n "$(wc -l < "$tmp/g22x2.txt")" Measurements/testbed/results/g22_x250_run2_analysis.txt | cmp -s - "$tmp/g22x2.txt" && echo "G22 X250 run 2 analysis OK" || { echo "G22 X250 run 2 analysis DIFF"; exit 1; }
+  $PY Measurements/testbed/analyze_g22.py --run "$g22x" --run2 "$g22x2" --machine X250 --out "$tmp/g22nf.txt" >/dev/null
+  head -n "$(wc -l < "$tmp/g22nf.txt")" Measurements/testbed/results/g22_x250_noisefloor.txt | cmp -s - "$tmp/g22nf.txt" && echo "G22 X250 noise floor OK" || { echo "G22 X250 noise floor DIFF"; exit 1; }
+fi
+g22g=$(ls data/gx10/scenarios/G22/*/data/g22.csv 2>/dev/null | tail -1 || true)
+if [ -n "$g22g" ] && [ -n "$g22x" ]; then
+  $PY Measurements/testbed/analyze_g22.py --run "$g22g" --machine GX10 --out "$tmp/g22g.txt" >/dev/null
+  head -n "$(wc -l < "$tmp/g22g.txt")" Measurements/testbed/results/g22_gx10_analysis.txt | cmp -s - "$tmp/g22g.txt" && echo "G22 GX10 analysis OK" || { echo "G22 GX10 analysis DIFF"; exit 1; }
+  $PY Measurements/testbed/one_sided_errors.py --g22-only --out "$tmp/os22.txt" >/dev/null
+  cmp -s "$tmp/os22.txt" Measurements/testbed/results/one_sided_errors_g22.txt && echo "direction of the errors, G22 OK" || { echo "direction of the errors, G22 DIFF"; exit 1; }
+fi
+# the direction of the errors of the model over every per-cell test of L1 (supplement, Table 7): rerun from the archived raw files
+$PY Measurements/testbed/one_sided_errors.py --out "$tmp/one_sided.txt" >/dev/null
+cmp -s "$tmp/one_sided.txt" Measurements/testbed/results/one_sided_errors.txt && echo "direction of the errors OK" || { echo "direction of the errors DIFF"; exit 1; }
 if [ -f Measurements/testbed/results/g20/X250/g20_ecdsa_k12.csv ]; then
   $PY Measurements/testbed/analyze_g20_g21.py --exp g20 --run Measurements/testbed/results/g20/X250 --out "$tmp/g20_analysis.txt" >/dev/null
   cmp -s "$tmp/g20_analysis.txt" Measurements/testbed/results/g20_analysis.txt && echo "G20 analysis OK" || { echo "G20 analysis DIFF"; exit 1; }
