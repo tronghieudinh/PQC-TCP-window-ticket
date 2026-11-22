@@ -44,7 +44,7 @@ def run_one(tb, probe, suite, req, resp, depth, mtls, n, outdir, tag, rtt, pcap,
     ch = RT.ensure_chain(alg, depth, os.path.join(HERE, "work"))
     port = tbnet.PROBE_PORT
     srv_cmd = ["taskset", "-c", os.environ.get("PQC_SRV_CPU", "1")] + tb.exec_prefix("s") + [probe, "server", "--addr", tb.server_bind, "--port", port, "--cert", ch["server"][0], "--key", ch["server"][1],
-               "--ca", ch["ca"], "--groups", group, "--req", str(req), "--resp", str(resp)] + (["--resume"] if resume else []) + (["--mtls"] if mtls else []) + (["--no-resumed-ticket"] if os.environ.get("PQC_NO_RESUMED_TICKET") else [])
+               "--ca", ch["ca"], "--groups", group, "--req", str(req), "--resp", str(resp)] + (["--resume"] if resume else []) + (["--mtls"] if mtls else []) + (["--no-resumed-ticket"] if os.environ.get("PQC_NO_RESUMED_TICKET") else []) + (["--pre-write-delay-us", os.environ["R3_WRITE_DELAY_US"]] if os.environ.get("R3_WRITE_DELAY_US") not in (None, "", "off") else [])
     cli_cmd = ["taskset", "-c", "0"] + tb.exec_prefix("c") + [probe, "client", "--addr", tb.client_target, "--port", port, "--ca", ch["ca"], "--groups", group, "--req", str(req),
                "--resp", str(resp), "--n", str(n), "--warmup", "2", "--gap-ms", f"{2 * rtt + 5:g}"] + (["--resume"] if resume else []) + (["--cert", ch["client"][0], "--key", ch["client"][1]] if mtls else [])
     srv = subprocess.Popen(srv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

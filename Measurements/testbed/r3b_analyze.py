@@ -13,7 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import analyze_r3 as R, analyze_ticket_race as T
 
 def txs(rundir):
-    m = re.search(r"_d(off|[0-9.]+)_m(\d+)$", rundir.rstrip("/")); delay, mtu = m.group(1), int(m.group(2)); ev_rows, tx_rows = [], []
+    m = re.search(r"_([dw])(off|[0-9.]+)_m(\d+)$", rundir.rstrip("/")); kind, delay, mtu = m.group(1), m.group(2), int(m.group(3)); ev_rows, tx_rows = [], []
     for f in sorted(glob.glob(os.path.join(rundir, "*_srv.pcap"))):
         g = T.TAG.search(os.path.basename(f)).groupdict(); bpf = f[:-len("_srv.pcap")] + ".bpf.txt"
         if not os.path.exists(bpf): continue
@@ -26,9 +26,10 @@ def txs(rundir):
         ak = collections.defaultdict(list); akr = collections.defaultdict(list)
         for e in ev["AK"]: ak[e[1]].append(e)
         for e in ev["AKR"]: akr[e[1]].append(e)
-        rx = {}
+        rx = {}; rxdata = collections.defaultdict(list)
         for e in ev["RX"]:
             if e[2] == R.PORT and e[5] == 0: rx.setdefault((e[1], e[4]), e[0])
+            elif e[2] == R.PORT and e[5] > 0: rxdata[e[1]].append(e[0])                      # client data segments (the request) arriving at the server
         for i, (cp, ps) in enumerate(R.conns(f).items()):
             if i % 2 == 0: continue
             r = T.analyse_conn(ps, R.PORT, shift, int(g["req"])); big = [s for s in sends.get(cp, []) if s[3] - s[2] >= 5000]
@@ -54,12 +55,14 @@ def txs(rundir):
                 cw, ssth, mpo, lim = a[4], a[6], a[5], a[7]
                 rule = min(cw + acked, ssth) if ((lim or cw < 2 * mpo) and cw < ssth) else cw
                 tot_ev += 1; ok_ev += (b[4] == rule)
-                ev_rows.append(dict(delay=delay, mtu=mtu, suite=g["suite"], cwnd_before=cw, cwnd_after=b[4], acked=acked, ssthresh=ssth, max_po=mpo, limited=lim, rule=rule, met=int(b[4] == rule), t_vs_write_us=round((a[0] - t_q) / 1000.0, 1)))
+                ev_rows.append(dict(kind=kind, delay=delay, mtu=mtu, suite=g["suite"], cwnd_before=cw, cwnd_after=b[4], acked=acked, ssthresh=ssth, max_po=mpo, limited=lim, rule=rule, met=int(b[4] == rule), t_vs_write_us=round((a[0] - t_q) / 1000.0, 1)))
             if not pairs: continue
             tk = [(a, b) for a, b in pairs if a[2] != b[2] and t_start < b[2] <= t_end]
             shifts = [(a[0] - rx[(cp, b[2])]) / 1000.0 for a, b in tk if (cp, b[2]) in rx]
             lastb = [b for a, b in pairs][-1]
-            tx_rows.append(dict(delay=delay, mtu=mtu, suite=g["suite"], n=n, resp_segs=r["resp_segs"], burst=r["burst"], tk_acks=len(tk), late=sum(a[0] > t_q for a, _ in tk),
+            lastreq = [t for t in rxdata.get(cp, []) if t <= t_q]
+            pw = round((t_q - max(lastreq)) / 1000.0, 1) if lastreq else ""
+            tx_rows.append(dict(kind=kind, delay=delay, pw_us=pw, ak_minus_tq_us=";".join(f"{(a_[0] - t_q) / 1000.0:.1f}" for a_, _ in tk), mtu=mtu, suite=g["suite"], n=n, resp_segs=r["resp_segs"], burst=r["burst"], tk_acks=len(tk), late=sum(a[0] > t_q for a, _ in tk),
                                 cwnd_final=lastb[4], po_final=lastb[3], max_po_final=lastb[5], events=tot_ev, events_met=ok_ev,
                                 shift_us=round(st.median(shifts), 1) if shifts else ""))
     return ev_rows, tx_rows
@@ -67,7 +70,7 @@ def txs(rundir):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--runs", required=True); ap.add_argument("--tag", default=""); ap.add_argument("--machine", default="")
     ap.add_argument("--csv", default=""); ap.add_argument("--out", default=""); a = ap.parse_args(); E, X = [], []
-    for d in sorted(glob.glob(os.path.join(os.path.expanduser(a.runs), f"trace_r3{a.tag}_d*_m*"))):
+    for d in sorted(glob.glob(os.path.join(os.path.expanduser(a.runs), f"trace_r3{a.tag}_[dw]*_m*"))):
         if os.path.isdir(d):
             e, x = txs(d); E += e; X += x
     L = [f"Round 3b analysis, machine {a.machine or '?'}: {len(X)} resumed transactions, {len(E)} window events"]

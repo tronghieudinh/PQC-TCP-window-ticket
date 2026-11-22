@@ -6,6 +6,7 @@
 #   sudo bash run_r3.sh run [TAG]      # the whole design: delays off, 0, 50, 100, 200, 400, 800, 1600 us x MTU 1500 and 1280 x ECDSA-P256, ML-DSA-65, ML-DSA-87, n = 30 (about 30 minutes)
 #   sudo bash run_r3.sh repeat         # the same once more into other directories (the declared repeat of one machine: the noise floor)
 # Request 25 000 B (it overflows every client window), RTT 100 ms, 100 Mbit/s. As in run_clock_repeat.sh: NTP off, CPU clock fixed (host_tune.sh), both restored on exit.
+# Round 3c: R3_WDELAYS="off 0 25 50 100 200 400 800" delays the WRITE of the response by that many microseconds instead (tls_probe --pre-write-delay-us; rebuild tls_probe first); directories trace_r3<TAG>_w<delay>_m<mtu>
 # Round 3b: R3_PROBE=ticket_ack2.bt (the probe with max_packets_out, ssthresh, is_cwnd_limited) and R3_DELAYS="off 0 200 800 1600 3200 6400" (microseconds; the X250 needs the long range) in the environment: sudo env R3_PROBE=ticket_ack2.bt R3_DELAYS="..." bash run_r3.sh run _p
 # Output: results/trace_r3<TAG>_d<delay>_m<mtu>/ (pcap of the server's link, <tag>.bpf.txt of ticket_ack.bt, clock files) and a tar.gz in the user's home to copy to the analysis machine.
 # On the GX10 pass the certificates: sudo env PQC_CERTS=... bash run_r3.sh run
@@ -34,23 +35,30 @@ restore() { [ "$TUNED" = 1 ] && ./host_tune.sh off >>"$LOG" 2>&1 && log "host tu
 trap restore EXIT
 timedatectl set-ntp false && log "NTP switched off (was: $NTP0)"
 if [ "${PQC_NO_TUNE:-0}" != 1 ]; then ./host_tune.sh on >>"$LOG" 2>&1; TUNED=1; log "CPU clock fixed (governor $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor))"; else log "CPU clock NOT fixed (PQC_NO_TUNE=1)"; fi
-run_cell() { # delay(us or off) mtu n outdir
-  local d=$1 m=$2 n=$3 out=$4
+run_cell() { # delay(us or off) mtu n outdir [write delay in us]
+  local d=$1 m=$2 n=$3 out=$4 wd=${5:-}
   rm -rf results/$out
-  PQC_ACK_DELAY_US=$d PQC_OUTDIR=$out PQC_BPF=${R3_PROBE:-ticket_ack.bt} PQC_NO_TCPPROBE=1 $PY trace_run.py race --suites "ECDSA-P256|X25519,ML-DSA-65|ML-KEM-768,ML-DSA-87|ML-KEM-1024" --reqs 25000 --nets "100:100:$m" --ks 13 --n "$n" >>"$LOG" 2>&1 || { log "trace_run FAILED for $out (see the log)"; return 1; }
+  R3_WRITE_DELAY_US=$wd PQC_ACK_DELAY_US=$d PQC_OUTDIR=$out PQC_BPF=${R3_PROBE:-ticket_ack.bt} PQC_NO_TCPPROBE=1 $PY trace_run.py race --suites "ECDSA-P256|X25519,ML-DSA-65|ML-KEM-768,ML-DSA-87|ML-KEM-1024" --reqs 25000 --nets "100:100:$m" --ks 13 --n "$n" >>"$LOG" 2>&1 || { log "trace_run FAILED for $out (see the log)"; return 1; }
   local ok=0 bad=0 f
   for f in results/$out/*.bpf.txt; do [ -e "$f" ] || continue
     if grep -q "^AK " "$f" && grep -q "^AKR " "$f" && grep -q "^XQ " "$f" && grep -q "^SEND " "$f"; then ok=$((ok+1)); else bad=$((bad+1)); log "  missing probe lines in $f"; fi; done
   log "$out: $ok bpf files with AK, AKR, XQ and SEND; $bad without"; [ "$bad" = 0 ] && [ "$ok" -gt 0 ]
 }
 if [ "$STEP" = smoke ]; then
-  run_cell 200 1500 3 trace_r3_smoke || { log "SMOKE FAILED: send the log (results/r3_run.log) and the head of results/trace_r3_smoke/*.bpf.txt"; exit 1; }
+  if [ -n "${R3_WDELAYS:-}" ]; then run_cell off 1500 3 trace_r3_smoke 400 || { log "SMOKE FAILED (write delay)"; exit 1; }; fi
+  [ -n "${R3_WDELAYS:-}" ] || run_cell 200 1500 3 trace_r3_smoke || { log "SMOKE FAILED: send the log (results/r3_run.log) and the head of results/trace_r3_smoke/*.bpf.txt"; exit 1; }
   head -c 900 results/trace_r3_smoke/ML-DSA-65*.bpf.txt | head -12 | tee -a "$LOG"; grep -m3 "^AKR " results/trace_r3_smoke/ML-DSA-65*.bpf.txt | tee -a "$LOG"
   ip netns list 2>/dev/null | head -2; log "smoke ok: AK and AKR lines are there; now sudo bash run_r3.sh run"; chown -R "$U" results; exit 0
 fi
+if [ -n "${R3_WDELAYS:-}" ]; then       # round 3c: the WRITE of the response is delayed (tls_probe --pre-write-delay-us), the ACKs are not: directories _w<delay>
+  for m in 1500 1280; do for w in $R3_WDELAYS; do
+    run_cell off $m 30 trace_r3${TAG}_w${w}_m${m} $w || exit 1
+  done; done
+else
 for m in 1500 1280; do for d in ${R3_DELAYS:-off 0 50 100 200 400 800 1600}; do
   run_cell $d $m 30 trace_r3${TAG}_d${d}_m${m} || exit 1
 done; done
+fi
 chown -R "$U" results
 T=$UH/r3_$(hostname -s)_$(date +%Y%m%d_%H%M)${TAG}.tar.gz
 tar -czf "$T" -C results $(cd results && ls -d trace_r3${TAG}_d* r3_run.log 2>/dev/null) && chown "$U" "$T" && log "packed: $T ($(du -h "$T" | cut -f1)); push_data or copy it to the analysis machine"
