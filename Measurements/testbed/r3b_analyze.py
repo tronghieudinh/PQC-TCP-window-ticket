@@ -13,7 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import analyze_r3 as R, analyze_ticket_race as T
 
 def txs(rundir):
-    m = re.search(r"_([dw])(off|[0-9.]+)_m(\d+)$", rundir.rstrip("/")); kind, delay, mtu = m.group(1), m.group(2), int(m.group(3)); ev_rows, tx_rows = [], []
+    m = re.search(r"_([dws])(off|[0-9.]+)_m(\d+)$", rundir.rstrip("/")); kind, delay, mtu = m.group(1), m.group(2), int(m.group(3)); ev_rows, tx_rows = [], []
     for f in sorted(glob.glob(os.path.join(rundir, "*_srv.pcap"))):
         g = T.TAG.search(os.path.basename(f)).groupdict(); bpf = f[:-len("_srv.pcap")] + ".bpf.txt"
         if not os.path.exists(bpf): continue
@@ -70,7 +70,7 @@ def txs(rundir):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--runs", required=True); ap.add_argument("--tag", default=""); ap.add_argument("--machine", default="")
     ap.add_argument("--csv", default=""); ap.add_argument("--out", default=""); a = ap.parse_args(); E, X = [], []
-    for d in sorted(glob.glob(os.path.join(os.path.expanduser(a.runs), f"trace_r3{a.tag}_[dw]*_m*"))):
+    for d in sorted(glob.glob(os.path.join(os.path.expanduser(a.runs), f"trace_r3{a.tag}_[dws]*_m*"))):
         if os.path.isdir(d):
             e, x = txs(d); E += e; X += x
     L = [f"Round 3b analysis, machine {a.machine or '?'}: {len(X)} resumed transactions, {len(E)} window events"]

@@ -1,0 +1,40 @@
+{
+ "training": {
+  "cells": 52,
+  "inside_band": 52,
+  "p_lo": 0.944,
+  "mean_abs_error": {
+   "Arm (3c pilot)": 2.62,
+   "x86 (3c test)": 0.68
+  },
+  "null_error": {
+   "Arm (3c pilot)": 6.65,
+   "x86 (3c test)": 33.06
+  }
+ },
+ "C1": {
+  "tolerance_us": 25.0,
+  "spread_slope_limit": 0.29,
+  "note": "the floor of the rule (a spin-wait has no timer slack: a prediction that can fail); the spread limit is the slope of the 3c pilot"
+ },
+ "C2": {
+  "mover_min_late_at_0": 10.0,
+  "max_late_at_max_fraction": 0.5,
+  "note": "as in round 3c"
+ },
+ "C3": {
+  "max_failures_by_cells": {
+   "24": 3,
+   "28": 4,
+   "32": 4,
+   "36": 4,
+   "40": 5
+  },
+  "mean_error_limit": 5.2,
+  "null_fraction": 0.79,
+  "note": "cells outside the binomial band: at most the failures that a machine behaving like the training cells stays under with probability 95 %; mean absolute error at most twice the largest training mean error and at most that fraction (twice the largest training ratio) of the error of 'no dependence on D'"
+ },
+ "C4": {
+  "note": "inherited: B1 >= 99.914 % and B2 >= 99.6 % of r3b_thresholds.json"
+ }
+}

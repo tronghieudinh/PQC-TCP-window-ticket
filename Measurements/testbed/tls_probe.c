@@ -53,7 +53,7 @@
 
 typedef struct {
     const char *addr, *port, *cert, *key, *ca, *groups;
-    int mtls, req, resp, n, warmup, resume, reuseport, no_resumed_ticket, pre_write_delay_us;
+    int mtls, req, resp, n, warmup, resume, reuseport, no_resumed_ticket, pre_write_delay_us, pre_write_spin_us;
     double gap_ms;
 } Opt;
 
@@ -67,6 +67,14 @@ static int new_session_cb(SSL *ssl, SSL_SESSION *sess) {
     if (g_sess) SSL_SESSION_free(g_sess);
     g_sess = sess;              /* keep the reference handed to us */
     return 1;
+}
+
+/* round 3d: --pre-write-spin-us waits by spinning on CLOCK_MONOTONIC until the deadline (no timer slack): the write is later by D within a few microseconds, on any machine */
+static void spin_us(int us) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    long long end = t.tv_sec * 1000000000LL + t.tv_nsec + (long long)us * 1000;
+    do clock_gettime(CLOCK_MONOTONIC, &t); while (t.tv_sec * 1000000000LL + t.tv_nsec < end);
 }
 
 static double now_ms(void) {
@@ -201,7 +209,7 @@ static int run_server(const Opt *o) {
         }
         SSL *ssl = SSL_new(ctx);
         SSL_set_fd(ssl, fd);
-        if (SSL_accept(ssl) == 1 && read_exact(ssl, req, o->req) == o->req && (o->pre_write_delay_us <= 0 || (nanosleep(&(struct timespec){o->pre_write_delay_us / 1000000, (long)(o->pre_write_delay_us % 1000000) * 1000L}, NULL), 1)) && write_all(ssl, resp, o->resp) == o->resp) {   /* round 3c: --pre-write-delay-us waits between the end of the request and the response */
+        if (SSL_accept(ssl) == 1 && read_exact(ssl, req, o->req) == o->req && (o->pre_write_spin_us <= 0 || (spin_us(o->pre_write_spin_us), 1)) && (o->pre_write_delay_us <= 0 || (nanosleep(&(struct timespec){o->pre_write_delay_us / 1000000, (long)(o->pre_write_delay_us % 1000000) * 1000L}, NULL), 1)) && write_all(ssl, resp, o->resp) == o->resp) {   /* round 3c: --pre-write-delay-us waits between the end of the request and the response */
             hs_ok++;
             SSL_shutdown(ssl);
         } else
@@ -332,7 +340,7 @@ int main(int argc, char **argv) {
     static struct option lo[] = {
         {"addr", 1, 0, 'a'}, {"port", 1, 0, 'p'}, {"cert", 1, 0, 'c'}, {"key", 1, 0, 'k'}, {"ca", 1, 0, 'A'},
         {"groups", 1, 0, 'g'}, {"mtls", 0, 0, 'm'}, {"req", 1, 0, 'q'}, {"resp", 1, 0, 'r'}, {"n", 1, 0, 'n'},
-        {"warmup", 1, 0, 'w'}, {"gap-ms", 1, 0, 'G'}, {"resume", 0, 0, 'R'}, {"reuseport", 0, 0, 'P'}, {"no-resumed-ticket", 0, 0, 'T'}, {"pre-write-delay-us", 1, 0, 'D'}, {0, 0, 0, 0}};
+        {"warmup", 1, 0, 'w'}, {"gap-ms", 1, 0, 'G'}, {"resume", 0, 0, 'R'}, {"reuseport", 0, 0, 'P'}, {"no-resumed-ticket", 0, 0, 'T'}, {"pre-write-delay-us", 1, 0, 'D'}, {"pre-write-spin-us", 1, 0, 'S'}, {0, 0, 0, 0}};
     int c;
     optind = 2;
     while ((c = getopt_long(argc, argv, "", lo, NULL)) != -1) {
@@ -353,6 +361,7 @@ int main(int argc, char **argv) {
         case 'P': o.reuseport = 1; break;
         case 'T': o.no_resumed_ticket = 1; break;
         case 'D': o.pre_write_delay_us = atoi(optarg); break;
+        case 'S': o.pre_write_spin_us = atoi(optarg); break;
         default: return 2;
         }
     }

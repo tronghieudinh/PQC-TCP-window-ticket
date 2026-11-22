@@ -8,13 +8,13 @@ relative to t_q are in the CSV); the predicted late share at D is the share of t
 import argparse, collections, csv, json, math, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-def load(path):
+def load(path, kind="w"):
     X = list(csv.DictReader(open(path)))
     for x in X:
         for k in ("n", "mtu", "late", "burst", "resp_segs", "cwnd_final"): x[k] = int(x[k])
         x["ak"] = [float(v) for v in x["ak_minus_tq_us"].split(";") if v != ""]
         x["pw"] = float(x["pw_us"]) if x["pw_us"] != "" else None
-    return [x for x in X if x.get("kind", "w") == "w"]
+    return [x for x in X if x.get("kind", "w") == kind]
 
 def series(X):
     return sorted({(x["suite"], x["mtu"]) for x in X if x["n"] >= 4})

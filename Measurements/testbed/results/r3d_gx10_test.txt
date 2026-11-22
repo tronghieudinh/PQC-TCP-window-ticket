@@ -1,0 +1,18 @@
+Round 3d test, machine GX10: 1499 resumed transactions
+C1 instrument (the write is later by D within 25 us)  -> NOT MET
+   D 50: median deviation -19.1 us (tolerance 25.0), spread 298 (limit 326)  ok
+   D 100: median deviation -15.4 us (tolerance 25.0), spread 299 (limit 340)  ok
+   D 150: median deviation -20.9 us (tolerance 25.0), spread 290 (limit 355)  ok
+   D 200: median deviation -17.6 us (tolerance 25.0), spread 300 (limit 369)  ok
+   D 300: median deviation -29.8 us (tolerance 25.0), spread 265 (limit 398)  OUTSIDE
+   D 400: median deviation -22.0 us (tolerance 25.0), spread 305 (limit 427)  ok
+C2 the order moves in the predicted direction  -> MET
+   ML-DSA-65 MTU 1280: change +0 points (band 17)  ok
+   ML-DSA-65 MTU 1500: change -6 points (band 17)  ok
+   ML-DSA-87 MTU 1280: 19 % -> 9 % (at or below 9 %)  ok
+   ML-DSA-87 MTU 1500: 16 % -> 3 % (at or below 8 %)  ok
+C3 the late share at each D is predicted from the D = 0 transactions and the measured shifts: 26 of 28 cells in the band (allowed outside: 4), mean absolute error 5.2 points (limit 5.2), null 4.4 (needs at most 0.79 of it)  -> NOT MET
+   OUTSIDE: ML-DSA-87 MTU 1280 D 300: measured 28 %, predicted 4 %
+   OUTSIDE: ML-DSA-87 MTU 1500 D 150: measured 25 %, predicted 8 %
+C4 the rule and the accounting: B1 100.000 % of 8738 events, B2 100.00 % of 1499 transactions  -> MET
+Reading (as registered): C1 not met: the instrument is not within the registered precision; nothing else is concluded for this machine.
