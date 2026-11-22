@@ -57,6 +57,12 @@ if [ -n "$g22g" ] && [ -n "$g22x" ]; then
   $PY Measurements/testbed/one_sided_errors.py --g22-only --out "$tmp/os22.txt" >/dev/null
   cmp -s "$tmp/os22.txt" Measurements/testbed/results/one_sided_errors_g22.txt && echo "direction of the errors, G22 OK" || { echo "direction of the errors, G22 DIFF"; exit 1; }
 fi
+# G23 (the third TLS library, GnuTLS): the numbers of the paper's paragraph from the archived data of the two machines
+g23a=$(ls -d data/gx10/scenarios/G23/*g23-gx10*/data 2>/dev/null | tail -1 || true); g23x=$(ls -d data/x250/scenarios/G23/*X250-g23-X250/data 2>/dev/null | tail -1 || true)
+if [ -n "$g23a" ] && [ -n "$g23x" ] && [ -f Measurements/testbed/results/g23_report.txt ]; then
+  $PY Measurements/testbed/g23_report.py --gx10 "$g23a" --x250 "$g23x" --out "$tmp/g23_report.txt" >/dev/null
+  cmp -s "$tmp/g23_report.txt" Measurements/testbed/results/g23_report.txt && echo "G23 report OK" || { echo "G23 report DIFF"; exit 1; }
+fi
 # the direction of the errors of the model over every per-cell test of L1 (supplement, Table 7): rerun from the archived raw files
 $PY Measurements/testbed/one_sided_errors.py --out "$tmp/one_sided.txt" >/dev/null
 cmp -s "$tmp/one_sided.txt" Measurements/testbed/results/one_sided_errors.txt && echo "direction of the errors OK" || { echo "direction of the errors DIFF"; exit 1; }

@@ -198,7 +198,7 @@ def run_config(c, tb, probe, cpus, work, loopback):
     mtls = ["--mtls"] if c["mtls"] else []
     srv_cmd = ["taskset", "-c", str(cpu_s)] + pre_s + [probe, "server", "--addr", s_addr, "--port", port,
               "--cert", ch["server"][0], "--key", ch["server"][1], "--ca", ca_srv, "--groups", group,
-              "--req", str(c["req"]), "--resp", str(c["resp"])] + mtls + (["--resume"] if c["resume"] else [])
+              "--req", str(c["req"]), "--resp", str(c["resp"])] + mtls + (["--resume"] if c["resume"] else []) + os.environ.get("PQC_PROBE_SERVER_ARGS", "").split()   # extra server options of a probe (G23: --tickets-resumed N)
     gap = 2 * c["rtt_ms"] + 5
     cli_cmd = ["taskset", "-c", str(cpu_c)] + pre_c + [probe, "client", "--addr", c_addr, "--port", port,
               "--ca", ch["ca"], "--groups", group, "--req", str(c["req"]), "--resp", str(c["resp"]),

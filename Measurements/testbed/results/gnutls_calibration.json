@@ -1,0 +1,326 @@
+{
+ "request": 302,
+ "response": 222,
+ "depth": 1,
+ "probe_sha256": "6c65963e7cf42176adc4aa8776b4ed598ed97230d41ffc9264c48248a05685ae",
+ "probe_version": "GnuTLS 3.8.14 (probe: tls_probe_gnutls)",
+ "suites": {
+  "ECDSA-P256|X25519": {
+   "resumed_client_hello_writes": [
+    1569
+   ],
+   "resumed_client_finished_writes": [
+    6,
+    74
+   ],
+   "resumed_request_writes": [
+    324
+   ],
+   "resumed_server_flight_writes": [
+    139,
+    108
+   ],
+   "resumed_ticket_writes": [
+    2626
+   ],
+   "resumed_response_writes": [
+    244
+   ],
+   "close_notify": 24,
+   "full_server_flight_writes": [
+    133,
+    1491
+   ],
+   "full_server_ticket_writes": [
+    2626
+   ],
+   "full_response_writes": [
+    244
+   ],
+   "full_client_writes": [
+    236,
+    6,
+    1224,
+    324,
+    24
+   ],
+   "leaf_server_pem_bytes": 1432,
+   "leaf_client_pem_bytes": 1432,
+   "inter_chain_pem_bytes": 0,
+   "sha256_server_pem": "e3c3fecc895b13751eb006d32e91a25af4481fab35d240e86d829193e163401c",
+   "sha256_client_pem": "da317ceabad6fb6c4c32b55a6e40e70e56eede92e72507e1f39d36703f004790",
+   "ticket_bytes": 2626,
+   "resumed_ticket_bytes": 2626,
+   "tickets1_resumed_ticket_bytes": 1313,
+   "tickets1_resumed_server_flight_writes": [
+    139,
+    108
+   ],
+   "tickets1_resumed_response_writes": [
+    244
+   ],
+   "tickets3_resumed_ticket_bytes": 3939,
+   "tickets3_resumed_server_flight_writes": [
+    139,
+    108
+   ],
+   "tickets3_resumed_response_writes": [
+    244
+   ],
+   "tickets4_resumed_ticket_bytes": 5252,
+   "tickets4_resumed_server_flight_writes": [
+    139,
+    108
+   ],
+   "tickets4_resumed_response_writes": [
+    244
+   ],
+   "tickets0_resumed_ticket_bytes": 0,
+   "tickets0_resumed_server_flight_writes": [
+    139,
+    108
+   ],
+   "tickets0_resumed_response_writes": [
+    244
+   ]
+  },
+  "ML-DSA-44|ML-KEM-768": {
+   "resumed_client_hello_writes": [
+    6353
+   ],
+   "resumed_client_finished_writes": [
+    6,
+    74
+   ],
+   "resumed_request_writes": [
+    324
+   ],
+   "resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "resumed_ticket_writes": [
+    9826
+   ],
+   "resumed_response_writes": [
+    244
+   ],
+   "close_notify": 24,
+   "full_server_flight_writes": [
+    1221,
+    7436
+   ],
+   "full_server_ticket_writes": [
+    9826
+   ],
+   "full_response_writes": [
+    244
+   ],
+   "full_client_writes": [
+    1420,
+    6,
+    7170,
+    324,
+    24
+   ],
+   "leaf_server_pem_bytes": 6299,
+   "leaf_client_pem_bytes": 6299,
+   "inter_chain_pem_bytes": 0,
+   "sha256_server_pem": "fda72dbd101103cbccc31f0e2965c6c29cb0052a8f5ed7c46e803ad9cc6f658d",
+   "sha256_client_pem": "f4c5fa158e05469562eb6684c99c1915583438d76bad48188bba111020582556",
+   "ticket_bytes": 9826,
+   "resumed_ticket_bytes": 9826,
+   "tickets1_resumed_ticket_bytes": 4913,
+   "tickets1_resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "tickets1_resumed_response_writes": [
+    244
+   ],
+   "tickets3_resumed_ticket_bytes": 14739,
+   "tickets3_resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "tickets3_resumed_response_writes": [
+    244
+   ],
+   "tickets4_resumed_ticket_bytes": 19652,
+   "tickets4_resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "tickets4_resumed_response_writes": [
+    244
+   ],
+   "tickets0_resumed_ticket_bytes": 0,
+   "tickets0_resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "tickets0_resumed_response_writes": [
+    244
+   ]
+  },
+  "ML-DSA-65|ML-KEM-768": {
+   "resumed_client_hello_writes": [
+    7889
+   ],
+   "resumed_client_finished_writes": [
+    6,
+    74
+   ],
+   "resumed_request_writes": [
+    324
+   ],
+   "resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "resumed_ticket_writes": [
+    12898
+   ],
+   "resumed_response_writes": [
+    244
+   ],
+   "close_notify": 24,
+   "full_server_flight_writes": [
+    1221,
+    9854
+   ],
+   "full_server_ticket_writes": [
+    12898
+   ],
+   "full_response_writes": [
+    244
+   ],
+   "full_client_writes": [
+    1420,
+    6,
+    9588,
+    324,
+    24
+   ],
+   "leaf_server_pem_bytes": 8370,
+   "leaf_client_pem_bytes": 8370,
+   "inter_chain_pem_bytes": 0,
+   "sha256_server_pem": "5fe2f6045f5adfeff03dfc05f64130abfee6380c62eeade885b69af7072e05a2",
+   "sha256_client_pem": "b2246df6eb51c6e561006ea6b2d8769caa2651f657060732d7480a121698df68",
+   "ticket_bytes": 12898,
+   "resumed_ticket_bytes": 12898,
+   "tickets1_resumed_ticket_bytes": 6449,
+   "tickets1_resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "tickets1_resumed_response_writes": [
+    244
+   ],
+   "tickets3_resumed_ticket_bytes": 19347,
+   "tickets3_resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "tickets3_resumed_response_writes": [
+    244
+   ],
+   "tickets4_resumed_ticket_bytes": 25796,
+   "tickets4_resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "tickets4_resumed_response_writes": [
+    244
+   ],
+   "tickets0_resumed_ticket_bytes": 0,
+   "tickets0_resumed_server_flight_writes": [
+    1227,
+    108
+   ],
+   "tickets0_resumed_response_writes": [
+    244
+   ]
+  },
+  "ML-DSA-87|ML-KEM-1024": {
+   "resumed_client_hello_writes": [
+    10290
+   ],
+   "resumed_client_finished_writes": [
+    6,
+    74
+   ],
+   "resumed_request_writes": [
+    324
+   ],
+   "resumed_server_flight_writes": [
+    1772,
+    108
+   ],
+   "resumed_ticket_writes": [
+    16802
+   ],
+   "resumed_response_writes": [
+    244
+   ],
+   "close_notify": 24,
+   "full_server_flight_writes": [
+    1766,
+    13130
+   ],
+   "full_server_ticket_writes": [
+    16802
+   ],
+   "full_response_writes": [
+    244
+   ],
+   "full_client_writes": [
+    1869,
+    6,
+    12864,
+    324,
+    24
+   ],
+   "leaf_server_pem_bytes": 11023,
+   "leaf_client_pem_bytes": 11023,
+   "inter_chain_pem_bytes": 0,
+   "sha256_server_pem": "6aacafdeeb8b5db5f82891d796e6fc532bf69b93aff76de6bb9bb7617be13622",
+   "sha256_client_pem": "e00f09e7cf9053dc8c0ca5bf58d693d7d1f222ce6ec2ba2370af03242a5d2e07",
+   "ticket_bytes": 16802,
+   "resumed_ticket_bytes": 16802,
+   "tickets1_resumed_ticket_bytes": 8401,
+   "tickets1_resumed_server_flight_writes": [
+    1772,
+    108
+   ],
+   "tickets1_resumed_response_writes": [
+    244
+   ],
+   "tickets3_resumed_ticket_bytes": 25203,
+   "tickets3_resumed_server_flight_writes": [
+    1772,
+    108
+   ],
+   "tickets3_resumed_response_writes": [
+    244
+   ],
+   "tickets4_resumed_ticket_bytes": 33604,
+   "tickets4_resumed_server_flight_writes": [
+    1772,
+    108
+   ],
+   "tickets4_resumed_response_writes": [
+    244
+   ],
+   "tickets0_resumed_ticket_bytes": 0,
+   "tickets0_resumed_server_flight_writes": [
+    1772,
+    108
+   ],
+   "tickets0_resumed_response_writes": [
+    244
+   ]
+  }
+ },
+ "measured": "2026-11-22 14:01:29"
+}

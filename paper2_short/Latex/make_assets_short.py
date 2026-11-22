@@ -375,6 +375,15 @@ def _g22():
         if a and b and c: num("GttXRunTwoWrong", a.group(1)); num("GttXRunTwoMae", b.group(1)); num("GttXNoise", c.group(1))
 _g22()
 
+# ---- G23, the third TLS library (GnuTLS), results/g23_report.txt (key value lines from g23_report.py)
+def _g23():
+    pth = os.path.join(RES, "g23_report.txt")
+    if not os.path.exists(pth): return
+    for ln in open(pth):
+        k, _, v = ln.strip().partition(" ")
+        if k: num(k, v)
+_g23()
+
 # ---- tables of the details that the paper summarises (supplement): the 13 configurations of stage A, the cells off by a few ms, the tails
 def _details_tables():
     out = []

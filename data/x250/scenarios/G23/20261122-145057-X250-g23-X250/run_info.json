@@ -1,0 +1,35 @@
+{
+ "scenario": "G23",
+ "device_fingerprint": "9191a226e61f",
+ "preflight_before": "warn",
+ "dry_run": false,
+ "n": "30",
+ "no_tune": false,
+ "args": "",
+ "started": "2026-11-22T14:50:58+07:00",
+ "finished": "2026-11-22T18:02:04+07:00",
+ "failed_commands": 0,
+ "fingerprint_same_after": true,
+ "state_change": {
+  "load": [
+   [
+    0.06,
+    0.16,
+    0.53
+   ],
+   [
+    0.06,
+    0.03,
+    0.0
+   ]
+  ],
+  "temp_max_c": [
+   46.0,
+   42.0
+  ],
+  "freq_ratio_median": [
+   0.82,
+   0.92
+  ]
+ }
+}

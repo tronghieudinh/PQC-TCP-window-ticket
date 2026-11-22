@@ -1,0 +1,20 @@
+GnuTLS 3.8.14 (G23), machine GX10, run ~/pqc_measurements/scenarios/G23/20261122-141612-gx10-g23-gx10/data
+  C: 32 cells (0 missing): rule (1) wrong on 0 (inside its band); loosened by 2 wrong on 3 of 3 discriminating cells; textbook wrong on 13 of 13
+  D: 85 cells (0 missing): where early and joined differ (35 cells): early wrong on 0 (inside its band), joined on 35; early wrong on 6 of 85 (inside its band), MAE 8.6 ms
+  direction over C, D, R: model too fast by more than half an RTT on 0 cells (inside its band)
+  R: 40 random cells (0 missing): early wrong on 6 (ABOVE its band (0-3): diagnose)
+  O: 20 OpenSSL control cells (0 missing): the model of L1 wrong on 0 (inside its band)
+  T: the ticket data (cells measured 100 of 100, 0 missing). Per suite and number of tickets: the cells that follow `inflight` (the model of L1), `acked` (window = rule (1) on the ticket flight), both, neither;
+     and the response size k at which the first extra round trip appears: measured, `inflight`, `acked` (None = none up to k = 22)
+     ML-DSA-44  tickets 0 ( 0 segments, 10 cells): inflight 0, acked 0, both 10, neither 0; k of the first extra round trip: measured 12, inflight 12, acked 12
+     ML-DSA-44  tickets 1 ( 4 segments, 10 cells): inflight 2, acked 0, both 8, neither 0; k of the first extra round trip: measured 8, inflight 8, acked 12
+     ML-DSA-44  tickets 2 ( 7 segments, 10 cells): inflight 5, acked 0, both 5, neither 0; k of the first extra round trip: measured None, inflight None, acked 14
+     ML-DSA-44  tickets 3 (11 segments, 10 cells): inflight 9, acked 0, both 1, neither 0; k of the first extra round trip: measured 22, inflight 22, acked 20
+     ML-DSA-44  tickets 4 (14 segments, 10 cells): inflight 10, acked 0, both 0, neither 0; k of the first extra round trip: measured 18, inflight 18, acked None
+     ML-DSA-65  tickets 0 ( 0 segments, 10 cells): inflight 0, acked 0, both 10, neither 0; k of the first extra round trip: measured 12, inflight 12, acked 12
+     ML-DSA-65  tickets 1 ( 5 segments, 10 cells): inflight 3, acked 0, both 7, neither 0; k of the first extra round trip: measured 6, inflight 6, acked 12
+     ML-DSA-65  tickets 2 ( 9 segments, 10 cells): inflight 8, acked 0, both 2, neither 0; k of the first extra round trip: measured 22, inflight 22, acked 18
+     ML-DSA-65  tickets 3 (14 segments, 10 cells): inflight 10, acked 0, both 0, neither 0; k of the first extra round trip: measured 18, inflight 18, acked None
+     ML-DSA-65  tickets 4 (18 segments, 10 cells): inflight 10, acked 0, both 0, neither 0; k of the first extra round trip: measured 14, inflight 14, acked None
+  data: bytes against the calibration: 0 cells differ by more than 16 B (0 after the allowance for the close_notify record, 24 B)
+  diagnosis, cells wrong by more than half an RTT (stage, suite, request, k or cell, prediction, measured, measured minus prediction; negative = the model too slow): ('d', 'ML-DSA-44', '19460', '11', 501.5, 404.7, -96.8); ('d', 'ML-DSA-65', '19460', '11', 501.4, 404.4, -97.0); ('d', 'ML-DSA-65', '19460', '15', 501.9, 405.1, -96.8); ('d', 'ML-DSA-87', '19460', '11', 501.2, 404.3, -96.9); ('d', 'ML-DSA-87', '19460', '15', 501.7, 404.9, -96.8); ('d', 'ML-DSA-87', '19460', '18', 502.1, 405.4, -96.7); ('r', 'ML-DSA-44', '15939', '6', 101.7, 85.4, -16.3); ('r', 'ML-DSA-87', '21057', '11', 1000.1, 803.1, -197.1); ('r', 'ML-DSA-65', '15257', '22', 150.2, 124.0, -26.2); ('r', 'ML-DSA-87', '19407', '23', 518.0, 434.9, -83.1); ('r', 'ML-DSA-87', '21232', '24', 767.2, 632.8, -134.4); ('r', 'ML-DSA-44', '14477', '28', 514.3, 428.1, -86.2)
