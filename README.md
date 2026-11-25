@@ -4,6 +4,9 @@ Repeatable paper (ACM SIGCOMM Computer Communication Review); its appendix says 
 
 The paper measures how Linux grows the TCP congestion window after a short flight (plain TCP, 13 configurations, four kernels, three CPUs), refutes with predictions fixed in advance a larger-window explanation of a model error, and shows with an intervention that the TLS session ticket, a write of its own, enlarges the server's window through acknowledgments that the kernel processes while the sender is window-limited. It is a companion of the study archived in `pqc-financial-transport` (Zenodo concept DOI 10.5281/zenodo.23839449), whose per-segment transport model it uses (`Simulation/pqc_sim.py`).
 
+## Requirements
+[`REQUIREMENTS.md`](REQUIREMENTS.md): the packages and kernel features needed to rebuild the numbers and the PDF, to rerun the analyses of the raw traces, and to repeat measurements.
+
 ## Layout (the paths are those of the working repository, so that no script needs another path)
 - `paper2_short/CCR_repeatable/`: the manuscript (`main.tex`, `refs.bib`; ACM `acmart`, build with `latexmk -pdf main.tex`) and its supplement (`supplement_ack.tex`). `paper2_short/CCR/` (l1-v1.0) and `paper2_short/CCR_v3/` (l1-v1.1 and l1-v1.2) are earlier versions, kept for the record; they read the current files of `paper2_short/Latex/`, so rebuild them from their tags.
 - `paper2_short/Latex/`: `make_assets_short.py` (figures and `numbers_short.tex` from the data), the figures and the numbers as used in the paper.
