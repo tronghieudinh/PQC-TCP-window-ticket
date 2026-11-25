@@ -9,12 +9,15 @@ cd "$HERE"
 OSSL_VER=${OSSL_VER:-3.5.4}
 PREFIX=${PQC_OPENSSL:-$HOME/opt/openssl-3.5}
 
+# SKIP_APT=1: install nothing and change no system service (a shared machine that already has the packages).
+if [ "${SKIP_APT:-0}" = 1 ]; then echo "== packages: skipped (SKIP_APT=1)"; else
 echo "== packages"
 sudo apt-get update
 sudo apt-get install -y build-essential perl iproute2 ethtool util-linux curl ca-certificates \
      python3 python3-matplotlib haproxy tcpdump cpufrequtils || true
 # haproxy is only used by --topology proxy-*; keep the system service off
 sudo systemctl disable --now haproxy 2>/dev/null || true
+fi
 
 echo "== OpenSSL $OSSL_VER -> $PREFIX"
 if [ ! -x "$PREFIX/bin/openssl" ] || ! "$PREFIX/bin/openssl" version | grep -q " 3\.5"; then

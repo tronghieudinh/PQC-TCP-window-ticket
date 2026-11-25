@@ -9,3 +9,15 @@
 *.synctex.gz
 __pycache__/
 *.pyc
+# test keys and built binaries of level 3 (appendix of the paper): never commit them
+*.key
+Measurements/certs/
+Measurements/testbed/bin/
+Measurements/testbed/hsm_shim.so
+Measurements/testbed/tls_probe
+Measurements/testbed/tls_serve
+Measurements/testbed/tls_load
+Measurements/testbed/tls_load_open
+Measurements/testbed/tcp_flight
+Measurements/testbed/bench_pqc
+Measurements/testbed/tls_client_time
