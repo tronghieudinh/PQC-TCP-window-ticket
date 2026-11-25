@@ -20,7 +20,8 @@ sudo systemctl disable --now haproxy 2>/dev/null || true
 fi
 
 echo "== OpenSSL $OSSL_VER -> $PREFIX"
-if [ ! -x "$PREFIX/bin/openssl" ] || ! "$PREFIX/bin/openssl" version | grep -q " 3\.5"; then
+# the version is asked WITH the library path of the prefix: without it the binary may load an older system libssl, fail, and trigger a needless rebuild over an existing installation
+if [ ! -x "$PREFIX/bin/openssl" ] || ! LD_LIBRARY_PATH="$PREFIX/lib:$PREFIX/lib64" "$PREFIX/bin/openssl" version 2>/dev/null | grep -q " 3\.5"; then
   mkdir -p "$HOME/opt/src" && cd "$HOME/opt/src"
   [ -f openssl-$OSSL_VER.tar.gz ] || curl -fL -o openssl-$OSSL_VER.tar.gz \
       https://github.com/openssl/openssl/releases/download/openssl-$OSSL_VER/openssl-$OSSL_VER.tar.gz
@@ -48,4 +49,4 @@ if [ "${SKIP_CERTS:-0}" = 1 ]; then echo "skipped (SKIP_CERTS=1): use PQC_CERTS=
 elif [ ! -f ../certs/ML-DSA-65/d4/server.key ] || [ ! -f ../certs/ECDSA-P256/d4/server.key ]; then
   (cd "$HERE/.." && ./certs.sh)      # regenerates all keys and certificates (overwrites the committed .pem files)
 else echo "already present"; fi
-echo "setup done. Next: ./pqcm.sh build && ./pqcm.sh check  (scenarios: see scenarios/mint/RUNBOOK_I9_VA_GX10.md)"
+echo "setup done. The commands of the key results are in the appendix of the paper."
