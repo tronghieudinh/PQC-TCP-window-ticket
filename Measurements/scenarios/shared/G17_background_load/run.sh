@@ -31,5 +31,5 @@ PY
   done <<< "$PLAN"
   unset PQC_LOAD
 done
-sc_finish
 [ "$SC_DRY" = 1 ] || python3 "$SC_TESTBED/analyze_g17.py" --run "$D" --out "$SC_RUNDIR/g17_analysis.txt" || true
+sc_finish    # last: it ends the script (exit)

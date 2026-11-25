@@ -8,5 +8,5 @@ REPS=${SC_N:-20}
 D="$SC_RUNDIR/data"; mkdir -p "$D"
 sc_tune_on
 sc_exec sc_sudo python3 "$SC_TESTBED/run_slack.py" --stage A --configs base,bbr,reno_fq,cubic_fq --reps-a "$REPS" --out "$D/slack_tcp.csv"
-sc_finish
 [ "$SC_DRY" = 1 ] || python3 "$SC_TESTBED/analyze_g11.py" --run "$D/slack_tcp.csv" --out "$SC_RUNDIR/g11_analysis.txt" || true
+sc_finish    # last: it ends the script (exit)

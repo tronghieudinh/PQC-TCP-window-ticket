@@ -12,6 +12,8 @@ cp paper2_short/Latex/numbers_short.tex "$tmp/numbers_short.tex"; for t in g19_c
 if diff -q "$tmp/numbers_short.tex" paper2_short/Latex/numbers_short.tex >/dev/null; then echo "numbers check OK"
 else echo "numbers DIFF (regenerated against shipped):"; diff "$tmp/numbers_short.tex" paper2_short/Latex/numbers_short.tex || true; exit 1; fi
 for t in g19_cells_table os_table details_tables g24_table; do cmp -s "$tmp/$t.tex" paper2_short/Latex/$t.tex && echo "table $t OK" || { echo "table $t DIFF"; exit 1; }; done
+# the scripts of new measurements load with the files of this archive (a missing module would otherwise appear only in a root run)
+$PY -B -c "import sys; sys.path[:0]=['Measurements/testbed','Measurements']; import run_testbed, trace_run, run_slack, g24_run, netem_calibrate, tbnet, tbnet_phys" && echo "measurement scripts load OK" || { echo "measurement scripts FAILED to load"; exit 1; }
 # the kernel-logic derivation of rule (1) and the model comparison (Table 1) from the shipped data
 $PY Simulation/window_from_kernel.py | tee "$tmp/kernel.txt"; grep -q "480 of 480" "$tmp/kernel.txt" || { echo "kernel logic check FAILED"; exit 1; }
 cp Measurements/testbed/results/l1_model_comparison.csv "$tmp/cmp.csv"

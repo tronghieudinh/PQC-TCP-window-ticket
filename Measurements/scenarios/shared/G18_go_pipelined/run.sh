@@ -29,5 +29,5 @@ while read -r SUITE RQ RS RTTS; do
   [ -z "$SUITE" ] && continue
   sc_exec sc_sudo python3 "$SC_TESTBED/run_testbed.py" --profile core --resume --depths 1 --rtts "$RTTS" --rates 100 --mtus 1500 --icws 10 --n "$N" --suites "$SUITE" --req "$RQ" --resp "$RS" --out "$D/g18.csv"
 done <<< "$PLAN"
-sc_finish
 [ "$SC_DRY" = 1 ] || python3 "$SC_TESTBED/analyze_g18.py" --run "$D/g18.csv" --out "$SC_RUNDIR/g18_analysis.txt" || true
+sc_finish    # last: it ends the script (exit)

@@ -11,5 +11,5 @@ RT=(python3 "$SC_TESTBED/run_testbed.py" --profile core --resume --depths 2 --rt
 sc_exec sc_sudo "${RT[@]}" --suites "ML-DSA-87|ML-KEM-1024" --req 19460 --resp 6500  --out "$D/g20_mldsa87_k5.csv"
 sc_exec sc_sudo "${RT[@]}" --suites "ML-DSA-87|ML-KEM-1024" --req 19460 --resp 7940  --out "$D/g20_mldsa87_k6.csv"
 sc_exec sc_sudo "${RT[@]}" --suites "ECDSA-P256|X25519"    --req 19460 --resp 16580 --out "$D/g20_ecdsa_k12.csv"
-sc_finish
 [ "$SC_DRY" = 1 ] || python3 "$SC_TESTBED/analyze_g20_g21.py" --exp g20 --run "$D" --out "$SC_RUNDIR/g20_analysis.txt" || true
+sc_finish    # last: it ends the script (exit)

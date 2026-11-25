@@ -12,5 +12,5 @@ sc_exec sc_sudo "${RT[@]}" --suites "ML-DSA-65|ML-KEM-768"   --req 14500 --resp 
 sc_exec sc_sudo "${RT[@]}" --suites "ML-DSA-65|ML-KEM-768"   --req 19460 --resp 9380  --out "$D/g21_c4.csv"
 sc_exec sc_sudo "${RT[@]}" --suites "ML-DSA-87|ML-KEM-1024"  --req 19460 --resp 10820 --out "$D/g21_c5.csv"
 sc_exec sc_sudo "${RT[@]}" --suites "ML-DSA-44|ML-KEM-768"   --req 19460 --resp 10820 --out "$D/g21_c6.csv"
-sc_finish
 [ "$SC_DRY" = 1 ] || python3 "$SC_TESTBED/analyze_g20_g21.py" --exp g21 --run "$D" --out "$SC_RUNDIR/g21_analysis.txt" || true
+sc_finish    # last: it ends the script (exit)

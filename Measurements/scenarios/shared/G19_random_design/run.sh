@@ -8,5 +8,5 @@ N=${SC_N:-30}
 D="$SC_RUNDIR/data"; mkdir -p "$D"
 sc_tune_on
 sc_exec sc_sudo python3 "$SC_TESTBED/run_testbed.py" --profile core --resume --n "$N" --configs-from "$TB/results/g19_cells.csv" --out "$D/g19.csv"
-sc_finish
 [ "$SC_DRY" = 1 ] || python3 "$SC_TESTBED/analyze_g19.py" --run "$D/g19.csv" --out "$SC_RUNDIR/g19_analysis.txt" --cells "$SC_RUNDIR/g19_cells_report.txt" || true
+sc_finish    # last: it ends the script (exit)

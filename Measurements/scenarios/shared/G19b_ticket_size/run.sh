@@ -15,5 +15,5 @@ while read -r RS N; do
   [ -z "$RS" ] && continue
   sc_exec sc_sudo python3 "$SC_TESTBED/run_testbed.py" --profile core --resume --depths 2 --rtts 150 --rates 1000 --mtus 1400 --icws 10 --n "$N" --suites "ECDSA-P256|X25519" --req 3203 --resp "$RS" --out "$D/g19b.csv"
 done <<< "$PLAN"
-sc_finish
 [ "$SC_DRY" = 1 ] || python3 "$SC_TESTBED/analyze_g19b.py" --run "$D/g19b.csv" --out "$SC_RUNDIR/g19b_analysis.txt" || true
+sc_finish    # last: it ends the script (exit)
