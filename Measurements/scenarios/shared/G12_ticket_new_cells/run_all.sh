@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# G12 in one call, on ANY measuring machine: build the OpenSSL probe, preflight, measure, analyse. Run it inside tmux (about 100 minutes with n = 40):
+# Scenario G12 in one call, on any measurement machine: build the OpenSSL probe, preflight, measure, analyse. Run it inside tmux (about 100 minutes with n = 40):
 #   ./run_all.sh | ./run_all.sh --smoke (3 calls, n = 3) | ./run_all.sh --dry-run
 # Options: --certs DIR | --n N (default 40) | --ossl PREFIX (default ~/opt/openssl-3.5) | --cpus S=a,b,C=c,d | --quiet-services | --label TEXT
 # Asks for sudo ONCE. A machine already recorded in ~/pqc_measurements/G12_state_<host>.tsv is not measured again (delete the line to repeat).
@@ -9,6 +9,7 @@ CERTS=${PQC_CERTS:-}; N=40; DRY=0; SMOKE=0; OSSL=$HOME/opt/openssl-3.5; LABEL=""
 while [ $# -gt 0 ]; do case "$1" in
   --certs) CERTS=$2; shift;; --n) N=$2; shift;; --dry-run) DRY=1;; --smoke) SMOKE=1;; --ossl) OSSL=$2; shift;; --label) LABEL=$2; shift;; --cpus) CPUS=$2; shift;; --quiet-services) QUIET=--quiet-services;;
   -h|--help) sed -n '2,6p' "${BASH_SOURCE[0]}"; exit 0;; *) echo "unknown option: $1"; exit 2;; esac; shift; done
+# Certificates (default locations), state file of finished machines and log file.
 if [ -z "$CERTS" ]; then for c in "$HOME/meas_copy/certs" "$HOME/pqc_certs_local/certs"; do [ -d "$c/ML-DSA-65/d2" ] && { CERTS=$c; break; }; done; fi
 export PQC_CERTS=$CERTS
 HOST=$(hostname -s); STATE=$HOME/pqc_measurements/G12_state_$HOST.tsv; mkdir -p "$(dirname "$STATE")"; touch "$STATE"
@@ -25,6 +26,7 @@ echo "$out" | grep -q "\[FAIL\]" && { say "preflight has FAIL: nothing was measu
 [ "$DRY" = 1 ] && { say "dry run: stopping after the preflight"; exit 0; }
 if [ "$SMOKE" = 0 ] && grep -q "^$HOST	" "$STATE"; then say "$HOST already measured: not run again"; exit 0; fi
 say "sudo is needed: asking once"; sudo -v || { say "sudo not available"; exit 1; }
+# Keep the sudo authorization alive during the long run.
 ( while true; do sudo -n true 2>/dev/null; sleep 50; done ) & KA=$!; trap 'kill $KA 2>/dev/null' EXIT
 if [ "$SMOKE" = 1 ]; then ARGS=(--limit 3 --n 3 --label "smoke$LABEL"); else ARGS=(--n "$N" --label "g12-$HOST$LABEL"); fi
 [ -n "$CPUS" ] && ARGS+=(--cpus "$CPUS"); [ -n "$QUIET" ] && ARGS+=("$QUIET")

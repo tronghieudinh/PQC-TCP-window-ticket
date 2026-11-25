@@ -1,34 +1,31 @@
 #!/usr/bin/env python3
-"""
-analyze_ticket_race.py - what decides the window the server has for its response after a session ticket (paper 2, WP6 B1b). No root.
+"""analyze_ticket_race.py - what decides the window the server has for its response after a session ticket.
 
-    python3 analyze_ticket_race.py results/trace_race/*_srv.pcap [--port 4433] [--mss auto] [--csv results/ticket_race.csv]
-
-Input: tcpdump captures on the SERVER's link (vs0) written by `trace_run.py race`. C>S packets are time-stamped when they ARRIVE at the server. S>C packets are time-stamped
-AFTER the netem egress delay of vs0 (tcpdump taps the device after the qdisc: the SYN-ACK of every capture appears RTT/2 after the SYN), so the true send time of a server
-packet is its time stamp minus RTT/2 (RTT from the file name); this script applies that shift and every time below is on the server's clock. Each file holds pairs of connections (a full transaction that obtains the ticket, then the resumed one); only the
-resumed ones (every second connection) are analysed.
-
-For a resumed transaction (mutual TLS, large request, response of k segments) it extracts:
-  t_fin     arrival of the client's Finished (the first C>S data segment of at most 100 bytes after the ServerHello flight)
-  ticket    S>C data sent after t_fin and before the request is complete (segments, bytes)
-  t_ack_tkt arrival of the first ACK that covers the whole ticket
-  t_req     arrival of the last request segment (the response is written at about this time)
-  t_w       the first S>C data segment of the response
-  burst     response segments sent before the first ACK of response data arrives = the window the server really used
-  extra     response segments sent in the same round trip but only after the ticket's ACK arrived (the ACK opened the window while the response was being sent)
-and the three quantities that decide between the hypotheses:
-  H_race: the window is 10 + (growth by the ticket ACK) if the ticket's ACK arrives BEFORE the response is written (t_ack_tkt <= t_w), else 10 minus the unacknowledged ticket
-  H_ack_clock: the ACK of the ticket opens the window also when it arrives after the first response segments (extra > 0)
-  H_const: the burst is the same on every network (the stage-E values 12 and 15)
-It prints, per (suite, network, k), the medians of burst, (t_ack_tkt - t_w) in ms, the share of transactions whose ticket ACK arrived before the response was written, and the
-number of response round trips; with --csv one line per transaction.
+    python3 analyze_ticket_race.py results/trace_race/*_srv.pcap [--port 4433] [--csv results/ticket_race.csv]
+Input: captures on the server's link written by `trace_run.py race`. Segments from the client are time-stamped when they arrive at the
+server. Segments of the server are time-stamped after the emulated delay of its link (the capture taps the device after the queueing
+discipline: the SYN-ACK of every capture appears RTT/2 after the SYN), so their true send time is the time stamp minus RTT/2 (RTT from
+the file name); this script applies that shift, and all times below are on the server's clock. Each file holds pairs of connections (a
+full transaction that obtains the ticket, then the resumed one); only the resumed ones are analyzed.
+For each resumed transaction:
+  t_fin      arrival of the client's Finished (first client data segment of at most 100 bytes after the server's flight)
+  ticket     server data sent after t_fin and before the request is complete (segments, bytes)
+  t_ack_tkt  arrival of the first acknowledgment that covers the whole ticket
+  t_req      arrival of the last request segment (the response is written at about this time)
+  t_w        the first response segment
+  burst      response segments sent before the first acknowledgment of response data arrives = the window the server really used
+  extra      response segments of the same round trip sent only after the ticket's acknowledgment arrived
+Hypotheses compared: the window depends on whether the ticket is acknowledged before the response is written; or the ticket's
+acknowledgment also opens the window afterwards (extra > 0); or the burst is the same on every network.
+Printed per (suite, rate, MTU, RTT, k): medians of burst and of the time differences, and an exploratory (post hoc) search for the
+threshold that separates bursts above ten from bursts of ten; --csv writes one line per transaction.
 """
 import argparse, collections, csv, os, re, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from pcap_summary import read_pcap  # noqa: E402
 
+# parameters encoded in the capture file name: suite, request size, response segments k, RTT, rate, MTU
 TAG = re.compile(r"(?P<suite>.+)_req(?P<req>\d+)_k(?P<k>\d+)_rtt(?P<rtt>[\d.]+)_rate(?P<rate>[\d.]+)_mtu(?P<mtu>\d+)_srv\.pcap$")
 
 
@@ -92,6 +89,7 @@ def analyse_conn(pk, port, shift=0.0, req_bytes=19460):
 
 
 def main():
+    """Analyze every capture given, write the CSV and print the summary."""
     ap = argparse.ArgumentParser()
     ap.add_argument("files", nargs="+")
     ap.add_argument("--port", type=int, default=4433)

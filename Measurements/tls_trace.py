@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""
-tls_trace.py - real TLS 1.3 handshakes (OpenSSL 3.5) through relay.py on loopback.
+"""tls_trace.py - sizes of the three handshake flights and handshake time of real TLS 1.3 handshakes (OpenSSL 3.5) over loopback.
 
-For every suite, chain depth 1-4 and authentication mode (mutual TLS or server-only) it runs N
-handshakes and records the bytes of the three handshake flights - ClientHello (CH), server
-flight (SF), client flight (CF) - and the loopback handshake time (first CH byte to last byte of
-the client flight), which is dominated by real cryptographic computation.
+For every cipher suite, certificate-chain depth 1-4 and authentication mode (mutual TLS or server only) it runs N handshakes of
+`openssl s_client` against `openssl s_server` through relay.py, which records every chunk of bytes. From the chunks it derives the sizes
+of the ClientHello (CH), the server flight (SF) and the client flight (CF), and the time from the first byte of the CH to the last byte of
+the CF, which on loopback is dominated by the cryptographic computation. The testbed imports SUITES from this module.
 
-    python3 tls_trace.py [N]   -> data/tls_trace.csv, data/tls_trace_raw.jsonl
+    python3 tls_trace.py [N]        (default 21)   -> data/tls_trace.csv
+Columns: suite, cert_alg, group, depth, mtls, n_ok (successful handshakes), ch_bytes, sf_bytes, cf_bytes (medians),
+hs_ms_median, hs_ms_p10, hs_ms_p90, note (error text if all handshakes failed).
 """
 import csv
 import json
@@ -38,7 +39,9 @@ SUITES = {
 
 
 def flights(chunks):
-    """Group relay chunks into direction runs: CH, SF, CF (a later server close_notify run is ignored)."""
+    """Join the chunks (time in ms, direction 0 = client to server, bytes) recorded by relay.py into runs of one direction and return
+    (CH bytes, SF bytes, CF bytes, duration); None if the connection does not start client, server, client.
+    """
     runs = []
     for t, d, n in chunks:
         if runs and runs[-1]["dir"] == d:
@@ -53,6 +56,10 @@ def flights(chunks):
 
 
 def run(suite, alg, group, depth, mtls, n, port):
+    """Run n handshakes of one configuration: `alg` and `group` of the suite, chain depth, mutual authentication or not, through the
+    relay listening on port + 1 to the server on `port`. Returns (successful handshakes, list of flights() results, error text).
+    Server, client and relay are bound to CPUs 15, 16 and 17.
+    """
     d = os.path.join(HERE, "certs", alg, f"d{depth}")
     log = os.path.join(HERE, "data", f"relay_{port}.jsonl")
     if os.path.exists(log):
@@ -89,6 +96,7 @@ def run(suite, alg, group, depth, mtls, n, port):
 
 
 def main():
+    """Measure every suite, depth and authentication mode and write data/tls_trace.csv."""
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 21
     os.makedirs(os.path.join(HERE, "data"), exist_ok=True)
     out = open(os.path.join(HERE, "data", "tls_trace.csv"), "w", newline="")

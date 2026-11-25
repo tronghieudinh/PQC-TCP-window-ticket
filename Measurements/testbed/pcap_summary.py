@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""
-pcap_summary.py - timeline of one TLS transaction from a tcpdump file captured on the client link (paper 2, WP6 B11/B1).
-Minimal reader (classic pcap, Ethernet/IPv6/TCP, no libraries): prints, per TCP connection, every segment with its time from the first packet,
-direction (C>S client to server, S>C server to client), flags and payload bytes, merging runs of same-direction segments with the same
-timestamp (within --gap ms) into flights. Use: python3 pcap_summary.py results/trace_fullticket/<tag>.pcap [--conn 0] [--gap 2]
+"""pcap_summary.py - minimal reader of packet captures and a printed timeline of one TLS transaction. The reader (read_pcap) is used by the
+analyses.
+
+Reads classic pcap files with Ethernet or Linux-cooked headers, IPv6 and TCP, without libraries. As a program it prints, per TCP
+connection, the segments with their time from the first packet, direction (C>S client to server, S>C server to client), flags and payload
+bytes; consecutive segments of the same direction and flags within --gap ms are merged into one line, and pure acknowledgments are
+omitted.
+    python3 pcap_summary.py results/trace_fullticket/<tag>.pcap [--conn 0] [--gap 2] [--port 4433]
 """
 import argparse, struct, sys
 
 
 def read_pcap(path):
+    """All IPv6/TCP packets of a capture file as tuples (time in seconds, source port, destination port, sequence number,
+    acknowledgment number, TCP flags, payload bytes).
+    """
     d = open(path, "rb").read()
     magic = struct.unpack("<I", d[:4])[0]
     le = magic in (0xA1B2C3D4, 0xA1B23C4D)
@@ -35,6 +41,7 @@ def read_pcap(path):
 
 
 def main():
+    """Print the timeline."""
     ap = argparse.ArgumentParser()
     ap.add_argument("pcap")
     ap.add_argument("--port", type=int, default=4433)

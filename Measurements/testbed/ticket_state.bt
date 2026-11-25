@@ -1,14 +1,16 @@
 #!/usr/bin/env bpftrace
 /*
- * WP6 part F: state of the server's TCP sender at every acknowledgment that Reno processes, and at every call of tcp_slow_start.
- *   sudo bpftrace -q ticket_state.bt 4433 > tag.bpf.txt          ($1 = local port of the server)
- * Lines (fields separated by blanks; tid identifies the CPU thread that runs the softirq):
- *   RENO ns tid dport ack acked cwnd ssthresh packets_out max_packets_out is_cwnd_limited snd_una snd_nxt   at entry of tcp_reno_cong_avoid(sk, ack, acked)
- *   SS   ns tid dport acked cwnd ssthresh                                                                 at entry of tcp_slow_start(tp, acked)
- *   SSR  ns tid cwnd_after                                                                                at return of tcp_slow_start
+ * ticket_state.bt - state of the server's TCP sender at every acknowledgment that Reno processes and at every call of tcp_slow_start().
+ *
+ *   sudo bpftrace -q ticket_state.bt 4433 > tag.bpf.txt        ($1 = port of the server; trace_run.py starts it when PQC_BPF names this file)
+ *
+ * Output lines (fields separated by blanks; tid = kernel thread that runs the code):
+ *   RENO ns tid dport ack acked cwnd ssthresh packets_out max_packets_out is_cwnd_limited snd_una snd_nxt   entry of tcp_reno_cong_avoid(sk, ack, acked)
+ *   SS   ns tid dport acked cwnd ssthresh            entry of tcp_slow_start(tp, acked)
+ *   SSR  ns tid cwnd_after                           return of tcp_slow_start()
  * tcp_is_cwnd_limited() (include/net/tcp.h) is true if tp->is_cwnd_limited, or, in slow start, if snd_cwnd < 2 * max_packets_out;
- * tcp_reno_cong_avoid returns without calling tcp_slow_start otherwise. nsecs is CLOCK_MONOTONIC; the analysis does not need it to be aligned with the capture
- * (events are joined with the packets by client port and acknowledgment number).
+ * otherwise tcp_reno_cong_avoid() returns without calling tcp_slow_start(). The events are joined with the captured packets by client port
+ * and acknowledgment number, so the kernel clock need not be related to the capture clock.
  */
 BEGIN { printf("READY\n"); }
 

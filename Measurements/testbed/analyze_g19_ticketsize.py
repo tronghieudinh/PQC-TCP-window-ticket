@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""analyze_g19_ticketsize.py - POST HOC: the ticket-size explanation of the ECDSA cell of G19 (found after G19; tested with the pre-registered cells of G19b).
-Compares the size of the NewSessionTicket in the model (pqc_sim.py: ticket_base + client leaf + overhead) with the size seen on the wire (ticket_race.csv, bytes of the ticket), and recomputes the
-100 predictions of G19 with the model's overhead lowered by the difference of each suite (ML-DSA-87: no wire measurement, evaluated with both ends of the range of the other suites).
-    python3 analyze_g19_ticketsize.py [--write]      writes results/g19_ticketsize.txt
+"""analyze_g19_ticketsize.py - post hoc: does the size of the session ticket explain the ECDSA cell of the random draw (G19) that the model
+got wrong? Found after G19; tested afterwards with cells fixed in advance (scenario G19b).
+
+Compares the size of the NewSessionTicket in the model (pqc_sim.py: ticket base + client certificate + overhead) with the size seen on
+the wire (results/ticket_race.csv) and recomputes the 100 predictions of G19 with the overhead of each suite lowered by the difference
+(ML-DSA-87 was not measured on the wire: evaluated with both ends of the range of the other suites).
+
+    python3 analyze_g19_ticketsize.py [--write]      (--write also writes results/g19_ticketsize.txt)
 """
 import csv, collections, dataclasses, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -14,6 +18,7 @@ SUITES = {"ECDSA-P256": "ECDSA-P256|X25519", "ML-DSA-44": "ML-DSA-44|ML-KEM-768"
 
 
 def predict(c, delta):
+    """Early-ticket prediction (ms) of one cell with the ticket overhead of the model reduced by `delta` bytes."""
     A.NST_EARLY = True
     d = {k: str(c[k]) for k in ("suite", "req", "resp", "rtt_ms", "rate_mbps", "mtu", "icw")}
     m0 = S.Model(); m = dataclasses.replace(m0, nst_overhead=m0.nst_overhead - delta)
@@ -24,6 +29,7 @@ def predict(c, delta):
 
 
 def main():
+    """Print the size comparison and the cells whose recomputed prediction changes."""
     wire = collections.defaultdict(collections.Counter)
     for r in csv.DictReader(open(os.path.join(RES, "ticket_race.csv"))):
         wire[r["suite"]][int(r["ticket_bytes"])] += 1

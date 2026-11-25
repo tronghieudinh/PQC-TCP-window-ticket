@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Raw kernel traces of the ticket tests of L1 (made on the i7-5600U, 1-2 Nov 2026; the directories results/trace_* of the old tree).
+# Raw kernel traces of the ticket tests (recorded on the ThinkPad X250, i7-5600U): the directories trace_* of its results.
 #   bash tools/raw_traces.sh verify TRACE_RESULTS_DIR   re-run the analyses on the raw traces and compare each output with the shipped one (nothing is changed)
 #   bash tools/raw_traces.sh pack   TRACE_RESULTS_DIR OUT.tar.xz   archive the trace directories used by the paper, with a checksum list
-# TRACE_RESULTS_DIR is the directory that holds trace_race, trace_kernel, trace_state, ... (on the X250:
-#   ~/PQC-TCP-window-ticket/Measurements/testbed/results). Run on the machine that has the traces; needs only python3 and tar/xz.
+# TRACE_RESULTS_DIR is the directory that holds trace_race, trace_kernel, trace_state, ... (the unpacked trace
+# archive, or the results directory of the measuring machine). Needs only python3 and tar/xz.
 set -uo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TB="$ROOT/Measurements/testbed"; RES="$TB/results"

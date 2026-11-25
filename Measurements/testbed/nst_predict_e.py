@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""
-nst_predict_e.py - pre-registration of the stage-E test (WP5): the server's window after an acknowledged ticket.
+"""nst_predict_e.py - predictions for the window after the ticket (stage E): which window does the server have after an acknowledged
+ticket?
 
-Stage D confirmed that the ticket is an earlier write (nst_early), but left four cells on which both models were a round trip wrong:
-ML-DSA-44 and -65, a request flight that needs an extra round trip (so that the ticket is acknowledged when the response leaves), responses
-of 11 and 12 segments. There the transaction paid one extra round trip where the models charge two: the server had a window of more than
-ten segments. Stage E maps that window.
-
-Design (run_nst_e.sh): resumed TLS 1.3, ECDSA-P256 (ticket 1 segment) and ML-DSA-44/-65/-87 (4, 5 and 6 segments) at depth 2 with mutual
-TLS, RTT 100 ms, MTU 1500, a small request (302 B: the ticket is still in flight when the response leaves) and the large one of stage D
-(19,460 B: the request flight needs an extra round trip for ECDSA, ML-DSA-44 and -65 but not for ML-DSA-87, so -87 is a control), and
-responses of k = 10..18 segments. Hypotheses: the server's window for the response after an acknowledged ticket is W segments, with W in
-{10, 12, 14, 16, 20}; W = 10 is the model of stage D. The analysis fits W per suite and also reports, for every series, the smallest k at
-which the measured latency rises by a round trip. Run once, commit the output BEFORE measuring.
+Stage D confirmed that the ticket is an earlier write, but left four cells on which both models were one round trip wrong (ML-DSA-44 and
+-65, a request that needs an extra round trip so that the ticket is acknowledged when the response leaves, responses of 11 and 12
+segments): the server had a window above ten segments. Stage E maps that window.
+Design: as stage D, with a small request (302 bytes: the ticket is still in flight when the response leaves) and the large one (19 460
+bytes), responses of 10..18 segments (ML-DSA-87 is a control, as its request fits). Hypotheses: the server's window for the response
+after an acknowledged ticket is W segments, W in {10, 12, 14, 16, 20}; W = 10 is the model of stage D. The analysis fits W per suite.
+Predictions are written before the measurement: the script refuses to overwrite existing files. Writes results/nst_predictions_e.csv.
 """
 import csv, hashlib, os, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -20,17 +16,19 @@ sys.path.insert(0, HERE)
 import analyze_testbed as A  # noqa: E402
 
 SUITES = ["ECDSA-P256|X25519", "ML-DSA-44|ML-KEM-768", "ML-DSA-65|ML-KEM-768", "ML-DSA-87|ML-KEM-1024"]
-MSS = 1440
+MSS = 1440      # segment size: MTU 1500, IPv6, no timestamps
 REQS = [302, 19460]
 KS = list(range(10, 19))
-WS = [10, 12, 14, 16, 20]
+WS = [10, 12, 14, 16, 20]      # candidate server windows after the ticket (segments)
 
 
 def resp_bytes(k):
+    """Response size of k segments."""
     return k * MSS - 700
 
 
 def main():
+    """Predict every cell for every W and write the table."""
     out = os.path.join(HERE, "results", "nst_predictions_e.csv")
     if os.path.exists(out) and "--force" not in sys.argv:
         sys.exit(f"{out} exists (pre-registered); delete it deliberately to redo")

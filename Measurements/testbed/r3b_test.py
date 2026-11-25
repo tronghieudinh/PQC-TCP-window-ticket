@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""r3b_test.py - the out-of-sample test of round 3b on the runs of ONE machine, with the thresholds fixed by r3b_thresholds.py from the GX10 pilot (results/r3b_thresholds.json).
+"""r3b_test.py - round 3b, out-of-sample test on the runs of ONE machine, with the thresholds that r3b_thresholds.py fixed on the GX10
+pilot (results/r3b_thresholds.json).
+
     python3 r3b_test.py --runs DIR --tag _t --machine X250 [--out results/r3b_<machine>_test.txt] [--pilot-b2 1.0]
-Criteria B1-B6 as in results/r3b_design.md and results/r3b_thresholds.md; readings as written there."""
+Criteria (results/r3b_design.md, results/r3b_thresholds.md): B1 window rule per event; B2 burst = min(cwnd, response segments);
+B3 the delay instrument shifts the acknowledgments by delta; B4 the late share of ML-DSA grows with the delay; B5 B2 holds for
+ECDSA-P256; B6 B1 and B2 hold here and the B2 share is close to the pilot's. The printed reading follows the design document.
+--pilot-b2 is the share of B2 on the pilot.
+"""
 import argparse, collections, glob, json, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import r3b_analyze as A

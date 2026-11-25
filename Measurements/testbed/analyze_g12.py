@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""analyze_g12.py - evaluates the criteria K1-K4 of results/g12_predictions.md on runs of scenario G12 (OpenSSL, other RTTs and request sizes, n = 40).
+"""analyze_g12.py - ticket timing on new cells (scenario G12: OpenSSL, other round-trip times and request sizes, 40 transactions):
+evaluates criteria K1-K4 fixed before the measurement (results/g12_predictions.md).
+
     python3 analyze_g12.py --run DIR [--run DIR2 ...] [--out results/g12_analysis.txt]
-DIR holds nst_tls.csv of one run (the `data` directory of the run). Measured excess latency of a cell = median t_total_ms of the resumed transactions on the shaped link minus the
-median on the unshaped base. A cell is 'wrong' when the prediction is off by more than half the RTT; a cell with fewer than 30 valid transactions counts as MISSING.
-  K1  per RTT, the 16 discriminating cells: early-ticket model wrong on at most 2
-  K2  per RTT, the 16 discriminating cells: joined-ticket model wrong on at least 14
-  K3  per RTT, all 38 design cells: early-ticket model wrong on at most 8
+
+DIR holds nst_tls.csv of one run (the `data` directory of the run). Excess latency of a cell: median total time of the resumed transactions on the shaped link minus the median on the unshaped link (round-trip time 0). A cell is "wrong" when the prediction is off by
+more than half the RTT; a cell with fewer than 30 valid transactions counts as missing.
+  K1  per RTT, the 16 discriminating cells: the early-ticket model (ticket written separately, before the response) wrong on at most 2
+  K2  per RTT, the 16 discriminating cells: the joined-ticket model (ticket sent together with the response) wrong on at least 14
+  K3  per RTT, all 38 design cells: the early-ticket model wrong on at most 8
   K4  data: every design cell has at least 30 valid transactions
-Also reported (not a criterion): per RTT and suite, the largest response (segments) whose measured excess latency stays within half an RTT of the early model for requests of 302 B.
+Also reported: per RTT and suite, the largest response (segments) that stays within half an RTT of the early model for requests of 302
+bytes.
 """
 import argparse, csv, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -17,6 +21,7 @@ MIN_VALID = 30
 
 
 def excess(path):
+    """{(RTT, suite, request, response): (excess latency in ms, valid transactions)} of one CSV file."""
     g = {}
     for r in rd(path):
         if r["err"] or r["reused"] != "1":
@@ -31,6 +36,7 @@ def excess(path):
 
 
 def evaluate(d):
+    """Counts of measured, missing and wrong cells and the outcome of K1-K4, per RTT."""
     m = excess(os.path.join(d, "nst_tls.csv"))
     pr = [r for r in rd(os.path.join(RES, "g12_predictions.csv")) if r["in_design"] == "1"]
     res = {}
@@ -58,6 +64,7 @@ def evaluate(d):
 
 
 def main():
+    """Evaluate every --run directory and write the report."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", action="append", required=True)
     ap.add_argument("--out", default=os.path.join(RES, "g12_analysis.txt"))

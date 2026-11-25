@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""L1 item 1: derive the window rule (1) from the Linux congestion-control code and check it against the closed form and the data.
+"""window_from_kernel.py - derives the window rule of the paper from the Linux congestion-control code and checks it against the closed
+formula and against measurements.
 
-Kernel logic modelled (mainline torvalds/linux, checked 18 Nov 2026, master 20eef29b7c84):
-  include/net/tcp.h        tcp_is_cwnd_limited(): true if tp->is_cwnd_limited, or (slow start and cwnd < 2 * tp->max_packets_out)
-  net/ipv4/tcp_cong.c      tcp_reno_cong_avoid(): returns unless tcp_is_cwnd_limited(); in slow start calls tcp_slow_start()
-                           tcp_slow_start(): cwnd = min(cwnd + acked, ssthresh)   (ssthresh is infinite on a new connection)
-  net/ipv4/tcp_output.c    tcp_cwnd_validate(): is_cwnd_limited = (packets in flight >= cwnd) after the send; max_packets_out = packets_out
-One acknowledgment per segment (quickack), flight of n segments, initial window w0, Reno or Cubic in slow start (Cubic's slow start is tcp_slow_start too).
-  Case n >= w0: the sender is window-limited (flag true) and every acknowledged segment adds one: w = w0 + n.
-  Case n <  w0: not limited, max_packets_out = n; each acknowledgment adds one while cwnd < 2n: w = max(w0, 2n)... which is 2n if 2n > w0, else w0.
-Together: w(n) = max(w0, min(w0 + n, 2n)), i.e. rule (1). Run: python3 Simulation/window_from_kernel.py
+Kernel logic modeled (mainline Linux, checked in November 2026, commit 20eef29b7c84):
+  include/net/tcp.h        tcp_is_cwnd_limited(): true if tp->is_cwnd_limited, or in slow start if cwnd < 2 * tp->max_packets_out
+  net/ipv4/tcp_cong.c      tcp_reno_cong_avoid() returns unless tcp_is_cwnd_limited(); in slow start it calls tcp_slow_start(),
+                           which sets cwnd = min(cwnd + acked, ssthresh) (ssthresh is unlimited on a new connection)
+  net/ipv4/tcp_output.c    tcp_cwnd_validate(): after a send, is_cwnd_limited = (packets in flight >= cwnd) and max_packets_out is updated
+With one acknowledgment per segment (quickack), a flight of n segments, initial window w0 and Reno or Cubic in slow start (Cubic uses
+tcp_slow_start too):
+  n >= w0   the sender is limited by the window and every acknowledged segment adds one: w = w0 + n
+  n <  w0   it is not limited and max_packets_out = n; an acknowledgment adds one only while cwnd < 2n: w = max(w0, 2n)
+Together: w(n) = max(w0, min(w0 + n, 2n)), the window rule.
+Run: python3 Simulation/window_from_kernel.py   (reads Measurements/testbed/results/slack_tcp.csv)
 """
 import csv, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -25,9 +28,13 @@ def kernel_window(w0, n):
             cwnd += 1                    # tcp_slow_start(acked = 1)
     return cwnd
 
+# The closed formula of the window rule.
 closed = lambda w0, n: max(w0, min(w0 + n, 2 * n))
 
 def main():
+    """Check the kernel logic against the formula for six initial windows and flights of 1..80 segments, then against the median window
+    measured for every configuration of the plain-TCP experiment. Returns (differences, matches, points, mismatched points).
+    """
     bad = [(w0, n, kernel_window(w0, n), closed(w0, n)) for w0 in (2, 4, 10, 16, 20, 32) for n in range(1, 81) if kernel_window(w0, n) != closed(w0, n)]
     print(f"kernel logic vs closed form (1): {6 * 80 - len(bad)} of {6 * 80} (w0, n) pairs identical; differences: {bad[:6]}")
     obs = {}

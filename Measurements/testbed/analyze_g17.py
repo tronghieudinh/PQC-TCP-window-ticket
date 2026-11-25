@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""analyze_g17.py - evaluates the criteria Y1-Y4 of results/phase2_predictions.md (section G17).
-    python3 analyze_g17.py --run DIR [--out results/g17_analysis.txt]       DIR holds g17_L0.csv ... g17_L3.csv (and g17_L*.csv.load.json) of one run
-Measured excess of a cell = median shaped - median base (same suite and sizes, same level). A cell is wrong when the prediction is off by more than half an RTT (50 ms).
-Stage C cells: prediction rule (1); stage D cells: early-ticket model (joined-ticket model for contrast).
+"""analyze_g17.py - background load (scenario G17): evaluates criteria Y1-Y4 fixed before the measurement
+(results/phase2_predictions.md, section G17).
+
+    python3 analyze_g17.py --run DIR [--out results/g17_analysis.txt]
+DIR holds g17_L0.csv .. g17_L3.csv (and g17_L*.csv.load.json) of one run; L0..L3 are the load levels of results/g17_levels.json.
+Excess latency of a cell: median total time of the resumed transactions on the shaped link minus the median on the unshaped link, for the same suite and sizes. A cell is wrong when the prediction is off by more than half an RTT (50 ms). Stage-C cells are predicted by the window
+rule, stage-D cells by the early-ticket model (the joined-ticket model is shown for contrast).
   Y1  level L0 (no load, control): the model is wrong on at most 1 of the 22 cells
   Y2  each loaded level (L1, L2, L3): the model is wrong on at most 3 of the 22 cells
-  Y3  every level: the joined-ticket model is wrong on at least 8 of the 10 discriminating (stage D) cells
+  Y3  every level: the joined-ticket model is wrong on at least 8 of the 10 discriminating (stage-D) cells
   Y4  every cell at every level has at least 30 valid transactions
 """
 import argparse, csv, json, os, statistics as st
@@ -15,6 +18,7 @@ LEVELS = [x["name"] for x in json.load(open(os.path.join(RES, "g17_levels.json")
 
 
 def level(path, pred):
+    """(cells with their measured excess, number of cells with fewer than 30 valid transactions) for the CSV file of one load level."""
     base, sh = {}, {}
     if os.path.exists(path):
         for r in csv.DictReader(open(path)):
@@ -33,6 +37,7 @@ def level(path, pred):
 
 
 def main():
+    """Evaluate every level, report the achieved load and the shift against L0, and write the report."""
     ap = argparse.ArgumentParser(); ap.add_argument("--run", required=True); ap.add_argument("--out", default=os.path.join(RES, "g17_analysis.txt")); a = ap.parse_args()
     d = os.path.expanduser(a.run)
     pred = list(csv.DictReader(open(os.path.join(RES, "g17_predictions.csv"))))

@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""WP6 part H: where do the ACKs of the session ticket wait before TCP processes them?  No root.
+"""analyze_softirq.py - where do the acknowledgments of the session ticket wait before TCP processes them?
 
-    python3 analyze_softirq.py [DIR]            # default results/trace_softirq (arm A); results/trace_softirq_cpu3 is arm B (server on another CPU)
-
-Input: <tag>_srv.pcap and <tag>.bpf.txt (ticket_softirq.bt). Ticket ACKs are found in the capture as in analyze_state.py and joined, by (client port, ACK number), with ENQ (queued to a CPU backlog), RCV
-(tcp_v6_rcv starts) and RENO/SS events, all on the clock of bpftrace. The first write of the response is the first SEND return of at least 16,000 bytes. "Late" = tcp_v6_rcv starts after that return.
-Pre-registered (results/wp6_pred_softirq.txt), for the late ACKs that called tcp_slow_start:
-  H1a  >= 80 % were queued (ENQ) BEFORE the write returned: they waited inside the server host, the delivery was not late;
-  H1b  >= 80 % of the waits (RCV - ENQ) overlap, for at least 80 % of their length, a period in which a thread of the SERVER ran on the CPU of the ENQ: the softirq waited for the CPU the application was using.
-If H1a fails the delay is before the server's queue (netem/veth/capture clock); if H1a holds and H1b fails the wait has another cause (bottom halves disabled, ksoftirqd, interrupts).
-Exploratory: wait distribution, ENQ cpu = RCV cpu, ENQ cpu = CPU of the server thread, share of late ACKs by arm.
+    python3 analyze_softirq.py [DIR]      (default results/trace_softirq; results/trace_softirq_cpu3: server on another CPU)
+Input: <tag>_srv.pcap and <tag>.bpf.txt (ticket_softirq.bt). The ticket ACKs are found in the capture as in analyze_state.py and joined,
+by (client port, acknowledgment number), with ENQ (queued to a CPU's backlog), RCV (tcp_v6_rcv starts) and the RENO and SS events, all
+on the clock of bpftrace. The first write of the response is the first SEND return of at least 16 000 bytes. "Late" = tcp_v6_rcv starts
+after that return.
+Criteria fixed beforehand (results/wp6_pred_softirq.txt), for the late ACKs that called tcp_slow_start:
+  H1a  at least 80 % were queued before the write returned: they waited inside the server host, the delivery was not late;
+  H1b  at least 80 % of the waits (RCV - ENQ) overlap, for at least 80 % of their length, a period in which a thread of the server ran
+       on the CPU of the ENQ: the interrupt processing waited for the CPU that the application was using.
+If H1a fails, the delay arises before the server's queue (netem, veth, capture clock); if H1a holds and H1b fails, the wait has another
+cause. Also reported: the wait distribution and whether ENQ and RCV ran on the same CPU.
 """
 import argparse, collections, glob, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -18,6 +20,9 @@ from analyze_state import _ticket_acks  # noqa: E402
 from pcap_summary import read_pcap  # noqa: E402
 
 def parse(path):
+    """Read one trace: ENQ, RCV and RENO events by (client port, acknowledgment), the keys with a slow-start call, the server's write
+    returns per port, the intervals per CPU in which a server thread ran, and the server thread ids.
+    """
     enq, rcv, reno, ss, sends, sw, last = {}, {}, {}, set(), collections.defaultdict(list), collections.defaultdict(list), {}
     server_tids = set()
     for line in open(path, errors="ignore"):
@@ -39,9 +44,11 @@ def parse(path):
     return enq, rcv, reno, ss, sends, run, server_tids
 
 def overlap(iv, a, b):
+    """Fraction of the interval [a, b] covered by the intervals iv."""
     return sum(max(0, min(e, b) - max(s, a)) for s, e in iv) / max(1, b - a)
 
 def main():
+    """Join capture and trace for every run and print the criteria."""
     ap = argparse.ArgumentParser(); ap.add_argument("dir", nargs="?", default=os.path.join(HERE, "results", "trace_softirq"))
     a = ap.parse_args(); rows = []
     for f in sorted(glob.glob(os.path.join(a.dir, "*_srv.pcap"))):

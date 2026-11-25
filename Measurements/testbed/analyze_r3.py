@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
-"""analyze_r3.py - evaluates criteria R1-R6 of results/r3_design.md (section 7, approved 22 Nov 2026) on the runs of run_r3.sh of ONE machine.
-    python3 analyze_r3.py --runs DIR_WITH_trace_r3_d*_m*  [--machine NAME] [--out results/r3_<machine>_analysis.txt] [--csv results/r3_<machine>_points.csv]
-Per resumed transaction (the odd connections of the capture of the server's link): n ticket segments and the observed burst from the capture (analyze_ticket_race.analyse_conn); from ticket_ack.bt (one
-clock): the processing time AK of each ticket acknowledgment (entry of tcp_ack whose cumulative acknowledgment falls in the ticket's sequence range) against the XQ of the first response segment:
-k_in = ticket ACKs processed after it ('late' if k_in >= 1, 'early' if every one was before), and the shift of each ACK = AK minus the RX stamp of the same packet (netif_rx, before the ifb delay).
-The model value of the burst: early max(10, min(10 + n, 2n)); late the replay of Simulation/ticket_ackorder_sim.py with the ACKs late (nothing fitted).
-  R1  at delta > 0 the shift of at least 95 % of the ticket ACKs is the shift at delta = 0 (with the ifb path) plus delta, within 20 us
+"""analyze_r3.py - order intervention (round 3): evaluates criteria R1-R6 fixed before the measurement (results/r3_design.md, section 7)
+on the runs of run_r3.sh of one machine.
+
+    python3 analyze_r3.py --runs DIR_WITH_trace_r3_d*_m* [--machine NAME] [--tag TAG]
+                          [--out results/r3_<machine>_analysis.txt] [--csv results/r3_<machine>_points.csv]
+Per resumed transaction: the number n of ticket segments and the observed burst from the capture of the server's link
+(analyze_ticket_race.analyse_conn); from ticket_ack.bt (one clock) the processing time AK of each ticket acknowledgment (entry of
+tcp_ack whose cumulative acknowledgment lies in the sequence range of the ticket) against XQ of the first response segment:
+k_in = ticket ACKs processed after it ("late" if k_in >= 1, "early" if all came before), and the shift of each ACK = AK minus the RX
+time stamp of the same packet (taken before the added delay).
+Model value of the burst: early max(10, min(10 + n, 2n)); late: the replay of Simulation/ticket_ackorder_sim.py with late ACKs (nothing
+fitted).
+  R1  at delay > 0, at least 95 % of the ticket ACKs are shifted by the delay (relative to delay 0 on the same path), within 20 us
   R2  with n >= 4 the burst equals the model value of the transaction's own order in at least 90 %
-  R3  per (suite, MTU) the late share is non-decreasing in delta up to 10 points, and at every delta the share of bursts equal to the late value differs from the late share by at most 10 points
-  R4  ECDSA-P256 (n = 1): burst at most 11 at every delta
-  R5  (across machines: run this on each machine and compare the R2 shares: at most 10 points apart)
-  R6  delta = 0 with and without the ifb path: share of bursts above ten and late share each differ by at most 10 points
+  R3  per (suite, MTU) the late share does not decrease with the delay (within 10 points), and at every delay the share of bursts equal
+      to the late value differs from the late share by at most 10 points
+  R4  ECDSA-P256 (n = 1): burst at most 11 at every delay
+  R5  across machines: the R2 shares differ by at most 10 points (run this on each machine and compare)
+  R6  delay 0 with and without the delaying path: the share of bursts above ten and the late share differ by at most 10 points each
 """
 import argparse, collections, csv, glob, os, re, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -19,10 +26,11 @@ import analyze_ticket_race as T
 import ticket_ackorder_sim as SIM
 from pcap_summary import read_pcap
 PORT = 4433
-RTT, RATE, REQ = 100.0, 100.0, 25000
+RTT, RATE, REQ = 100.0, 100.0, 25000      # network and request of the runs of run_r3.sh
 
 
 def parse_bpf(path):
+    """Read the probe lines of one run (XQ, XS, RX, SEND, AK, AKR), grouped by their first word, as tuples of integers."""
     ev = collections.defaultdict(list)
     for line in open(path, errors="ignore"):
         f = line.split()
@@ -37,6 +45,7 @@ def parse_bpf(path):
 
 
 def conns(pcap):
+    """Packets of the capture grouped by client port, in order of first appearance."""
     d = collections.OrderedDict()
     for p in read_pcap(pcap):
         cp = p[2] if p[1] == PORT else (p[1] if p[2] == PORT else None)
@@ -46,6 +55,7 @@ def conns(pcap):
 
 _late = {}
 def late_value(suite, mtu, n):
+    """Burst that the replay model gives when the ticket acknowledgments arrive late (computed once per suite, MTU and n)."""
     k = (suite, mtu, n)
     if k not in _late:
         _late[k] = SIM.simulate(suite, RTT, RATE, mtu, REQ, 13, n, c_ack_us=5, p_t_us=20, p_w_us=50, d_tkt_us=3000)["burst"]
@@ -53,10 +63,12 @@ def late_value(suite, mtu, n):
 
 
 def early_value(n):
+    """Burst the window rule gives when all n ticket segments are acknowledged before the response is written."""
     return max(10, min(10 + n, 2 * n))
 
 
 def transactions(rundir):
+    """One record per resumed transaction of a run directory (named ..._d<delay>_m<mtu>): ticket segments, order class, burst and ACK shifts."""
     m = re.search(r"_d(off|[0-9.]+)_m(\d+)$", rundir.rstrip("/"))
     delay = m.group(1); mtu = int(m.group(2))
     out = []
@@ -99,10 +111,13 @@ def transactions(rundir):
     return out
 
 
-def share(a, b): return 100.0 * a / b if b else float("nan")
+def share(a, b):
+    """Percentage a of b."""
+    return 100.0 * a / b if b else float("nan")
 
 
 def main():
+    """Evaluate R1-R6 over all run directories and write the report and the table of transactions."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--runs", required=True, help="directory that holds trace_r3*_d*_m* (results/)")
     ap.add_argument("--machine", default=""); ap.add_argument("--out", default=""); ap.add_argument("--csv", default="")

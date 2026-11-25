@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
-"""
-trace_run.py - packet- and window-level traces of TLS transactions in the netns testbed (paper 2, WP6: scenarios B1, B5, B11). Needs root.
+"""trace_run.py - run TLS transactions in the emulated network while recording packet captures and kernel state. Needs root.
 
-  sudo python3 trace_run.py window   --suites "ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768" --n 8   # B1: the server's window in resumed transactions
-  sudo python3 trace_run.py fullticket --n 8                                                                          # B11: the half round trip of a full handshake that issues a ticket
-  sudo python3 trace_run.py race --n 6                                                                                # B1b: SERVER-side timeline of ticket, its acknowledgment and the response, over networks and RTTs
+    sudo python3 trace_run.py window --n 8        # the server's window during resumed transactions
+    sudo python3 trace_run.py fullticket --n 8    # full handshakes with and without a session ticket
+    sudo python3 trace_run.py race --n 6          # server-side timeline of the ticket, its acknowledgments and the response
 
-Both run `tls_probe` (server and client, --resume: each measured transaction is a resumed one, preceded by a full one that obtains the
-ticket) in the namespaces of tbnet.py, with the kernel tracepoint tcp:tcp_probe enabled (state of the socket that receives a segment: snd_cwnd,
-snd_una, snd_nxt) and tcpdump on the client link. Output: results/trace_<scenario>/<tag>.{trace.txt,pcap} and the `tls_probe` CSV.
-Analyse with analyze_trace.py (tcp_probe) and pcap_summary.py (packets).
+Each preset runs tls_probe (server and client) in the namespaces of tbnet.py; with --resume every measured transaction is a resumed one,
+preceded by a full one that obtains the ticket. run_one() is also the building block of other runners (g24_run.py).
+
+What is recorded, per configuration, in the output directory (results/trace_<preset>/ by default), as <tag>.*:
+  .csv          timing rows of the probe client
+  .pcap         capture on the client's interface;  _srv.pcap  capture on the server's interface
+  .trace.txt    kernel tracepoint tcp:tcp_probe (congestion window and sequence numbers when a segment arrives) or the function tracer
+  .bpf.txt      output of the bpftrace probe named in PQC_BPF (state of the sender at each acknowledgment)
+
+Environment switches: PQC_BPF probe script; PQC_FTRACE kernel functions to trace; PQC_NO_TCPPROBE=1 skip tcp_probe; PQC_CLOCK_SYNC=0
+skip the clock records; PQC_ACK_DELAY_US delay of the client's pure ACKs; PQC_NO_RESUMED_TICKET=1 server issues no ticket on resumed
+connections; R3_WRITE_DELAY_US / R3_WRITE_SPIN_US delay the server's response write by sleeping / busy waiting; PQC_SRV_CPU server core.
+Analysis: analyze_trace.py (tcp_probe), pcap_summary.py (captures) and the analyze_*.py script of each test.
 """
 from __future__ import annotations
 
@@ -32,14 +40,29 @@ TRACEFS = "/sys/kernel/tracing"
 PRESETS = {
     "window": dict(suites="ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768", reqs=[19460], resps=[14 * 1440 - 700], rtt=100.0, rate=100.0, mtu=1500, depth=2, mtls=1),
     "fullticket": dict(suites="ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768", reqs=[302], resps=[222], rtt=100.0, rate=100.0, mtu=1500, depth=3, mtls=1),
-    # race: large request (the ticket is still in flight when the request completes), response of k segments (k * MSS - 700 bytes), several networks.
-    # nets = rtt:rate:mtu; the RTT sweep at 100 Mbit/s locates where the window after the ticket changes (12/15 segments at 30 ms, 10 at 5 ms and at 10 Mbit/s)
+    # race: a large request (so that the ticket is still in flight when the request is complete) and a response of k segments
+    # (k * MSS - 700 bytes) on several networks, each written rtt:rate:mtu. The RTT sweep shows where the window after the ticket changes.
     "race": dict(suites="ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768", reqs=[19460], ks=[13], depth=2, mtls=1,
                  nets="5:100:1500,10:100:1500,15:100:1500,20:100:1500,30:100:1500,50:100:1500,100:100:1500,100:10:1500,100:100:1280,100:100:9000"),
 }
 
 
 def run_one(tb, probe, suite, req, resp, depth, mtls, n, outdir, tag, rtt, pcap, resume=True, srv_pcap=False):
+    """Run one traced configuration on a testbed that has already been shaped.
+
+    tb, probe     testbed and path of tls_probe
+    suite         key of tls_trace.SUITES (certificate algorithm | TLS group)
+    req, resp     request and response size in bytes
+    depth, mtls   certificate chain depth; 1 for mutual authentication
+    n             measured transactions (two warm-up ones are added)
+    outdir, tag   output directory and common name of the output files
+    rtt           round-trip time in ms, used for the pause between transactions and for the time limit
+    pcap          capture on the client's interface
+    resume        measure resumed transactions
+    srv_pcap      capture on the server's interface
+
+    Tracers are started before the client and stopped after it, even if the run fails.
+    """
     alg, group = ALL_SUITES[suite]
     ch = RT.ensure_chain(alg, depth, os.path.join(HERE, "work"))
     port = tbnet.PROBE_PORT
@@ -57,7 +80,7 @@ def run_one(tb, probe, suite, req, resp, depth, mtls, n, outdir, tag, rtt, pcap,
     if pcap:
         dump = subprocess.Popen(tb.exec_prefix("c") + ["tcpdump", "-i", "vc0", "-U", "-s", "128", "-w", os.path.join(outdir, tag + ".pcap")], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     open(f"{TRACEFS}/trace", "w").write("")
-    ft = os.environ.get("PQC_FTRACE")        # WP6 kernel test: calls of the congestion-control functions and of tcp_sendmsg with their time stamps
+    ft = os.environ.get("PQC_FTRACE")        # kernel function tracer: time-stamped calls of the listed functions (congestion control, tcp_sendmsg)
     if ft:
         try:
             open(f"{TRACEFS}/set_ftrace_filter", "w").write("\n".join(ft.split(",")))
@@ -65,7 +88,7 @@ def run_one(tb, probe, suite, req, resp, depth, mtls, n, outdir, tag, rtt, pcap,
         except OSError as e:
             print("function tracer not available:", e, file=sys.stderr)
     bpf = None
-    if os.environ.get("PQC_BPF"):            # WP6 part F: state of the server's sender at each ACK (ticket_state.bt); READY is printed when the probes are attached
+    if os.environ.get("PQC_BPF"):            # bpftrace probe on the server's sender (e.g. ticket_state.bt); it prints READY once its probes are attached
         bpf_out = os.path.join(outdir, tag + ".bpf.txt")
         bpf = subprocess.Popen(["bpftrace", "-q", os.environ["PQC_BPF"], str(tbnet.PROBE_PORT)], stdout=open(bpf_out, "w"), stderr=subprocess.PIPE, text=True)
         for _ in range(100):
@@ -77,7 +100,7 @@ def run_one(tb, probe, suite, req, resp, depth, mtls, n, outdir, tag, rtt, pcap,
         else:
             bpf.kill()
             raise RuntimeError("bpftrace did not become ready")
-    if not os.environ.get("PQC_NO_TCPPROBE"):   # part F does not use tcp_probe; its trace file is the largest one
+    if not os.environ.get("PQC_NO_TCPPROBE"):   # tcp_probe produces the largest file, so tests that use only bpftrace switch it off
         open(f"{TRACEFS}/events/tcp/tcp_probe/enable", "w").write("1")
     if not ft:   # nothing else may be traced: a tracer left over from an earlier run (function tracer without a filter) fills trace_pipe with every kernel function
         try:
@@ -86,7 +109,7 @@ def run_one(tb, probe, suite, req, resp, depth, mtls, n, outdir, tag, rtt, pcap,
             pass
     if ft or not os.environ.get("PQC_NO_TCPPROBE"):
         tr = subprocess.Popen(["cat", f"{TRACEFS}/trace_pipe"], stdout=open(os.path.join(outdir, tag + ".trace.txt"), "w"))
-    else:        # parts F and G read only the bpftrace output and the captures: no trace_pipe file at all
+    else:        # only bpftrace output and captures are wanted: do not read trace_pipe at all
         tr = subprocess.Popen(["true"])
     if os.environ.get("PQC_CLOCK_SYNC", "1") != "0":      # fixes and records the time bases before the run; --after checks that the offset has not moved (clock_sync.py)
         subprocess.run([sys.executable, os.path.join(HERE, "clock_sync.py"), "--out", os.path.join(outdir, tag)], check=False)
@@ -126,6 +149,7 @@ def run_one(tb, probe, suite, req, resp, depth, mtls, n, outdir, tag, rtt, pcap,
 
 
 def main():
+    """Run every combination of suite and message size of the chosen preset and hand the output files back to the calling user."""
     ap = argparse.ArgumentParser()
     ap.add_argument("scenario", choices=list(PRESETS))
     ap.add_argument("--suites", default="")
@@ -135,7 +159,7 @@ def main():
     ap.add_argument("--rtt", type=float, default=0)
     ap.add_argument("--rate", type=float, default=0)
     ap.add_argument("--mtu", type=int, default=0)
-    ap.add_argument("--depth", type=int, default=0, help="certificate chain depth (default: the preset's; G10 uses 1)")
+    ap.add_argument("--depth", type=int, default=0, help="certificate chain depth (default: that of the preset)")
     ap.add_argument("--no-pcap", action="store_true")
     ap.add_argument("--nets", default="", help="race: comma list rtt:rate:mtu")
     ap.add_argument("--ks", default="", help="race: comma list of response sizes in segments")
@@ -147,7 +171,7 @@ def main():
     reqs = [int(x) for x in a.reqs.split(",")] if a.reqs else pr["reqs"]
     resps = [int(x) for x in a.resps.split(",")] if a.resps else pr.get("resps", [])
     rtt, rate, mtu = a.rtt or pr.get("rtt", 100.0), a.rate or pr.get("rate", 100.0), a.mtu or pr.get("mtu", 1500)
-    probe = os.environ.get("PQC_PROBE") or os.path.join(HERE, "tls_probe")   # PQC_PROBE: tls_probe_go (G10)
+    probe = os.environ.get("PQC_PROBE") or os.path.join(HERE, "tls_probe")   # PQC_PROBE: another implementation, e.g. tls_probe_go
     if a.depth:
         pr["depth"] = a.depth
     outdir = os.path.join(HERE, "results", os.environ.get("PQC_OUTDIR", f"trace_{a.scenario}"))
@@ -161,7 +185,7 @@ def main():
             for (r_, rt_, m_) in nets:
                 m_ = int(m_)
                 tb.shape(r_, rt_, 0.0, m_, 10, "reno", quickack=True)
-                if os.environ.get("PQC_ACK_DELAY_US", "") not in ("", "off"):          # round 3: the pure ACKs of the client are delayed by this many microseconds (0 = through the ifb path with no delay)
+                if os.environ.get("PQC_ACK_DELAY_US", "") not in ("", "off"):          # intervention: delay the client's pure ACKs by this many microseconds (0 = same ifb path, no added delay)
                     tb.ack_delay(float(os.environ["PQC_ACK_DELAY_US"]))
                 for su in suites:
                     for rq in reqs:
@@ -176,7 +200,7 @@ def main():
         for su in suites:
             for rq in reqs:
                 for rs in resps:
-                    for resume in ((True, False) if a.scenario == "fullticket" else (True,)):    # fullticket: with tickets (--resume) and ticketless (as in Paper 1)
+                    for resume in ((True, False) if a.scenario == "fullticket" else (True,)):    # fullticket: once with session tickets and once without
                         tag = f"{su.split('|')[0]}_req{rq}_resp{rs}_rtt{rtt:g}_mtu{mtu}" + ("" if resume else "_ticketless")
                         print(f"[{time.strftime('%H:%M:%S')}] {tag}", flush=True)
                         run_one(tb, probe, su, rq, rs, pr["depth"], pr["mtls"], a.n, outdir, tag, rtt, not a.no_pcap, resume)

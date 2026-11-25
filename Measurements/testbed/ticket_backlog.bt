@@ -1,15 +1,19 @@
 #!/usr/bin/env bpftrace
 /*
- * WP6 part G1: are the ACKs of the session ticket deferred while the application owns the socket? (the open point of the Letter)
- *   sudo bpftrace -q ticket_backlog.bt 4433 > tag.bpf.txt          ($1 = local port of the server)
- * The server's tcp_sendmsg() takes the socket lock; ACKs that arrive meanwhile are queued by tcp_add_backlog() and processed by release_sock() -> __release_sock(), at the end of
- * tcp_sendmsg (still inside the call). Lines (nsecs is CLOCK_MONOTONIC; tid = CPU thread):
- *   SEND ns tid dport write_seq_before write_seq_after     at return of tcp_sendmsg (the bytes written by that call are (before, after])
- *   BKLG ns tid dport                                      at entry of tcp_add_backlog (an incoming segment found the socket owned by the user)
- *   RELS ns tid dport / RELE ns tid                        entry / return of __release_sock (the backlog is processed between the two)
- *   RENO ns tid dport ack acked cwnd ssthresh packets_out max_packets_out is_cwnd_limited   at entry of tcp_reno_cong_avoid (as in ticket_state.bt)
- *   SS   ns tid dport acked cwnd ssthresh                  at entry of tcp_slow_start
- * analyze_backlog.py joins them: a RENO event with the same tid between RELS and RELE was processed from the backlog.
+ * ticket_backlog.bt - are the acknowledgments of the session ticket deferred because the application owns the socket?
+ *
+ * While the server's tcp_sendmsg() holds the socket lock, arriving ACKs are queued by tcp_add_backlog() and processed afterwards by
+ * release_sock() -> __release_sock(), still inside the call.
+ *
+ *   sudo bpftrace -q ticket_backlog.bt 4433 > tag.bpf.txt        ($1 = port of the server; trace_run.py starts it when PQC_BPF names this file)
+ *
+ * Output lines (nsecs = CLOCK_MONOTONIC; tid = kernel thread):
+ *   SEND ns tid dport write_seq_before write_seq_after   return of tcp_sendmsg() (it wrote the bytes (before, after])
+ *   BKLG ns tid dport                                    entry of tcp_add_backlog(): a segment found the socket owned by the application
+ *   RELS ns tid dport / RELE ns tid                      entry / return of __release_sock(): the backlog is processed in between
+ *   RENO ns tid dport ack acked cwnd ssthresh packets_out max_packets_out is_cwnd_limited   entry of tcp_reno_cong_avoid()
+ *   SS   ns tid dport acked cwnd ssthresh                entry of tcp_slow_start()
+ * analyze_backlog.py joins them: a RENO event of the same thread between RELS and RELE was processed from the backlog.
  */
 BEGIN { printf("READY\n"); }
 

@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""WP6 part G2: intervention. The server issues NO new ticket on a resumed connection (tls_probe --no-resumed-ticket); the same cells are run with the ticket (arm A) and without it (arm B). No root.
+"""analyze_notkt.py - intervention: the server issues no new ticket on a resumed connection (tls_probe --no-resumed-ticket). The same cells
+are run with the ticket (arm A) and without it (arm B).
 
     python3 analyze_notkt.py results/trace_tkt results/trace_notkt
 
-For every resumed transaction the burst of the response is the number of response segments sent before the first ACK of response data (as analyze_ticket_race.py).
-Pre-registered (results/wp6_pred_notkt.txt), from the hypothesis that the ticket is a separate write whose ACKs enlarge the server's window:
-  G2a  arm B: burst <= 10 segments in >= 95 % of the resumed transactions of every cell (nothing can enlarge the window beyond the initial 10 without the ticket's ACKs);
-  G2b  arm A (same session): in the cells where >= 50 % of the transactions had burst > 10 in the earlier parts (ML-DSA-44/-65 with a large request), the same holds here (control);
-  G2c  the median burst of arm B is not larger than that of arm A in any cell.
+For every resumed transaction the burst of the response is the number of response segments sent before the first acknowledgment of
+response data (as in analyze_ticket_race.py).
+Criteria fixed beforehand (results/wp6_pred_notkt.txt), from the explanation that the ticket is a separate write whose acknowledgments
+enlarge the server's window:
+  G2a  arm B: burst <= 10 segments in at least 95 % of the resumed transactions of every cell (without the ticket's ACKs nothing can
+       enlarge the initial window of 10)
+  G2b  arm A (same session): the cells that had a burst > 10 in at least half of the transactions before show it again (control)
+  G2c  the median burst of arm B is not larger than that of arm A in any cell
 If G2a fails, the ticket is not the only thing that enlarges the window.
 """
 import collections, glob, os, re, statistics as st, sys
@@ -16,6 +20,7 @@ import analyze_ticket_race as T  # noqa: E402
 from pcap_summary import read_pcap  # noqa: E402
 
 def bursts(d):
+    """{(suite, RTT, rate, MTU, request, k): bursts of the resumed transactions} of one trace directory."""
     out = collections.defaultdict(list)
     for f in sorted(glob.glob(os.path.join(d, "*_srv.pcap"))):
         m = T.TAG.search(os.path.basename(f))
@@ -45,6 +50,7 @@ def bursts(d):
     return out
 
 def main():
+    """Print the bursts of both arms per cell and the counts for G2a-G2c."""
     A, B = bursts(sys.argv[1]), bursts(sys.argv[2])
     print(f"{'cell':52s} {'A n':>4s} {'A med':>6s} {'A>10':>5s} | {'B n':>4s} {'B med':>6s} {'B>10':>5s}")
     ok_a = ok_b = ok_c = n_cells = n_ctl = 0; ok_ctl = 0

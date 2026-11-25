@@ -1,25 +1,29 @@
 #!/usr/bin/env bash
-# Make timings stable: performance governor, no turbo. Reversible.
+# host_tune.sh - make timing measurements stable: CPU frequency governor "performance" and no turbo. Reversible.
 #   sudo ./host_tune.sh on      sudo ./host_tune.sh off      sudo ./host_tune.sh status
 # Optional (pqcm.sh --quiet-services, scenario runners --quiet-services): stop, for the duration of a measurement, the services that can
-# change the CPU clock or start work in the middle of a run, and start again exactly those that were running:
+# change the CPU clock or start work in the middle of a run, and afterwards start exactly those that were running:
 #   sudo ./host_tune.sh quiet-on      sudo ./host_tune.sh quiet-off      ./host_tune.sh quiet-status
 # Services (override with PQC_QUIET_LIST, space separated): power-profiles-daemon thermald apt-daily.timer apt-daily-upgrade.timer
-# unattended-upgrades.  Nothing is disabled or masked: only "systemctl stop" and "systemctl start".  Calls are counted, so nested use
-# (a scenario runner that calls pqcm.sh) restores the services only when the outermost call ends.
+# unattended-upgrades.  Nothing is disabled or masked: only "systemctl stop" and "systemctl start".  The calls are counted, so that with
+# nested use (a scenario runner that calls pqcm.sh) the services are restored only when the outermost call ends.
 set -euo pipefail
+# State files (in PQC_STATE_DIR, default /tmp). STATE: governor and turbo setting before "on".
 SD=${PQC_STATE_DIR:-/tmp}
 STATE=$SD/pqc_tune.state
 QSTATE=$SD/pqc_quiet.state      # services that this script stopped (one per line)
 QREFS=$SD/pqc_quiet.refs        # number of open quiet-on calls
 QLIST=${PQC_QUIET_LIST:-"power-profiles-daemon thermald apt-daily.timer apt-daily-upgrade.timer unattended-upgrades"}
+# Directory of the CPU settings in sysfs.
 G=/sys/devices/system/cpu
+# Show the state of the services, which of them this script stopped, and the number of logged-in users.
 quiet_status() {
   local u state
   for u in $QLIST; do state=$(systemctl is-active "$u" 2>/dev/null || true); printf '  %-28s %s\n' "$u" "${state:-unknown}"; done
   echo "stopped by this script: $( [ -s "$QSTATE" ] && tr '\n' ' ' < "$QSTATE" || echo none)   open calls: $(cat "$QREFS" 2>/dev/null || echo 0)"
   echo "logged-in users: $(who 2>/dev/null | wc -l)"
 }
+# Service commands.
 case "${1:-status}" in
   quiet-on)
     refs=$(cat "$QREFS" 2>/dev/null || echo 0); echo $((refs + 1)) > "$QREFS"
@@ -39,6 +43,7 @@ case "${1:-status}" in
     rm -f "$QSTATE" "$QREFS"; echo "quiet ended"; exit 0;;
   quiet-status) quiet_status; exit 0;;
 esac
+# CPU clock commands. "on" saves the current setting once, so that a second "on" cannot overwrite it; "off" restores it.
 case "${1:-status}" in
   on)
     [ -f "$STATE" ] || { cat $G/cpu0/cpufreq/scaling_governor > "$STATE" 2>/dev/null || echo powersave > "$STATE";

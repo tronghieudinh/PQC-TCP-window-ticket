@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G23: the ticket tests of L1 on GnuTLS 3.8.14 (stages C, D, T, R) and an OpenSSL control (stage O). See README.md.
+# Scenario G23, GnuTLS server: the ticket tests of the paper on GnuTLS 3.8.14 - client window (stage C), ticket position (D), number of
+# tickets 0..4 (T), random cells (R) - and an OpenSSL control in the same session (O). See README.md.
 #   ./run.sh [--stage CDTRO (default all)] [--probe PATH] [--limit N (first N calls: smoke test)] [--no-calibration-check] [scenario_lib options: --n N --label L --yes --dry-run --preflight-only --cpus ...]
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
 TB=$(cd "$HERE/../../../testbed" && pwd)
@@ -8,6 +9,7 @@ while [ $# -gt 0 ]; do case "$1" in
   --stage) STAGE=$2; shift;; --probe) PROBE=$2; shift;; --no-calibration-check) CALCHK=0;; --limit) LIMIT=$2; shift;; *) ARGS+=("$1");; esac; shift; done
 [ -x "$PROBE" ] || sc_die "GnuTLS probe not found: $PROBE (build it: $TB/build_gnutls_probe.sh)"
 CERTS=${PQC_CERTS:-}
+# The predictions were derived from the order and sizes of the probe's writes: check that this build writes the same way.
 if [ "$CALCHK" = 1 ]; then
   echo "checking that the write pattern of the probe on this machine is the calibrated one ..." >&2
   python3 "$TB/gnutls_calibrate.py" --probe "$PROBE" --check "$TB/results/gnutls_calibration.json" >&2 || sc_die "the write pattern differs from the calibration: the predictions do not apply"

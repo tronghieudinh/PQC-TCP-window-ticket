@@ -16,18 +16,21 @@
 #include <string.h>
 #include <time.h>
 
+/* Monotonic time in microseconds. */
 static double now_us(void) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec * 1e6 + t.tv_nsec / 1e3;
 }
 
+/* Print the failed step and the OpenSSL error queue, then stop. */
 static void die(const char *what) {
     fprintf(stderr, "error: %s\n", what);
     ERR_print_errors_fp(stderr);
     exit(1);
 }
 
+/* Generate one key pair of the named algorithm. */
 static EVP_PKEY *keygen(const char *alg) {
     EVP_PKEY *k = NULL;
     if (!strcmp(alg, "RSA-2048") || !strcmp(alg, "RSA-3072"))
@@ -40,6 +43,7 @@ static EVP_PKEY *keygen(const char *alg) {
     return k;
 }
 
+/* op_fn: one operation under test (returns 1 on success). cfg_t: seconds per repetition and number of repetitions. */
 typedef int (*op_fn)(void *);
 typedef struct { double secs; int reps; } cfg_t;
 
@@ -69,8 +73,10 @@ static void bench(const char *alg, const char *op, op_fn fn, void *arg, cfg_t c)
 }
 
 /* ---------------- signatures ---------------- */
+/* State of a signature test: key, digest name (NULL for ML-DSA and SLH-DSA), RSA-PSS flag, message and signature. */
 typedef struct { EVP_PKEY *k; const char *md; int pss; unsigned char msg[512]; unsigned char sig[60000]; size_t siglen; } sig_t;
 
+/* One signature, including the creation of the context. */
 static int do_sign(void *p) {
     sig_t *s = p;
     EVP_MD_CTX *c = EVP_MD_CTX_new();
@@ -83,6 +89,7 @@ static int do_sign(void *p) {
     return ok;
 }
 
+/* One verification of the signature made by do_sign. */
 static int do_verify(void *p) {
     sig_t *s = p;
     EVP_MD_CTX *c = EVP_MD_CTX_new();
@@ -94,6 +101,7 @@ static int do_verify(void *p) {
     return ok;
 }
 
+/* Time signing and verification of one algorithm and report the signature size. */
 static void bench_sig(const char *alg, cfg_t c) {
     sig_t *s = calloc(1, sizeof(sig_t));
     s->k = keygen(alg);
@@ -109,9 +117,10 @@ static void bench_sig(const char *alg, cfg_t c) {
     free(s);
 }
 
-/* ---------------- key establishment ---------------- */
+/* State of a key-establishment test: key, peer key (ECDH), ciphertext and shared secret. */
 typedef struct { const char *alg; EVP_PKEY *k, *peer; unsigned char ct[4096], ss[128]; size_t ctlen, sslen; } kex_t;
 
+/* One key generation. */
 static int do_keygen(void *p) {
     kex_t *x = p;
     EVP_PKEY *k = keygen(x->alg);
@@ -129,6 +138,7 @@ static int do_derive(void *p) {             /* ECDH / X25519 shared secret */
     return ok;
 }
 
+/* One KEM encapsulation. */
 static int do_encap(void *p) {
     kex_t *x = p;
     EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_pkey(NULL, x->k, NULL);
@@ -139,6 +149,7 @@ static int do_encap(void *p) {
     return ok;
 }
 
+/* One KEM decapsulation of the ciphertext made by do_encap. */
 static int do_decap(void *p) {
     kex_t *x = p;
     EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_pkey(NULL, x->k, NULL);
@@ -149,6 +160,7 @@ static int do_decap(void *p) {
     return ok;
 }
 
+/* Time key generation and either encapsulation and decapsulation (kem != 0) or the shared-secret derivation. */
 static void bench_kex(const char *alg, int kem, cfg_t c) {
     kex_t *x = calloc(1, sizeof(kex_t));
     x->alg = alg;

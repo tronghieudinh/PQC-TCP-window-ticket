@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
-"""r3c.py - round 3c (results/r3c_design.md): the WRITE of the response is delayed by D us (tls_probe --pre-write-delay-us), the ACKs are not.
+"""r3c.py - round 3c (results/r3c_design.md): the server's WRITE of the response is delayed by D microseconds
+(tls_probe --pre-write-delay-us) while the acknowledgments are left alone.
+
     python3 r3c.py thresholds --tx results/r3c_gx10_pilot.csv --out results/r3c_thresholds     # from the PILOT (writes .json and .md)
     python3 r3c.py test --tx results/r3c_x250_test.csv --ack results/r3c_x250_test_ack.csv --machine X250 [--thresholds results/r3c_thresholds.json]
 The CSV files are the output of r3b_analyze.py (--csv X.csv writes X.csv and X_ack.csv) on directories trace_r3<TAG>_w<D>_m<mtu>.
-Prediction (C3, from the D = 0 transactions alone): at delay D a transaction is late iff its last ticket ACK was processed more than D after the XQ of its first response segment at D = 0 (the AK times
-relative to t_q are in the CSV); the predicted late share at D is the share of the D = 0 transactions of the same series (suite, MTU) for which that holds. No fitted parameter. The shift of the write is the MEASURED one (median p_w at D minus median p_w at 0: a reading of the instrument, level B), not the nominal D: the pilot showed that the write is later by D plus about 60 us (the timer of nanosleep); this definition was fixed on the pilot before any test data was opened."""
+
+A transaction is "late" when at least one ticket acknowledgment is processed after the first response segment is queued.
+Prediction (criterion C3, from the D = 0 transactions alone, no fitted parameter): at delay D a transaction of D = 0 would be late iff
+its last ticket acknowledgment was processed more than the write shift after the queueing of its first response segment (the times are
+in column ak_minus_tq_us). The predicted late share at D is the share of the D = 0 transactions of the same series (suite, MTU) for
+which this holds. The shift is the MEASURED one (median write time p_w at D minus median p_w at 0), not the nominal D: on the pilot the
+write came later by D plus about 60 us (timer of nanosleep); this definition was fixed on the pilot before the test data were opened.
+Criteria: C1 the write is later by D; C2 the late share moves as predicted in direction; C3 above; C4 B1 and B2 of round 3b still hold.
+"""
 import argparse, collections, csv, json, math, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 def load(path, kind="w"):
+    """Transaction rows of a CSV file, numbers converted: ak = acknowledgment times (us) relative to the queued response, pw = write time p_w; only rows of the given intervention kind (w sleep, s spin)."""
     X = list(csv.DictReader(open(path)))
     for x in X:
         for k in ("n", "mtu", "late", "burst", "resp_segs", "cwnd_final"): x[k] = int(x[k])
@@ -17,21 +27,32 @@ def load(path, kind="w"):
     return [x for x in X if x.get("kind", "w") == kind]
 
 def series(X):
+    """The (suite, MTU) series with a ticket of at least four segments."""
     return sorted({(x["suite"], x["mtu"]) for x in X if x["n"] >= 4})
 
-def late_share(v): return 100.0 * sum(x["late"] >= 1 for x in v) / len(v) if v else float("nan")
+def late_share(v):
+    """Percentage of the transactions with at least one late ticket acknowledgment."""
+    return 100.0 * sum(x["late"] >= 1 for x in v) / len(v) if v else float("nan")
 
-def band(n): return 1.96 * math.sqrt(0.25 / n) * 100
+def band(n):
+    """Half-width in percentage points of the widest 95 % binomial interval at n trials."""
+    return 1.96 * math.sqrt(0.25 / n) * 100
 
-def dlist(X): return sorted({float(x["delay"]) for x in X if x["delay"] != "off"})
+def dlist(X):
+    """The numeric delays D present in the rows, sorted."""
+    return sorted({float(x["delay"]) for x in X if x["delay"] != "off"})
 
 def shift_at(X, d):
+    """Measured shift of the write at delay d: median p_w at d minus median p_w at 0 (us)."""
     m0 = st.median(x["pw"] for x in X if x["delay"] == "0" and x["pw"] is not None)
     return st.median(x["pw"] for x in X if x["delay"] == f"{d:g}" and x["pw"] is not None) - m0 if d > 0 else 0.0
 
-def at(X, suite, mtu, d): return [x for x in X if x["suite"] == suite and x["mtu"] == mtu and x["delay"] == (f"{d:g}" if d is not None else "off")]
+def at(X, suite, mtu, d):
+    """Rows of one series at delay d (None selects the runs with the intervention off)."""
+    return [x for x in X if x["suite"] == suite and x["mtu"] == mtu and x["delay"] == (f"{d:g}" if d is not None else "off")]
 
 def thresholds(a):
+    """Derive the thresholds of C1 to C4 from the pilot and write the JSON and Markdown files."""
     X = load(a.tx); D = dlist(X); dmax = max(D); out = {}
     med0 = st.median(x["pw"] for x in X if x["delay"] == "0" and x["pw"] is not None)
     sp = lambda d: (lambda v: sorted(v)[9 * len(v) // 10] - sorted(v)[len(v) // 10])([x["pw"] for x in X if x["delay"] == f"{d:g}" and x["pw"] is not None])
@@ -62,6 +83,7 @@ def thresholds(a):
     open(a.out + ".md", "w").write("\n".join(L) + "\n"); print("\n".join(L))
 
 def test(a):
+    """Apply the thresholds to the runs of one machine and print the verdict of each criterion with the reading."""
     T = json.load(open(a.thresholds)); X = load(a.tx); D = dlist(X); dmax = max(D); ok = {}; L = [f"Round 3c test, machine {a.machine}: {len(X)} resumed transactions"]
     med0 = st.median(x["pw"] for x in X if x["delay"] == "0" and x["pw"] is not None)
     sp = lambda d: (lambda v: sorted(v)[9 * len(v) // 10] - sorted(v)[len(v) // 10])([x["pw"] for x in X if x["delay"] == f"{d:g}" and x["pw"] is not None])

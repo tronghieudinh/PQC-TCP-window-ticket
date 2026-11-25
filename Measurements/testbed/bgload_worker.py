@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""bgload_worker.py - one background-load process of scenario G17 (cross traffic and CPU load). Prints one JSON line with what it did when it receives SIGTERM.
+"""bgload_worker.py - one background-load process of scenario G17 (cross traffic and CPU load), started by bgload.py. When it receives
+SIGTERM it prints one JSON line with what it did (mode, seconds, bytes, Mbit/s).
     udp-recv --bind ADDR --port P
-    udp-send --dst ADDR --port P --rate MBITS [--size 1200]       constant bit rate in 2 ms batches
+    udp-send --dst ADDR --port P --rate MBITS [--size 1200]       constant bit rate, datagrams of --size bytes in 2 ms batches
     tcp-recv --bind ADDR --port P
     tcp-send --dst ADDR --port P --flows K --rate MBITS_EACH      K long-lived connections, each application-limited to the rate (5 ms ticks)
     busy                                                         a CPU-bound loop
@@ -12,11 +13,13 @@ STOP = False
 
 
 def _stop(*_):
+    """Signal handler: ask the main loop to end."""
     global STOP
     STOP = True
 
 
 def fam(addr):
+    """Address family (IPv6 or IPv4) of a numeric address."""
     return socket.AF_INET6 if ":" in addr else socket.AF_INET
 
 

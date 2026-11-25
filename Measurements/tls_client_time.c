@@ -17,6 +17,7 @@
 #include <time.h>
 #include <unistd.h>
 
+/* Monotonic time in milliseconds. */
 static double now_ms(void) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);

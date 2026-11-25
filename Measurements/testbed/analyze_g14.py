@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""analyze_g14.py - evaluates the criteria of results/g14_robustness_predictions.md on runs of scenario G14.
+"""analyze_g14.py - robustness (scenario G14): evaluates the criteria fixed before the measurement
+(results/g14_robustness_predictions.md) under BBR (--arm bbr) or under delayed acknowledgments (--arm delack).
+
     python3 analyze_g14.py --arm bbr|delack --run DIR [--out results/g14_analysis_ARM.txt]
-DIR holds slack_tls.csv (stage C) and nst_tls.csv (stage D) of one run. Measured excess latency of a cell = median t_total_ms of the resumed transactions on the shaped link
-minus the median on the unshaped base (as analyze_g12.py). A cell is 'wrong' when the prediction is off by more than 50 ms (half the RTT); a cell with fewer than 30 valid
-transactions counts as MISSING.
+
+DIR holds slack_tls.csv (stage C, client window) and nst_tls.csv (stage D, ticket position) of one run. Excess latency of a cell: median total time of the resumed transactions on the shaped link minus the median on the unshaped link (round-trip time 0). A cell is
+"wrong" when the prediction is off by more than 50 ms (half the RTT); a cell with fewer than 30 valid transactions counts as missing.
 Arm bbr:    B1 stage C: the model with window w0 + n wrong on at most 2 of the 28 cells
-            B2 stage C: rule (1) wrong on at least 8 of the 10 cells where it differs from w0 + n
+            B2 stage C: the window rule wrong on at least 8 of the 10 cells where it differs from w0 + n
             B3 stage D: the BBR model (early ticket, window w0 + n) wrong on at most 8 of the 41 design cells
-            B4 stage D: the model of L1 (rule (1), early ticket) wrong on at least 17 of the 21 cells where it differs from the BBR model
+            B4 stage D: the paper's model (window rule, early ticket) wrong on at least 17 of the 21 cells where it differs from the BBR model
             B5 data: every design cell has at least 30 valid transactions
-Arm delack: D1 stage C: rule (1) wrong on at most 2 of the 28 cells
+Arm delack: D1 stage C: the window rule wrong on at most 2 of the 28 cells
             D2 stage D: the early-ticket model wrong on at most 2 of the 10 discriminating cells
             D3 stage D: the joined-ticket model wrong on at least 8 of the 10 discriminating cells
             D4 stage D: the early-ticket model wrong on at most 7 of the 32 design cells
@@ -23,6 +25,7 @@ MIN_VALID = 30
 
 
 def excess(path):
+    """{(suite, request, response): (excess latency in ms, valid transactions)} of one CSV file."""
     g = {}
     for r in rd(path):
         if r["err"] or r["reused"] != "1":
@@ -37,6 +40,7 @@ def excess(path):
 
 
 def evaluate(arm, d):
+    """Counts for one arm and run directory; the entry "met" gives the outcome of each criterion."""
     mc, md = excess(os.path.join(d, "slack_tls.csv")), excess(os.path.join(d, "nst_tls.csv"))
     pc = rd(os.path.join(RES, f"g14_predictions_{arm}_c.csv"))
     pdd = [r for r in rd(os.path.join(RES, f"g14_predictions_{arm}_d.csv")) if r["in_design"] == "1"]
@@ -62,6 +66,7 @@ def evaluate(arm, d):
 
 
 def main():
+    """Evaluate one run and write the report."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--arm", required=True, choices=["bbr", "delack"])
     ap.add_argument("--run", required=True)

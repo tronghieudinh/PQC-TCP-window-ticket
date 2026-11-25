@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""analyze_g19b.py - criteria U1-U4 of results/phase2_predictions.md (section G19b).
+"""analyze_g19b.py - ticket size (scenario G19b): evaluates criteria U1-U4 fixed before the measurement
+(results/phase2_predictions.md, section G19b).
+
     python3 analyze_g19b.py --run FILE.csv [--out results/g19b_analysis.txt]
-Measured excess = median shaped - median base (same suite and sizes). A cell is wrong when the prediction is off by more than half the RTT (75 ms).
-  U1  the cell of G19 (response 11 150 B), measured again with n = 200: median excess within 5 ms of its G19 value (450.7 ms)
+Excess latency of a cell: median total time of the resumed transactions on the shaped link minus the median on the unshaped link, for the same suite and sizes. A cell is wrong when the prediction is off by more than half the RTT (75 ms).
+  U1  the cell of G19 (response 11 150 bytes), measured again with 200 transactions: median excess within 5 ms of its value in G19
   U2  the model with the measured ticket size is right on all 6 cells
-  U3  the model with the ticket size of G19 is wrong on all 3 discriminating cells
+  U3  the model with the ticket size used in G19 is wrong on all 3 discriminating cells
   U4  data: at least 190 valid transactions in the cell of U1, at least 95 in each other cell
 """
 import argparse, csv, os, statistics as st
 HERE = os.path.dirname(os.path.abspath(__file__))
 RES = os.path.join(HERE, "results")
-G19_VALUE = 450.7
+G19_VALUE = 450.7      # measured excess (ms) of the repeated cell in G19
 
 
 def main():
+    """Evaluate one run and write the report."""
     ap = argparse.ArgumentParser(); ap.add_argument("--run", required=True); ap.add_argument("--out", default=os.path.join(RES, "g19b_analysis.txt")); a = ap.parse_args()
     base, sh = {}, {}
     for r in csv.DictReader(open(os.path.expanduser(a.run))):

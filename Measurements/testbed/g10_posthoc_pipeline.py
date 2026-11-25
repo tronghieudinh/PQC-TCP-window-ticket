@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""
-g10_posthoc_pipeline.py - POST HOC explanation of the ML-DSA-87 deviation of G10 (written after the first run; not a pre-registered prediction).
+"""g10_posthoc_pipeline.py - post hoc explanation of the ML-DSA-87 deviation of the Go server scenario (G10); written after the first run,
+so it was not a prediction made beforehand.
 
-The packet capture of a resumed ML-DSA-87 transaction (trace_g10, X250, 19 Nov) shows that the client sends its Finished and the request when the first
-10 segments of the server's first flight have arrived (ServerHello ... Finished are in the first 1.8 KB of the one write; the ticket follows it), long before the
-last 3 segments of the flight, which the server can only send when the first acknowledgments arrive. The model of `go_predict.py` treats a flight as complete
-before the next step: it charges the client a round trip for those 3 segments, which the client does not wait for. Post hoc variant:
-  first server step = the first `w` segments of the first-flight write (w = the server's window, 10), as one flight; the rest of that write (the tail of the ticket)
-  goes with the response, from the window the first flight grew (grow_cwnd(10, 10) = 20).
-Compares measured excess latency with the pre-registered `go` prediction and with this variant for every measured cell of every suite.
+The capture of a resumed ML-DSA-87 transaction shows that the client sends its Finished and the request as soon as the first 10 segments
+of the server's first flight have arrived (ServerHello .. Finished are in the first 1.8 KB of that one write; the ticket follows them),
+long before the last 3 segments, which the server can send only when the first acknowledgments arrive. The model of go_predict.py
+treats a flight as complete before the next step and therefore charges a round trip for those 3 segments, which the client does not wait
+for. Variant ("pipelined"): the first server step is the first w segments of the first write (w = server window, 10); the rest of that
+write (the end of the ticket) goes with the response, with the window grown by the first flight (20).
+Compares the measured excess latency with the earlier "go" prediction and with this variant for every measured cell.
+
     python3 g10_posthoc_pipeline.py DIR_WITH_slack_tls.csv_AND_nst_tls.csv [more dirs]
 """
 import csv, json, os, statistics as st, sys, collections
@@ -20,6 +21,7 @@ S, MSS = G.S, G.MSS
 
 
 def pipelined_flow(cal, req, resp):
+    """Model flow of one resumed transaction in the pipelined variant, from the calibrated write sizes of Go (cal), request and response sizes."""
     ch = list(cal["resumed_client_hello_writes"])
     sf = sum(cal["resumed_server_flight_writes"])
     first = min(sf, 10 * MSS)                               # the first window of the flight: what the client needs (up to Finished) is in it
@@ -33,6 +35,7 @@ def pipelined_flow(cal, req, resp):
 
 
 def measured(dirs, name):
+    """{(suite, request, response): excess latency in ms} from the CSV file `name` of the run directories."""
     g = collections.defaultdict(list)
     for d in dirs:
         p = os.path.join(os.path.expanduser(d), name)
@@ -45,6 +48,7 @@ def measured(dirs, name):
 
 
 def main():
+    """Count, per stage and suite, the cells wrong by more than 50 ms under both predictions."""
     dirs = sys.argv[1:] or ["."]
     cal = json.load(open(os.path.join(G.RES, "go_calibration.json")))["suites"]
     tot = collections.defaultdict(lambda: [0, 0, 0])

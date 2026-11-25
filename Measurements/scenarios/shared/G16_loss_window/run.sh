@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G16: the window rule (1) of L1 on plain TCP under independent packet loss (0.1, 0.5, 1 % per direction). See README.md.
+# Scenario G16, packet loss: the window rule of the paper on plain TCP under independent packet loss of 0.1, 0.5 and 1 % per direction.
+# --n: repetitions per flight size (--n1-a, in segments). See README.md.
 #   ./run.sh [scenario_lib options: --n REPS (default 200) --label L --yes --dry-run --preflight-only --cpus ...]
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
 sc_start "$HERE" "$@"

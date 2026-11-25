@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G20: the three cells of G14 (arm bbr) that sit between the two models or away from both, measured again with n = 200. See README.md.
+# Scenario G20, resampling: the three BBR cells of scenario G14 that lie between the two models or away from both, measured again with
+# 200 transactions. See README.md.
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
 sc_start "$HERE" "$@"
 N=${SC_N:-200}

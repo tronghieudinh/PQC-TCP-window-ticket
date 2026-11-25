@@ -1,8 +1,8 @@
-"""WP6 part D, follow-up: where do the misclassified ticket ACKs of analyze_ftrace.py lie?
+"""analyze_ftrace_misses.py - follow-up to analyze_ftrace.py: where do the ticket acknowledgments that the threshold rule misclassifies lie?
 
-Same join as analyze_ftrace.py (server pcap + function tracer of run_wp6d.sh). For each ACK of a ticket it records the arrival relative to the last request segment
-(`rel`), whether tcp_slow_start was called within 50 microseconds after it (`ss50`) or within 500 microseconds (`ss500`), and compares both with the rule
-"slow start is called iff rel > 0.049 ms". Output: results/wp6_analysis_kernel_misses.txt.
+The same join as analyze_ftrace.py (server capture and kernel function trace). For every acknowledgment of a ticket it records the
+arrival time relative to the last request segment (rel) and whether tcp_slow_start was called within 50 us (ss50) or 500 us (ss500)
+after it, and compares both with the rule "slow start is called exactly if rel > 0.049 ms". Run in Measurements/testbed:
 
     python3 analyze_ftrace_misses.py > results/wp6_analysis_kernel_misses.txt
 """
@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import analyze_ftrace as A
 import analyze_ticket_race as T
 from pcap_summary import read_pcap
-rows = []
+rows = []      # one row per ticket acknowledgment
 for f in sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results', 'trace_kernel', '*.trace.txt'))):
     base = f[:-len('.trace.txt')]; pc = base + '_srv.pcap'
     m = T.TAG.search(os.path.basename(pc))
@@ -47,7 +47,7 @@ for f in sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)
                 rel=(ack[0] - r['t_req']) * 1000, ss50='tcp_slow_start' in c50, ss500='tcp_slow_start' in c500,
                 burst=r['burst'], b=b, a=a))
 
-THR = 0.049
+THR = 0.049      # threshold of the rule, ms after the last request segment
 pred = lambda o: o['rel'] > THR
 bad = [o for o in rows if pred(o) != o['ss50']]
 print(f"{len(rows)} ticket ACKs; {len(bad)} outside the rule 'slow start called iff the ACK arrives more than {THR} ms after the tail'")

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Build tls_probe_gnutls (the GnuTLS counterpart of tls_probe, scenario G23) against GnuTLS 3.8.14 built with leancrypto (ML-DSA, ML-KEM).
-#   ./build_gnutls_probe.sh [PREFIX]      PREFIX defaults to $GNUTLS_PREFIX or ~/build_tls3/prefix (the prefix of the GnuTLS build; see results/G23 notes)
-# The binary carries an rpath to PREFIX/lib, so it runs under sudo without LD_LIBRARY_PATH.
+# Build tls_probe_gnutls, the GnuTLS counterpart of tls_probe (GnuTLS server scenario, G23), against GnuTLS 3.8.14 built with leancrypto
+# (ML-DSA, ML-KEM); tools/build_gnutls_stack.sh builds that library.
+#   ./build_gnutls_probe.sh [PREFIX]      PREFIX: installation directory of that GnuTLS build, default $GNUTLS_PREFIX or ~/build_tls3/prefix
+# The program records PREFIX/lib as its library search path (rpath), so it runs under sudo without LD_LIBRARY_PATH.
 set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 P=${1:-${GNUTLS_PREFIX:-$HOME/build_tls3/prefix}}

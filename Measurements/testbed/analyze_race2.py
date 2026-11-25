@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""
-analyze_race2.py - confirmatory test of the ticket-timing rule (paper 2, WP6 B2). No root.
+"""analyze_race2.py - confirmatory test of the ticket-timing rule on a sweep of request sizes (response of 16 segments).
 
     python3 analyze_race2.py [--pred results/wp6_pred_race2.csv] [--dir results/trace_race]
-
-Reads the server-side captures of the request-size sweep (response of 16 segments), the predictions fixed in advance (race2_predict.py) and reports
-  1. per cell (suite, network, request size): the median burst, the share of transactions with burst > 10, the measured median of (last ticket ACK - last request segment),
-     the predicted class and whether it is right (borderline cells are listed but not scored);
-  2. the success criterion: >= 90 % of the scored cells right, and the first request size with burst 10 within one segment (1,440 B) of the predicted one;
-  3. out of sample: the classification of the individual transactions by the sign of (ACK - tail) - 0.049 ms, the rule of the first run, on these new transactions.
+Reads the server-side captures and the predictions fixed beforehand (race2_predict.py) and reports
+  1. per cell (suite, network, request size): median burst, share of transactions with a burst above 10, median of (last ticket
+     acknowledgment minus last request segment), predicted class and whether it is right (borderline cells are listed, not scored);
+  2. the success criterion: at least 90 % of the scored cells right, and the first request size with a burst of 10 within one segment
+     (1 440 bytes) of the predicted one;
+  3. out of sample: the classification of single transactions by the threshold of the first traces (0.049 ms) on these new transactions.
 """
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import argparse, collections, csv, glob, os, re, statistics as st, sys
@@ -18,6 +17,7 @@ import analyze_ticket_race as T  # noqa: E402
 from pcap_summary import read_pcap  # noqa: E402
 
 def main():
+    """Compare measured and predicted classes and apply the threshold rule to every transaction."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--pred", default=os.path.join(HERE, "results", "wp6_pred_race2.csv"))
     ap.add_argument("--dir", default=os.path.join(HERE, "results", "trace_race"))

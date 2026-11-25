@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-"""r3b_report.py - the numbers of the paper on round 3b (the kernel's rule read ACK by ACK) from the derived CSV files of the pilot (GX10) and of the test (X250): `key value` lines for make_assets_short.py.
-    python3 r3b_report.py --out results/r3b_report.txt     (reads results/r3b_gx10_pilot{,_ack}.csv, results/r3b_x250_test{,_ack}.csv, results/r3_{gx10,x250}_points.csv)
-The raw traces are in the data archive (gx10/r3b_pilot_20261123, x250/r3_20261123, gx10/r3_20261122, x250/r3_20261122); the CSV files are what `r3b_analyze.py` and `analyze_r3.py` derive from them."""
+"""r3b_report.py - the numbers the paper reports for round 3b (the kernel's window rule read acknowledgment by acknowledgment), from the
+derived CSV files of the pilot (GX10) and of the test (X250), as `key value` lines for make_assets_short.py.
+
+    python3 r3b_report.py --out results/r3b_report.txt
+Reads results/r3b_gx10_pilot{,_ack}.csv, results/r3b_x250_test{,_ack}.csv and results/r3_{gx10,x250}_points.csv.
+The raw traces are in the data archive (gx10/r3b_pilot_20261123, x250/r3_20261123, gx10/r3_20261122, x250/r3_20261122); the CSV files
+are what r3b_analyze.py and r3b_state.py derive from them.
+Keys: Rb<Pilot|Test><EvN|EvOk> window events and those that follow the rule; <TxN|TxOk> transactions and those whose burst equals
+min(cwnd, response segments); Late<Zero|Max> late share (%) without delay and at the largest delay; RbRoundThree<A|X><N|Match> the
+first round on the Arm and x86 machines.
+"""
 import argparse, csv, os
 HERE = os.path.dirname(os.path.abspath(__file__)); RES = os.path.join(HERE, "results")
 
-def rd(n): return list(csv.DictReader(open(os.path.join(RES, n))))
+def rd(n):
+    """Rows of a CSV file in results/."""
+    return list(csv.DictReader(open(os.path.join(RES, n))))
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--out", default=os.path.join(RES, "r3b_report.txt")); a = ap.parse_args(); L = {}

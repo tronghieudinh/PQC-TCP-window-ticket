@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
-"""analyze_g24_posthoc.py - G24, POST HOC (written after the GX10 data were seen). analyze_g24.py (registered) drops a transaction whose ticket was not sent before the request was complete, and
-connections that reuse a client port shift the pairing of connections and latencies. This reads EVERY resumed transaction from the capture of the server's link:
-connections are split at the client's SYN (not by port), the latency is row j of the probe CSV for connection 2(j+2)+1, and per transaction it gives
-  request rounds   groups of client data segments after the Finished separated by more than half an RTT; segments sent in the first group
-  response         data segments of the server from its first segment of the response (the first server data after the last request segment), without segments of 24 bytes (close_notify)
-    python3 analyze_g24_posthoc.py --runs DIR --machine GX10 [--points results/g24_gx10_points.csv] [--out ...]"""
+"""analyze_g24_posthoc.py - G24, post hoc (written after the first data had been seen).
+
+analyze_g24.py (the analysis fixed beforehand) drops a transaction whose ticket was not sent before the request was complete, and a
+client port used by two connections shifts the pairing of connections and latencies. This script reads every resumed transaction from
+the capture of the server's link: connections are split at the client's SYN (not by port), the latency is row j of the probe's CSV for
+connection 2(j+2)+1, and per transaction it reports
+  request rounds   groups of client data segments after the Finished that are separated by more than half an RTT; segments in the first
+  response         data segments of the server from the start of its response (first server data after the last request segment),
+                   without segments of 24 bytes (close_notify)
+
+    python3 analyze_g24_posthoc.py --runs DIR --machine GX10 [--points results/g24_gx10_points.csv] [--out FILE]
+--points is the table written by analyze_g24.py (input).
+"""
 import argparse, collections, csv, glob, os, re, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 from pcap_summary import read_pcap
 import r3b_analyze as W
-PORT, SYN, ACKF = 4433, 0x02, 0x10
+PORT, SYN, ACKF = 4433, 0x02, 0x10      # server port; TCP flags
 
 
 def connections(path):
+    """Packets of the capture grouped into connections that start at a SYN of the client."""
     out, cur = [], {}
     for p in read_pcap(path):
         cp = p[2] if p[1] == PORT else (p[1] if p[2] == PORT else None)
@@ -25,6 +33,7 @@ def connections(path):
 
 
 def transaction(pk, rtt_ms):
+    """Request rounds, segments and times of one connection, and the number of response segments; None if it cannot be read."""
     shift = rtt_ms / 2000.0
     pk = [(p[0] - shift,) + tuple(p[1:]) if p[1] == PORT else p for p in pk]
     srv = [p for p in pk if p[1] == PORT and p[6] > 0]; cli = [p for p in pk if p[2] == PORT and p[6] > 0]
@@ -47,7 +56,9 @@ class _Split:
     def __init__(self, path):
         C = connections(path); ports = [c[0][1] if c[0][2] == PORT else c[0][2] for c in C]; n = collections.Counter(ports)
         self.i = [(p if n[p] == 1 else -k - 1, c) for k, (p, c) in enumerate(zip(ports, C))]
-    def items(self): return self.i
+    def items(self):
+        """(port or negative index, packets) of every connection."""
+        return self.i
 
 
 def windows(d):
@@ -58,6 +69,7 @@ def windows(d):
 
 
 def main():
+    """Analyze all runs and write the report and the table of transactions."""
     ap = argparse.ArgumentParser(); ap.add_argument("--runs", required=True); ap.add_argument("--machine", default=""); ap.add_argument("--out", default="")
     ap.add_argument("--points", default=""); ap.add_argument("--cells", default=os.path.join(HERE, "results", "g24_cells.csv")); a = ap.parse_args()
     cells = {int(c["cell"]): c for c in csv.DictReader(open(a.cells))}

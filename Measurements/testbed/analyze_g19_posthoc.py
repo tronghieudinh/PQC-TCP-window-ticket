@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""analyze_g19_posthoc.py - POST HOC description of the cells of G19 that the model got wrong (not pre-registered; the split of the cells by response size was made after seeing the result).
+"""analyze_g19_posthoc.py - post hoc description of the random cells (G19) that the model got wrong. Not one of the criteria fixed
+beforehand: the grouping of the cells by response size was chosen after the result had been seen.
+
     python3 analyze_g19_posthoc.py --run FILE.csv [--out results/g19_posthoc.txt]
 """
 import argparse, math, os, statistics as st, sys, collections
@@ -10,11 +12,13 @@ S = A.S
 
 
 def segs(c):
+    """Number of segments of the response of a cell."""
     mss = int(c["mtu"]) - 60
     return math.ceil(int(c["resp"]) / mss)
 
 
 def main():
+    """Describe the wrong cells (error in round trips, response size) and the others, and write the report."""
     ap = argparse.ArgumentParser(); ap.add_argument("--run", required=True); ap.add_argument("--out", default=os.path.join(HERE, "results", "g19_posthoc.txt")); a = ap.parse_args()
     r = G.evaluate(os.path.expanduser(a.run)); cells = r["cells"]
     err = lambda c: c["meas"] - float(c["model_early_ms"])

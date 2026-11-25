@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G13-lite: the window rule and the ticket tests of L1 on a REAL link between two machines. See README_LITE.md. Run on the CLIENT host, inside tmux.
+# Real-link scenario (G13-lite): the window rule and the ticket tests of the paper on a real link between two machines. See
+# README_LITE.md. Run on the client host, inside tmux. PHYS_*: server (user@host), interface on each host and options (see tbnet_phys.py).
 #   PHYS_SERVER=user@host PHYS_IFC=nic_here PHYS_IFS=nic_there [PHYS_REPO=/path/on/server] [PHYS_CPU_S=2] [PHYS_OFFLOAD=keep|off]
 #   [PHYS_SSH="-i ~/.ssh/id_ed25519 -o BatchMode=yes"] [PHYS_CERTS_REMOTE=/path/for/certs/on/server]  ./run_lite.sh [scenario_lib options]
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
@@ -18,7 +19,8 @@ echo "$SPEC" > "$SC_RUNDIR/phys_spec.txt"
 sc_tune_on
 # part A: plain TCP, stage A (window after a flight of n1 segments), RTT 100 and 30 ms, 20 repetitions
 sc_exec sc_sudo python3 "$SC_TESTBED/run_slack.py" --stage A --configs base,rtt30 --reps-a 20 --out "$D/slack_tcp.csv"
-# part B: the cells of G14 (delack arm) with quickack on: stage C (28 client-window cells) and stage D (32 ticket-timing design cells), n = 30
+# part B: the cells of the delayed-acknowledgment part of scenario G14, here with quickack on: stage C (28 client-window cells) and
+# stage D (32 ticket-timing cells), 30 transactions each
 N=${SC_N:-30}
 RT=(python3 "$SC_TESTBED/run_testbed.py" --profile core --resume --depths 2 --rtts 100 --rates 100 --mtus 1500 --icws 10 --n "$N")
 PLAN=$(python3 - "$TB/results/g14_cells.json" <<'PY'

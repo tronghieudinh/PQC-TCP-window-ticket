@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
-"""
-analyze_testbed.py - compare the emulated-network measurements with the transport model.
+"""analyze_testbed.py - compares the measurements on the emulated network with the transport model. Also the library of other analyses.
 
     python3 analyze_testbed.py results/testbed_raw.csv [--outdir results]
-
-Method. For every shaped configuration the *excess* latency is the median transaction time minus the median
-of the unshaped "base" run of the same suite, depth and mutual-TLS mode. Computation, TLS library overhead
-and loopback stack cost lie on the critical path in both runs and cancel, so the excess is what the model
-calls T_ser + T_prop + T_ssw (+ T_pen). It is compared with
-    model_excess = T - T_cpu   of pqc_sim.run_flow() for the same flow, link, MTU and initial window.
-Outputs (outdir):
-    testbed_summary.csv      one row per configuration (median / p10 / p90 of the measured times)
-    model_vs_testbed.csv     measured excess vs model, per configuration, plus size check
+Method. For every shaped configuration the excess latency is the median transaction time minus the median of the unshaped "base" run of
+the same suite, depth and authentication mode. Computation, TLS library and loopback costs are on the critical path of both runs and
+cancel, so the excess is what the model calls serialization + propagation + slow-start waiting (+ middlebox penalty). It is compared
+with model_excess = T - T_cpu of pqc_sim.run_flow() for the same flow, link, MTU and initial window.
+Outputs in outdir:
+    testbed_summary.csv          one row per configuration (median, 10th and 90th percentile of the measured times)
+    model_vs_testbed.csv         measured excess and model per configuration, with a check of the message sizes
     model_vs_testbed_stats.txt   errors per suite, rank correlation, size agreement
-    pi_theta_fit.csv         least-squares fit of the middlebox penalty pi for every threshold theta
-    proxy_delta.csv          (if proxy runs exist) latency added by a real middlebox over the direct path
-    model_vs_testbed.png     scatter (if matplotlib is installed)
+    pi_theta_fit.csv             least-squares fit of a middlebox penalty pi for every flight threshold theta
+    proxy_delta.csv              (if proxy runs exist) latency added by a real proxy over the direct path
+    model_vs_testbed.png         scatter plot (if matplotlib is installed)
+Three model variants appear: model_ms (textbook window growth, ideal segmentation), model_cv_ms (with the Linux window rule) and
+model_stack_ms (Linux rule and the write pattern of OpenSSL).
 """
 from __future__ import annotations
 
@@ -33,20 +32,24 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "Simulation"))
 import pqc_sim as S  # noqa: E402
 
+# columns that identify a base run, and those that identify the emulated network
 KEY_BASE = ("topology", "suite", "depth", "mtls", "req", "resp", "resume")
 KEY_NET = ("rtt_ms", "rate_mbps", "loss_pct", "mtu", "icw", "cc")
 
 
 def f(x):
+    """float() of a CSV field; NaN if empty."""
     return float(x) if x not in ("", None) else float("nan")
 
 
 def pct(xs, q):
+    """The q-quantile (0..1) of the values (nearest rank)."""
     xs = sorted(xs)
     return xs[min(len(xs) - 1, int(q * len(xs)))]
 
 
 def load(path, allow_loopback):
+    """Rows of a result CSV; runs without the resume column are full handshakes; loopback rows only with allow_loopback."""
     rows = list(csv.DictReader(open(path)))
     for r in rows:
         if r.get("resume") in (None, ""):
@@ -57,6 +60,10 @@ def load(path, allow_loopback):
 
 
 def aggregate(rows):
+    """Group the transactions by configuration (suite, sizes, network, base or shaped) and summarize each group: times, median,
+    percentiles, bytes, segment size, window, retransmissions and segment counts. Failed transactions are dropped, and without
+    loss also those with retransmissions; groups with fewer than 3 are left out.
+    """
     by = defaultdict(list)
     for r in rows:
         key = tuple((f"{float(r[k]):g}" if k in ("rtt_ms", "rate_mbps", "loss_pct") else r[k])
@@ -94,6 +101,7 @@ _PROTO = {}
 
 
 def probe_protocol(mtls, req, resp, depth):
+    """Name of the model protocol that corresponds to one probe transaction (request and response sizes, depth, authentication); created once."""
     name = f"PROBE_{mtls}_{req}_{resp}_{depth}"
     if name not in _PROTO:
         S.PROTOCOLS[name] = S.Protocol(name, "testbed probe", bool(int(mtls)), int(depth),
@@ -102,11 +110,14 @@ def probe_protocol(mtls, req, resp, depth):
     return name
 
 
-SLACK = 0     # Net.cwnd_slack used when model_for is not told otherwise (analyze_resume --cwnd-slack; refuted by WP5, kept for the record)
+SLACK = 0     # Net.cwnd_slack used when model_for is not told otherwise (analyze_resume --cwnd-slack; values above 0 were refuted by the measurements)
 NST_EARLY = False    # Net.nst_early (analyze_resume --nst-early): the ticket is its own, earlier write
 
 
 def model_for(c, penalty=0.0, thr=4, cwnd_validation=False, segmentation="ideal", cwnd_slack=None):
+    """Run the model for a configuration row c; returns (flow, result). penalty and thr: middlebox penalty; cwnd_validation: Linux
+    window rule; segmentation: "ideal" or "openssl"; cwnd_slack: loosening of the rule (default: the module variable SLACK).
+    """
     flow = S.build_flow(c["suite"], probe_protocol(c["mtls"], c["req"], c["resp"], c["depth"]), int(c["depth"]),
                         "resumed" if c.get("resume") == "1" else "cold", False)
     kw = {}
@@ -118,7 +129,9 @@ def model_for(c, penalty=0.0, thr=4, cwnd_validation=False, segmentation="ideal"
 
 
 def spearman(a, b):
+    """Spearman rank correlation of two lists (ties get the mean rank)."""
     def rank(x):
+        """Ranks of the values, ties averaged."""
         order = sorted(range(len(x)), key=lambda i: x[i])
         r = [0.0] * len(x)
         i = 0
@@ -138,7 +151,9 @@ def spearman(a, b):
 
 
 def fit_pi(rs, ps):
-    """argmin_pi sum (r - pi p)^2, pi >= 0; and the two-parameter fit r = a + pi p."""
+    """Least-squares fits of the residuals rs on the numbers ps of penalized flights: r = pi p (pi >= 0) and r = a + pi p. Returns
+    (pi, squared error, a, pi of the second fit, its squared error).
+    """
     spp = sum(p * p for p in ps)
     pi = max(0.0, sum(r * p for r, p in zip(rs, ps)) / spp) if spp else 0.0
     sse = sum((r - pi * p) ** 2 for r, p in zip(rs, ps))
@@ -152,7 +167,7 @@ def fit_pi(rs, ps):
 
 
 def build_table(agg, boot=1000):
-    """One row per shaped configuration: measured excess latency (with bootstrap CI) against three model variants."""
+    """One row per shaped configuration that has a base run: measured excess latency with a bootstrap confidence interval and the three model variants."""
     base = {tuple(c[k] for k in KEY_BASE): c for c in agg.values() if c["net_id"] == "base"}
     shaped = [c for c in agg.values() if c["net_id"] == "shaped"]
     table = []
@@ -184,6 +199,7 @@ def build_table(agg, boot=1000):
 
 
 def main():
+    """Write the summary tables, the error statistics, the penalty fit, the proxy comparison and the plot."""
     ap = argparse.ArgumentParser()
     ap.add_argument("raw")
     ap.add_argument("--outdir", default=os.path.join(HERE, "results"))

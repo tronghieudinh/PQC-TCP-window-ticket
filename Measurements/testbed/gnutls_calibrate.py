@@ -1,34 +1,32 @@
 #!/usr/bin/env python3
-"""
-gnutls_calibrate.py - the write pattern of tls_probe_gnutls (GnuTLS 3.8.14 with leancrypto) on one machine, for scenario G23 (the same method as go_calibrate.py of G10).
+"""gnutls_calibrate.py - the write pattern of tls_probe_gnutls (GnuTLS 3.8.14 with leancrypto) on one machine, for scenario G23; the same
+method as go_calibrate.py.
 
-Runs tls_probe_gnutls server and client on the loopback (no network emulation, no root: the sizes of the write() calls do not depend on the link), one full
-and one resumed transaction per suite with the small request/response of stage D (302 / 222 B), and records from the probe's own trace
-(PQC_PROBE_TRACE_FILE) the sizes of every write (writev) of the TLS connection. GnuTLS writes, on a resumed connection:
-  client: ClientHello (with the ticket), ChangeCipherSpec (6 B), Finished, request records, close_notify; server: ServerHello, EncryptedExtensions+Finished (flight), then ALL the tickets in ONE write
-  (two NewSessionTickets, each with the client certificate list inside), the response records, close_notify. With --tickets-resumed 1 one ticket, with 0 none (the interventions of G23).
-The lists below are what go_calibrate.py calls the same:
-  client, resumed connection : ClientHello (all writes before the Finished), Finished, request records, close_notify
-  server, resumed connection : first flight (ServerHello ... Finished, and the NewSessionTicket when Go writes it there), response records, close_notify
-  server, full connection    : first flight, the writes between it and the response (the NewSessionTicket), response, close_notify
-and the leaf/chain sizes of the certificates used (so that another machine's certificate files can be compared).
+Runs server and client of the probe on the loopback (no network emulation, no root: the sizes of the write() calls do not depend on the
+link), one full and one resumed transaction per suite with request 302 and response 222 bytes, and reads from the probe's own trace
+(PQC_PROBE_TRACE_FILE) the size of every write (writev) of the TLS connection. On a resumed connection GnuTLS writes:
+  client  ClientHello (with the ticket), ChangeCipherSpec (6 bytes), Finished, request records, close_notify
+  server  first flight (ServerHello .. Finished), all tickets in one write (by default two NewSessionTickets, each with the client's
+          certificate list), response records, close_notify
+Runs with --tickets-resumed 1, 3, 4 and 0 give the sizes for the interventions of G23. Certificate sizes and checksums are recorded so
+that another machine's files can be compared.
 
-  gnutls_calibrate.py --out results/gnutls_calibration.json                 # measure and write
-  gnutls_calibrate.py --check results/gnutls_calibration.json               # measure again and compare with a reference (every write within --tol bytes)
-
-The calibration is an input of the G23 predictions (gnutls_predict.py): the predictions use the sizes measured HERE, not sizes assumed.
+  gnutls_calibrate.py --out results/gnutls_calibration.json        # measure and write
+  gnutls_calibrate.py --check results/gnutls_calibration.json      # measure again and compare (every write within --tol bytes)
+The calibration is an input of the G23 predictions (gnutls_predict.py), which use the sizes measured here, not assumed ones.
 """
 import argparse, glob, hashlib, json, os, socket, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SUITES = {"ECDSA-P256|X25519": ("ECDSA-P256", "X25519"), "ML-DSA-44|ML-KEM-768": ("ML-DSA-44", "ML-KEM-768"),
           "ML-DSA-65|ML-KEM-768": ("ML-DSA-65", "ML-KEM-768"), "ML-DSA-87|ML-KEM-1024": ("ML-DSA-87", "ML-KEM-1024")}
-REQ, RESP = 302, 222
+REQ, RESP = 302, 222      # request and response of the calibration transaction (bytes)
 DEPTH = 1   # certificate chain depth (leaf only); --depth overrides
 TLS_REC_OVH = 22  # 5 B header + 1 B content type + 16 B tag (TLS 1.3 AEAD record)
 
 
 def certs_dir():
+    """Directory of the test certificates: PQC_CERTS, else one of the default places that has the needed chain depth."""
     for d in (os.environ.get("PQC_CERTS"), os.path.expanduser("~/meas_copy/certs"), os.path.expanduser("~/pqc_certs_local/certs"),
               os.path.join(HERE, "..", "certs")):
         if d and os.path.isdir(os.path.join(d, "ML-DSA-65", f"d{DEPTH}")):
@@ -37,6 +35,7 @@ def certs_dir():
 
 
 def free_port():
+    """A free TCP port on the IPv6 loopback."""
     s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     s.bind(("::1", 0))
     p = s.getsockname()[1]
@@ -45,11 +44,14 @@ def free_port():
 
 
 def sha(path):
+    """SHA-256 of a file."""
     return hashlib.sha256(open(path, "rb").read()).hexdigest()
 
 
 def one_suite(probe, certs, suite, tmp, tickets=-1):
-    """tickets: -1 the library's own number (two), 0 or 1: --tickets-resumed (and --tickets-full 2 so that the priming transaction gets its tickets)."""
+    """Write sizes of one suite from one full and one resumed transaction. tickets: -1 the library's own number (two); 0, 1, ...:
+    --tickets-resumed (with --tickets-full 2 so that the first transaction still gets its tickets).
+    """
     alg, grp = SUITES[suite]
     d = os.path.join(certs, alg, f"d{DEPTH}")
     sfull, cfull = os.path.join(tmp, f"{alg}_s.pem"), os.path.join(tmp, f"{alg}_c.pem")
@@ -106,6 +108,7 @@ def one_suite(probe, certs, suite, tmp, tickets=-1):
 
 
 def measure(probe):
+    """Write sizes of every suite and the identification of the probe (checksum, version)."""
     certs = certs_dir()
     res = dict(request=REQ, response=RESP, depth=DEPTH, probe_sha256=sha(probe),
                probe_version=subprocess.run([probe, "version"], capture_output=True, text=True).stdout.strip(), suites={})
@@ -121,6 +124,7 @@ def measure(probe):
 
 
 def flat(r):
+    """All integer values of a calibration as {"suite/key[index]": value}, for comparison."""
     o = {}
     for su, d in r["suites"].items():
         for k, v in d.items():
@@ -134,6 +138,7 @@ def flat(r):
 
 
 def main():
+    """Measure, optionally write the result (--out) and compare it with a reference (--check; exit status 1 if a size differs by more than --tol)."""
     global DEPTH
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--probe", default=os.path.join(HERE, "tls_probe_gnutls"))

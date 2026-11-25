@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""make_assets_short.py - figures and numbers of the short paper (WP5), from Measurements/testbed/results. Output: figures/*.pdf, numbers_short.tex"""
+r"""make_assets_short.py - the figures of the paper and every number quoted in it, computed from the results in Measurements/testbed/results
+(and, for a few model values, from the simulator in Simulation/).
+
+    python3 make_assets_short.py                     (reproduce_l1.sh runs it and compares the output with the shipped files)
+    PQC_FIG_FLAT=1 python3 make_assets_short.py      lower figures, written with the suffix _v3
+Output: figures/*.pdf; numbers_short.tex, one LaTeX macro per number (num(name, value) defines \name; the text of the paper uses the
+macros, so no result is typed by hand); and table rows g19_cells_table.tex, os_table.tex, details_tables.tex, g24_table.tex.
+The file is a sequence of sections, one per experiment; each reads the CSV files or the printed output of an analysis script. A section
+whose input file does not exist defines no macros.
+"""
 import collections, csv, json, math, os, statistics as st, sys
 os.environ.setdefault("SOURCE_DATE_EPOCH", "1795219200")      # 21 Nov 2026 00:00 UTC: matplotlib then writes the same PDF bytes on every run (no creation date), so the figures do not show up as changed in git
 import matplotlib
@@ -13,8 +22,12 @@ sys.path.insert(0, os.path.join(V5, "Simulation"))
 import pqc_sim as S  # noqa: E402
 
 NUMS = {}
-def num(k, v): NUMS[k] = v
-def rd(p): return list(csv.DictReader(open(p)))
+def num(k, v):
+    r"""Define the LaTeX macro \k with value v."""
+    NUMS[k] = v
+def rd(p):
+    """Rows of a CSV file."""
+    return list(csv.DictReader(open(p)))
 plt.rcParams.update({"font.size": 8, "axes.linewidth": 0.6, "pdf.fonttype": 42})
 INK, GREY, ACC = "#1b1b1b", "#8a8a8a", "#b33a00"
 closed = lambda w0, n: max(w0, min(w0 + n, 2 * n))
@@ -26,7 +39,7 @@ w0 = {}
 for r in a:
     obs[r["cfg"]][int(r["n1"])].append(int(r["cwnd_pre2"]))
     w0[r["cfg"]] = int(r["icw"])
-_FLAT = os.environ.get('PQC_FIG_FLAT') == '1'; _SUF = '_v3' if _FLAT else ''  # flatter copies for CCR_v3 (page budget); the other variants keep the original size
+_FLAT = os.environ.get('PQC_FIG_FLAT') == '1'; _SUF = '_v3' if _FLAT else ''  # lower figures for a tighter page budget; default: original size
 fig, ax = plt.subplots(figsize=(3.4, 1.85 if _FLAT else 2.5))
 ns = list(range(1, 41))
 for w, mk, col in ((4, "s", GREY), (10, "o", INK), (20, "^", ACC)):
@@ -131,7 +144,7 @@ for fn, tag in (("resume_summary.csv", "Joined"), ("resume_summary_earlyticket.c
     nw = sum(abs(x) > 0.5 * float(r["rtt_ms"]) for x, r in zip(e, rows)); num(f"R{tag}Wrong", nw); num(f"R{tag}Rest", len(e) - nw); num("RN", len(e))
     if tag == "Joined":
         num("RJoinedRestMax", f"{max(abs(x) for x, r in zip(e, rows) if abs(x) <= 0.5 * float(r['rtt_ms'])):.2f}")
-# ---- server-side ticket timing (WP6 race): exploratory rule, 134 ML-DSA transactions at MTU below 9000
+# ---- server-side ticket timing (the race between the ticket's acknowledgments and the response): exploratory rule, 134 ML-DSA transactions at MTU below 9000
 rr = rd(os.path.join(RES, "ticket_race.csv"))
 if rr:
     ml = [r for r in rr if r["suite"] != "ECDSA-P256" and int(r["mtu"]) != 9000 and r["t_ack_tkt_minus_req_ms"] not in ("", "None")]
@@ -142,7 +155,7 @@ if rr:
             best = (th, acc)
     non9 = [r for r in rr if int(r["mtu"]) != 9000 and r["t_ack_tkt_minus_w_ms"] not in ("", "None")]
     num("RaceN", len(rr)); num("RaceMlN", len(ml)); num("RaceThr", f"{best[0]:.3f}"); num("RaceRight", int(round(best[1] * len(ml))))
-    # share of the transactions in which at least one segment of the ticket is acknowledged before the response is written (199 of 221 = 90 %; decision of 15 Nov 2026)
+    # share of the transactions in which at least one segment of the ticket is acknowledged before the response is written (199 of 221 = 90 %)
     num("RaceBeforePct", f"{100 * sum(int(r['tkt_acked_pre']) > 0 for r in rr) / len(rr):.0f}")
 t2 = os.path.join(RES, "wp6_analysis_race2.txt")
 if os.path.exists(t2):
@@ -212,9 +225,10 @@ num("ServWindow", ",".join(sorted({str(v) for v in _sfit.values()})))
 assert len({v for v in _sfit.values()}) == 1 and len(_sfit) == 3, "server authentication only: the fit must be the same for the three suites"
 num("ServWrong", sum(abs(float(p_["model_early_w10_ms"]) - m) > 0.5 * k[3] for k, p_, m in _scells))
 
-# ---- part G: backlog trace (G1) and no-ticket intervention (G2) and the post hoc look at G1
+# ---- why the ticket's acknowledgments are processed late: backlog trace (criteria G1), run without a ticket (G2), post hoc look at G1, and the clock checks
 import re as _re
 def _grab(path, pats):
+    """Define macros from the text of an analysis output: for each (regular expression, macro names), the groups of the first match."""
     if not os.path.exists(path): return
     t = open(path).read()
     for rx, names in pats:
@@ -243,6 +257,7 @@ if "ClkWriteGap" in NUMS: num("ClkWriteAbs", str(NUMS["ClkWriteGap"]).lstrip("-"
 _grab(os.path.join(RES, "wp6_analysis_softirq.txt"), [(r"H1b .*?: (\d+) of (\d+) \(([\d.]+)%", ["HBOne", "HBN", "HBPct"])])
 if "HPcapMed" in NUMS: num("HPcapMedAbsUs", f"{abs(float(NUMS['HPcapMed'])) * 1000:.0f}")
 def _clk(prefix, fname):
+    """Macros (with the given prefix) of one run of the clock-safe repeat, read from the output of analyze_clock_repeat.py."""
     pth = os.path.join(RES, fname)
     if not os.path.exists(pth): return
     t = open(pth).read()
@@ -274,6 +289,7 @@ if os.path.exists(_bu):
             _k = {"first run": "First", "trace_clock_race": "Ur", "trace_clock_ctrl1": "Uc", "trace_clock_race2": "Ut", "trace_clock_ctrl1_t": "Pc", "trace_clock_race_t": "Pr"}[_m.group(1)]
             num("Bu" + _k + "EcUp", _m.group(2)); num("Bu" + _k + "EcN", _m.group(3))
 def _g19_cells_table():
+    """Table rows of the random cells (G19) that the model gets wrong in at least one run, and the number of wrong cells per run."""
     runs = [("g19_gx10_cells.txt", "arm", "GX10"), ("g19_x250_run2_cells.txt", "arm", "X250 run 2"), ("g19_optiplex_cells.txt", "arm", "OptiPlex"), ("g19_i9_cells.txt", "arm", "i9")]
     rx = _re.compile(r"^\s*(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)")
     data = {}
@@ -483,6 +499,7 @@ def _fig_k7_points():
     fig.tight_layout(pad=0.4, h_pad=0.2, rect=(0, 0.05, 1, 1)); fig.savefig(os.path.join(HERE, "figures", "fig_k7_points.pdf")); plt.close(fig)
 _fig_k7_points()
 def _count_met(files, rx):
+    """(criteria met, criteria) counted in analysis outputs; rx captures the criterion and MET or NOT MET. None if a file is missing."""
     k = n = 0
     for fn in files:
         pth = os.path.join(RES, fn)
@@ -553,7 +570,7 @@ _cmp = os.path.join(RES, "l1_model_comparison.csv")
 _W = {"fixed": "Fixed", "slow": "Slow", "linux": "Linux", "stack": "Joined", "early": "Early", "C_fixed": "CFixed", "C_slow": "CSlow", "C_linux": "CLinux"}
 for _r in rd(_cmp):
     _w = _W[_r["model"]]; num("Abl" + _w + "Mae", _r["mae_ms"]); num("Abl" + _w + "Off", _r["rtt_off"]); num("Abl" + _w + "N", _r["n"])
-# ---- OpenSSL versions (M1, i9, full handshakes): configurations in which the data segments per direction are identical to 3.5.4
+# ---- OpenSSL versions (full handshakes on the i9): configurations in which the data segments per direction are identical to 3.5.4
 _ov = open(os.path.join(RES, "ossl_versions_i9_analysis.txt")).read()
 _seg = _re.findall(r"V2 segments: identical in (\d+) of (\d+)", _ov)
 for _nm, (_a, _b) in zip(("OvTwo", "OvThree", "OvFour"), _seg): num(_nm + "Same", _a); num(_nm + "All", _b)
@@ -883,8 +900,9 @@ def _fmt(v):
     if re.fullmatch(r"\d{4,}", t):
         t = f"{int(t):,}".replace(",", "\\,")
     return t
-# ---- G24 (the server's window in nine random cells, three machines) and the replications of 25-26 Nov 2026
+# ---- G24 (the server's window in nine random cells, three machines) and the later replications
 def _g24():
+    """Macros and table rows of G24, the server's window in nine random cells on three machines."""
     rule = {10: 10, 15: 10, 20: 10, 32: 10, 37: 10, 16: 12, 65: 12, 66: 12, 72: 18}      # rule (1) applied to the ClientHello flight of the cell (g24_design.md, S3)
     tot = collections.Counter(); per = {}; groups = {}
     for m, tag in (("gx10", "Gx"), ("x250", "X"), ("i9", "I")):
@@ -914,6 +932,7 @@ def _g24():
 _g24()
 
 def _repl_nov25():
+    """Macros of the later replications of the ticket tests and the random cells on the Arm machine and the i9."""
     for tag, fn in (("Gx", "g9_gx10_analysis.txt"), ("I", "g9_i9_analysis.txt"), ("X", "g9_analysis.txt")):
         m = _re.search(r"OpenSSL 3\.5:.*?early wrong on (\d+) of (\d+)", open(os.path.join(RES, fn)).read())
         if m: num(f"Rone{tag}Early", m.group(1)); num("RoneDN", m.group(2))
@@ -922,7 +941,8 @@ def _repl_nov25():
         r = _count_met(fs, rx)
         if r: num(nm + "Met", r[0]); num(nm + "K", r[1])
 _repl_nov25()
-def _plain_i9():                                                     # G11 and G16 on the i9 (26 Nov 2026)
+def _plain_i9():                                                     # G11 and G16 on the i9
+    """Macros of the tests on plain TCP (G11, G16) on the i9."""
     t = open(os.path.join(RES, "g16_i9_analysis.txt")).read()
     a = _re.search(r"L1 (?:NOT )?MET: (\d+) of (\d+) cells", t); b = _re.search(r"L2 (?:NOT )?MET: (\d+) of (\d+) connections", t); k = _re.findall(r"L\d (NOT MET|MET)", t)
     num("GsixIWithin", a.group(1)); num("GsixINoRetxOk", b.group(1)); num("GsixINoRetxN", b.group(2)); num("GsixINoRetxPct", f"{100 * int(b.group(1)) / int(b.group(2)):.1f}")

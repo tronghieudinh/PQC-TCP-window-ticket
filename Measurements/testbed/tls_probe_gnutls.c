@@ -1,23 +1,26 @@
 /*
- * tls_probe_gnutls.c - the TLS 1.3 probe of the PQC transport testbed on GnuTLS (scenario G23), same command line and CSV as tls_probe.c (OpenSSL).
+ * tls_probe_gnutls.c - the TLS 1.3 probe of the testbed on GnuTLS (GnuTLS server scenario, G23), with the command line and CSV output of
+ * tls_probe.c (OpenSSL).
  *
- * One transaction = new TCP connection + TLS 1.3 handshake + one request of --req bytes + one response of --resp bytes. With --resume (both sides) every
- * measured transaction is a resumed one: a full transaction on a separate connection first obtains the ticket (prime_ms), the next connection offers it.
+ * One transaction = new TCP connection + TLS 1.3 handshake + one request of --req bytes + one response of --resp bytes. With --resume (on
+ * both sides) every measured transaction is a resumed one: a full transaction on a separate connection first obtains the ticket (column
+ * prime_ms), and the next connection offers it.
  *
- * What differs from tls_probe.c (all of it read from the GnuTLS 3.8.14 source, results/tls_libs_ticket_source_audit_20261119.md):
- *   - GnuTLS sends TWO tickets after the client's Finished, in one flush, each with the client's certificate list inside (the default, "auto").
- *   - server option --tickets-resumed N (default -1 = the library's own behaviour): the number of tickets of a RESUMED connection, sent with
- *     gnutls_session_ticket_send() right after the handshake (GNUTLS_NO_AUTO_SEND_TICKET). N = 0 is the intervention "no ticket", N = 1 one ticket.
- *     --tickets-full N does the same for full handshakes (default -1 = auto; the priming transaction needs at least one).
- *   - bytes written and read are counted at the transport (a writev/recv wrapper), because GnuTLS has no BIO counters; the wrapper keeps GnuTLS' own
- *     write pattern (writev of the queued records).
+ * Differences from tls_probe.c (read from the GnuTLS 3.8.14 source, results/tls_libs_ticket_source_audit_20261119.md):
+ *   - GnuTLS by default sends two tickets after the client's Finished, in one flush, each containing the client's certificate list.
+ *   - Server option --tickets-resumed N (default -1: the library's behavior): number of tickets of a resumed connection, sent with
+ *     gnutls_session_ticket_send() right after the handshake (GNUTLS_NO_AUTO_SEND_TICKET). N = 0 removes the ticket, N = 1 sends one.
+ *     --tickets-full N does the same for full handshakes (the transaction that obtains the ticket needs at least one).
+ *   - Bytes written and read are counted at the transport by wrappers around writev and recv, because GnuTLS has no counters; the wrapper
+ *     keeps the write pattern of GnuTLS (one writev of the queued records).
  *
- *   server: tls_probe_gnutls server --addr A --port P --cert full_chain.pem --key k.pem [--mtls --ca root.pem] [--resume] [--tickets-resumed N]
- *                                   [--tickets-full N] --groups G --req Q --resp R
- *   client: tls_probe_gnutls client --addr A --port P --ca root.pem --groups G [--cert full_chain.pem --key k.pem] [--resume] --req Q --resp R
- *                                   --n N --warmup W --gap-ms MS
- * --groups takes the OpenSSL names of the testbed (X25519, ECDHE-P256, X25519MLKEM768, ML-KEM-768, ML-KEM-1024) and maps them to GnuTLS groups (hybrids for the two ML-KEM names, see group_token).
- * Build: build_gnutls_probe.sh (GnuTLS 3.8.14 with leancrypto in ~/build_tls3/prefix).
+ *   server: tls_probe_gnutls server --addr A --port P --cert full_chain.pem --key k.pem [--mtls --ca root.pem] [--resume]
+ *                                   [--tickets-resumed N] [--tickets-full N] --groups G --req Q --resp R
+ *   client: tls_probe_gnutls client --addr A --port P --ca root.pem --groups G [--cert full_chain.pem --key k.pem] [--resume] --req Q
+ *                                   --resp R --n N --warmup W --gap-ms MS
+ * --groups takes the group names of the testbed (X25519, ECDHE-P256, X25519MLKEM768, ML-KEM-768, ML-KEM-1024) and maps them to GnuTLS
+ * groups; the two ML-KEM names map to hybrid groups (see group_token).
+ * Build: build_gnutls_probe.sh (needs the library built by tools/build_gnutls_stack.sh).
  */
 #define _GNU_SOURCE
 #include <gnutls/gnutls.h>
@@ -41,25 +44,31 @@
 #include <time.h>
 #include <unistd.h>
 
+/* Command-line options (see the header). */
 typedef struct {
     const char *addr, *port, *cert, *key, *ca, *groups;
     int mtls, req, resp, n, warmup, resume, reuseport, tk_res, tk_full;
     double gap_ms;
 } Opt;
 
+/* Set by SIGUSR1: the server then prints a STATS line (handshakes, user and system CPU seconds). */
 static volatile sig_atomic_t g_stats_req;
 static void on_usr1(int sig) { (void)sig; g_stats_req = 1; }
 
+/* Transport of one connection: socket, bytes written and read, connection number and role (S server, C client). */
 typedef struct { int fd; unsigned long bw, br; int cid; char role; } Tr;   /* the transport of one connection: counts the bytes */
-static FILE *g_trace;           /* PQC_PROBE_TRACE_FILE: one line role,connection,W,bytes,ms per write (writev) of a TLS connection, as tls_probe_go writes it (go_calibrate.py) */
+/*  */
+static FILE *g_trace;           /* PQC_PROBE_TRACE_FILE: one line role,connection,W,bytes,ms per write of a TLS connection, in the format of tls_probe_go */
 static double now_ms(void);
 
+/* Write callback of GnuTLS: writev, count the bytes and trace the write. */
 static ssize_t tr_vec_push(gnutls_transport_ptr_t p, const giovec_t *iov, int iovcnt) {
     Tr *t = p;
     ssize_t r = writev(t->fd, (const struct iovec *)iov, iovcnt);
     if (r > 0) { t->bw += (unsigned long)r; if (g_trace) { fprintf(g_trace, "%c,%d,W,%zd,%.3f\n", t->role, t->cid, r, now_ms()); fflush(g_trace); } }
     return r;
 }
+/* Read callback of GnuTLS: recv and count the bytes. */
 static ssize_t tr_pull(gnutls_transport_ptr_t p, void *buf, size_t n) {
     Tr *t = p;
     ssize_t r = recv(t->fd, buf, n, 0);
@@ -67,22 +76,25 @@ static ssize_t tr_pull(gnutls_transport_ptr_t p, void *buf, size_t n) {
     return r;
 }
 
+/* Monotonic time in milliseconds. */
 static double now_ms(void) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
+/* Receive and send timeout of a socket, so that a lost connection cannot block the probe. */
 static void set_timeouts(int fd, int sec) {
     struct timeval tv = {sec, 0};
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
 }
+/* Report an error with the GnuTLS message of `code`; returns 1 (the exit status). */
 static int fail(const char *what, int code) {
     fprintf(stderr, "tls_probe_gnutls: %s%s%s\n", what, code ? ": " : "", code ? gnutls_strerror(code) : "");
     return 1;
 }
 
-/* testbed group name -> GnuTLS priority token */
+/* GnuTLS priority token of a testbed group name; NULL if the name is unknown. */
 static const char *group_token(const char *g) {
     if (!g) return "GROUP-X25519";
     if (!strcasecmp(g, "X25519")) return "GROUP-X25519";
@@ -94,6 +106,7 @@ static const char *group_token(const char *g) {
     if (!strcasecmp(g, "ML-KEM-1024") || !strcasecmp(g, "MLKEM1024")) return "GROUP-SECP384R1-MLKEM1024";
     return NULL;
 }
+/* Restrict a session to TLS 1.3 and one key-exchange group. */
 static int set_priority(gnutls_session_t s, const Opt *o) {
     char buf[512];
     const char *gt = group_token(o->groups);
@@ -106,6 +119,7 @@ static int set_priority(gnutls_session_t s, const Opt *o) {
     return r;
 }
 
+/* Trust anchor, certificate chain and key of one side. */
 static gnutls_certificate_credentials_t make_cred(const Opt *o) {
     gnutls_certificate_credentials_t c;
     if (gnutls_certificate_allocate_credentials(&c) < 0) return NULL;
@@ -120,6 +134,7 @@ static gnutls_certificate_credentials_t make_cred(const Opt *o) {
     return c;
 }
 
+/* Read exactly n bytes of application data; -1 on error or end of connection. */
 static int read_exact(gnutls_session_t s, unsigned char *buf, int n) {
     int got = 0;
     while (got < n) {
@@ -130,6 +145,7 @@ static int read_exact(gnutls_session_t s, unsigned char *buf, int n) {
     }
     return got;
 }
+/* Write all n bytes of application data; -1 on error. */
 static int write_all(gnutls_session_t s, const unsigned char *buf, int n) {
     int done = 0;
     while (done < n) {
@@ -140,12 +156,15 @@ static int write_all(gnutls_session_t s, const unsigned char *buf, int n) {
     }
     return done;
 }
+/* Run the handshake, repeating it after interruptions; returns the GnuTLS result. */
 static int do_handshake(gnutls_session_t s) {
     int r;
     do r = gnutls_handshake(s); while (r == GNUTLS_E_AGAIN || r == GNUTLS_E_INTERRUPTED);
     return r;
 }
 
+/* Accept one connection at a time: handshake, send the tickets if chosen by hand, read the request, write the response.
+ * Prints READY, then SRVINFO (segment size and window of the first connection). */
 static int run_server(const Opt *o) {
     gnutls_certificate_credentials_t cred = make_cred(o);
     if (!cred) return 1;
@@ -205,6 +224,8 @@ static int run_server(const Opt *o) {
     }
 }
 
+/* Result of one transaction: t0 start, t1 TCP connected, t2 handshake done, t3 response received (ms); then TCP_INFO values
+ * (segment size, initial window, retransmissions, RTT, data segments out and in), bytes written and read, resumed, error. */
 typedef struct {
     double t0, t1, t2, t3;
     unsigned mss, cwnd0, retr, rtt, dso, dsi;
@@ -262,6 +283,8 @@ static void transact(gnutls_certificate_credentials_t cred, const struct addrinf
     close(fd);
 }
 
+/* Run warmup + n transactions (with --resume each is preceded by a full handshake that obtains the ticket) and print one CSV
+ * row per measured transaction. */
 static int run_client(const Opt *o) {
     gnutls_certificate_credentials_t cred = make_cred(o);
     if (!cred) return 1;

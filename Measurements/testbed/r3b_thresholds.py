@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
-"""r3b_thresholds.py - derives the thresholds of round 3b (results/r3b_design.md) from the GX10 PILOT by the rules written there, and writes results/r3b_thresholds.json and results/r3b_thresholds.md.
+"""r3b_thresholds.py - derives the thresholds of round 3b from the GX10 PILOT by the rules in results/r3b_design.md and writes
+results/r3b_thresholds.json and results/r3b_thresholds.md.
+
     python3 r3b_thresholds.py --events results/r3b_gx10_pilot_ack.csv --tx results/r3b_gx10_pilot.csv
-Rules: B1 and B2 (shares): the pilot share p_hat with its 95 % one-sided Clopper-Pearson lower bound p_lo; for a test of n events (or transactions) the number of failures that a machine with rate p_lo stays under
-with probability 95 %: the threshold is 1 - f/n. B3: tolerance = 2 x the largest deviation of the pilot's medians from (median at delta 0 + delta), at least 25 us; spread slope = 1.5 x the largest pilot slope of
-(spread - spread at delta 0)/delta. B4: half of the smallest difference of the late share between the largest delta and delta 0 over the pilot's ML-DSA series (MTU 1500 and 1280, both suites). B6: 10 points (judgment)."""
+B1, B2 (shares): from the pilot share, its 95 % one-sided Clopper-Pearson lower bound p_lo; for a test of n events (or transactions),
+the threshold is 1 - f/n, where f is the number of failures that a machine with success rate p_lo stays within with probability 95 %.
+B3: tolerance = 2 x the largest deviation of the pilot's median shifts from (median at delay 0 + delay), at least 25 us; limit of the
+spread slope = 1.5 x the largest pilot value of (spread - spread at delay 0) / delay.
+B4: half of the smallest increase of the late share between delay 0 and the largest pilot delay over the pilot's ML-DSA series.
+B5: as B2, on ECDSA-P256. B6: 10 points (a judgment).
+"""
 import argparse, csv, collections, json, math, statistics as st
 from math import comb
 
 def cp_lower(x, n, a=0.05):
+    """One-sided Clopper-Pearson lower confidence bound (level 1 - a) of a success probability, x successes in n trials."""
     if x == 0: return 0.0
     if x == n: return a ** (1.0 / n)                                       # all successes: the exact lower bound is a^(1/n)
     if n > 1000:                                                           # normal approximation of the Clopper-Pearson bound for large n with failures
@@ -20,7 +27,9 @@ def cp_lower(x, n, a=0.05):
     return lo
 
 def max_failures(n, q, conf=0.95):
-    """smallest f with P(Binomial(n, q) <= f) >= conf (Poisson-free exact sum)"""
+    """Smallest f with P(failures <= f) >= conf when each of n trials fails with probability q
+    (binomial sum up to n = 2000, Poisson approximation of the terms above).
+    """
     cum = 0.0
     for f in range(n + 1):
         cum += comb(n, f) * q ** f * (1 - q) ** (n - f) if n <= 2000 else math.exp(-n * q) * (n * q) ** f / math.factorial(f)
@@ -28,6 +37,7 @@ def max_failures(n, q, conf=0.95):
     return n
 
 def main():
+    """Compute the thresholds from the pilot files and write the JSON and Markdown results."""
     ap = argparse.ArgumentParser(); ap.add_argument("--events", required=True); ap.add_argument("--tx", required=True)
     ap.add_argument("--n-events", type=int, default=7000); ap.add_argument("--n-tx", type=int, default=1500); a = ap.parse_args()
     ev = list(csv.DictReader(open(a.events))); tx = list(csv.DictReader(open(a.tx)))

@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
-"""
-analyze_resume.py - TLS 1.3 session resumption on the testbed: measured against the stack model, and against the full handshake.
+"""analyze_resume.py - TLS 1.3 session resumption on the testbed: measurement against the stack model, and against the full handshake.
 
     python3 analyze_resume.py [results/resume.csv ...] [--out results/resume_summary.csv]
-
-Input: runs of `run_testbed.py --resume` (see run_resume.sh). Every measured transaction is a RESUMED one on a new TCP connection;
-`prime_ms` is the total time of the full transaction that obtained the ticket just before, under the same network conditions.
-
-For every shaped configuration it reports (all excess latencies are shaped median minus the unshaped median of the same suite,
-depth and kind, so that computation cancels as in paper 1):
-  resumed_excess     measured excess latency of the resumed transaction
-  resumed_model      stack model (mode "resumed")
-  full_excess        measured excess latency of the full transaction (prime_ms)
-  full_model         stack model (mode "cold")
-  gain_measured / gain_model   full minus resumed
-  size_ratio         bytes read and written by the client against the model (resumed flow, including the new ticket)
-and prints the mean absolute errors and the gain per suite.
+Input: runs of `run_testbed.py --resume`. Every measured transaction is a resumed one on a new TCP connection; `prime_ms` is the total
+time of the full transaction that obtained the ticket just before, under the same network conditions.
+Columns of the output, per shaped configuration (an excess latency is the shaped median minus the unshaped median of the same suite,
+depth and kind, so that computation time cancels):
+  resumed_excess / resumed_model   measured and predicted excess latency of the resumed transaction (stack model, mode "resumed")
+  full_excess / full_model         the same for the full transaction (mode "cold"); full_source says whether full_excess comes from
+                                   earlier runs without tickets ("ref") or from the priming transactions ("prime")
+  prime_excess                     excess latency of the priming transaction
+  gain_measured / gain_model       full minus resumed
+  size_ratio                       bytes read and written by the client divided by those of the model's resumed flow
+Also printed: mean absolute errors and the gain per message size and suite.
 """
 from __future__ import annotations
 
@@ -31,6 +28,7 @@ import analyze_testbed as A  # noqa: E402
 
 
 def main():
+    """Build the summary table of all input runs, write it and print the errors."""
     ap = argparse.ArgumentParser()
     ap.add_argument("files", nargs="*", default=[os.path.join(HERE, "results", "resume.csv")])
     ap.add_argument("--out", default=os.path.join(HERE, "results", "resume_summary.csv"))

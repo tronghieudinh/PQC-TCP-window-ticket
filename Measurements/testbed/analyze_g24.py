@@ -1,15 +1,31 @@
 #!/usr/bin/env python3
-"""analyze_g24.py - criteria Q1-Q5 of results/g24_design.md on the runs of run_g24.sh of ONE machine.
+"""analyze_g24.py - the server's window in selected random cells (scenario G24): evaluates criteria Q1-Q5 fixed before the measurement
+(results/g24_design.md) on the runs of run_g24.sh of one machine.
+
     python3 analyze_g24.py --runs DIR --machine GX10 [--out results/g24_<machine>_analysis.txt] [--csv results/g24_<machine>_points.csv]
-A resumed transaction is the odd connection 2(j+2)+1 of the capture and row j of the probe's CSV (two warm-up pairs). Latency = t_total_ms minus the median of the unshaped base run of the same cell and repetition;
-FAST iff it lies below the midpoint of the two model values (window 10 / window wide). The window is the kernel's snd_cwnd after the last tcp_ack before the first acknowledgment of the response can return (r3b_analyze.py)."""
+Resumed transaction number j (row j of the probe's CSV) is connection 2(j+2)+1 of the capture, counting from 0 (two warm-up pairs, and
+a full handshake before every resumed one). Latency is the total time minus the median of the unshaped run of the same cell and
+repetition; a transaction is "fast" if it lies below the midpoint of the two model values (server window ten, or wide enough for the
+response). The window is the kernel's snd_cwnd after the last tcp_ack() before the first acknowledgment of the response can return
+(r3b_analyze.py).
+  Q1  the window rule holds for each acknowledgment event
+  Q2  the first burst of the response equals min(cwnd, response segments)
+  Q3  a: fast exactly if cwnd >= response segments, all cells; b: in the cells of group U (wrong in the earlier random draw), the fast
+      transactions have cwnd >= response segments
+  Q4  the saving is not made on the request side
+  Q5  no fast transaction where ten plus the ticket segments is smaller than the response
+"""
 import argparse, collections, csv, glob, os, re, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import r3b_analyze as A
+# thresholds of the criteria, as fixed in results/g24_design.md
 Q1_MIN, Q2_MIN, Q3_ALL, Q3_FAST, Q4_MIN_CLASS, Q5_MAX = 0.99914, 0.996, 0.95, 0.90, 10, 0.01
 
 
 def load(runs, cells):
+    """Read all runs of the directory: returns (window events, transactions with cell, repetition, excess latency and fast flag, notes
+    about missing data). `cells` is the table of the selected cells.
+    """
     E, X, missing = [], [], []
     for d in sorted(glob.glob(os.path.join(os.path.expanduser(runs), "trace_g24*_c*_doff_m*"))):
         m = re.search(r"trace_g24([a-z0-9]*)_c(\d+)_doff_m(\d+)$", d)
@@ -31,10 +47,13 @@ def load(runs, cells):
     return E, X, missing
 
 
-def pct(a, b): return 100.0 * a / b if b else float("nan")
+def pct(a, b):
+    """Percentage a of b."""
+    return 100.0 * a / b if b else float("nan")
 
 
 def main():
+    """Evaluate the criteria and write the report and the table of transactions."""
     ap = argparse.ArgumentParser(); ap.add_argument("--runs", required=True); ap.add_argument("--machine", default=""); ap.add_argument("--out", default=""); ap.add_argument("--csv", default="")
     ap.add_argument("--cells", default=os.path.join(HERE, "results", "g24_cells.csv")); a = ap.parse_args()
     cells = {int(c["cell"]): c for c in csv.DictReader(open(a.cells))}

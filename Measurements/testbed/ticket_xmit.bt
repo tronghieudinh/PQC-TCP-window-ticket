@@ -1,14 +1,19 @@
 #!/usr/bin/env bpftrace
 /*
- * Clock-safe ordering of the server's own segments, the arrivals of the client's segments and the returns of the server's writes, ALL on ONE clock (nsecs).
- *   sudo bpftrace -q ticket_xmit.bt 4433 > tag.bpf.txt            ($1 = port of the server; used through PQC_BPF=ticket_xmit.bt in trace_run.py)
- *   XQ ns cpu sport dport seq len   a TCP segment of the connection is handed to the device queue (net_dev_queue: BEFORE the netem delay of that device)
- *   XS ns cpu sport dport seq len   the same segment leaves the qdisc (net_dev_start_xmit: AFTER the delay; this is where tcpdump stamps it)
- *   RX ns cpu sport dport seq ack len   a segment is queued to a CPU backlog on arrival (netif_rx; this is where the arrival stamp of tcpdump is taken)
- *   SEND ns tid dport write_seq_before write_seq_after   return of a tcp_sendmsg of the server
- * XS - XQ of one segment is the delay the device really added; the capture of S>C packets is stamped at XS, so the true send time is XQ, not "stamp - RTT/2".
- * The headers are read through skb->network_header, valid at all three points (the Ethernet header is present at XQ and XS and absent at RX).
- * Written 21 Nov 2026 after the clock check (results/wp6_clock_check.txt); NOT yet run: smoke it with  python3 clock_sync.py --smoke  before any measurement.
+ * ticket_xmit.bt - when every segment of a connection is queued, leaves the queueing discipline and arrives, and when the server's writes
+ * return, all on ONE clock (nsecs = CLOCK_MONOTONIC). With it the order of the server's own segments and of the client's segments can be
+ * read without relating the capture clock to the kernel clock.
+ *
+ *   sudo bpftrace -q ticket_xmit.bt 4433 > tag.bpf.txt        ($1 = port of the server; trace_run.py starts it when PQC_BPF names this file)
+ *
+ * Output lines:
+ *   XQ ns cpu sport dport seq len      a TCP segment of the connection is handed to the device queue (net_dev_queue: BEFORE the netem delay)
+ *   XS ns cpu sport dport seq len      the same segment leaves the queueing discipline (net_dev_start_xmit: AFTER the delay; tcpdump stamps here)
+ *   RX ns cpu sport dport seq ack len  a segment is queued to a CPU's input backlog on arrival (netif_rx; tcpdump stamps arrivals here)
+ *   SEND ns tid dport write_seq_before write_seq_after   return of a tcp_sendmsg() call of the server (the bytes it wrote)
+ * XS - XQ of a segment is the delay the device really added; because captured server-to-client packets are stamped at XS, the time the
+ * server sent them is XQ, not "capture stamp - RTT/2". Only IPv6 TCP is matched (next header 6); headers are read through
+ * skb->network_header. Check that the probe attaches on a new kernel with: python3 clock_sync.py --smoke
  */
 BEGIN { printf("READY\n"); }
 

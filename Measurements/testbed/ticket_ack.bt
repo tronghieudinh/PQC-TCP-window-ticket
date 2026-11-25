@@ -1,11 +1,16 @@
 #!/usr/bin/env bpftrace
 /*
- * Round 3 probe (results/r3_design.md): ticket_xmit.bt plus the moment the server's TCP PROCESSES each acknowledgment, on the same clock (nsecs).
- *   XQ, XS, RX, SEND  as in ticket_xmit.bt
- *   AK  ns cpu cport snd_una packets_out snd_cwnd   entry of tcp_ack on a socket of the server (state BEFORE the acknowledgment is processed)
- *   AKR ns cpu cport snd_una packets_out snd_cwnd   return of tcp_ack (state AFTER it): snd_una after = the cumulative acknowledgment just processed
- * The order of a transaction is read from AK against the XQ of the first response segment. $1 = port of the server (as ticket_xmit.bt).
- * Written 22 Nov 2026; NOT yet run: smoke it with  sudo bash run_r3.sh smoke  before any measurement.
+ * ticket_ack.bt - ticket_xmit.bt plus the moment at which the server's TCP PROCESSES each acknowledgment, on the same clock. Used by the
+ * first round of the intervention that delays the client's pure ACKs (results/r3_design.md). Version 2, ticket_ack2.bt, records more state.
+ *
+ *   sudo bpftrace -q ticket_ack.bt 4433 > tag.bpf.txt        ($1 = port of the server; trace_run.py starts it when PQC_BPF names this file)
+ *
+ * Output lines (nsecs = CLOCK_MONOTONIC):
+ *   XQ, XS, RX, SEND   as in ticket_xmit.bt
+ *
+ *   AK  ns cpu cport snd_una packets_out snd_cwnd   entry of tcp_ack() on a server socket (state BEFORE the acknowledgment is processed)
+ *   AKR ns cpu cport snd_una packets_out snd_cwnd   return of tcp_ack() (state AFTER it; snd_una is the cumulative acknowledgment just processed)
+ * The order of events within a transaction is read from AK against the XQ of the first segment of the response.
  */
 BEGIN { printf("READY\n"); }
 tracepoint:net:net_dev_queue

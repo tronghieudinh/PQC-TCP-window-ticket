@@ -1,27 +1,32 @@
 #!/usr/bin/env python3
-"""
-g19b_predict.py - pre-registration of scenario G19b: the ECDSA-P256 cell of G19 that the early-ticket model got wrong, measured again, and a test of the explanation found afterwards.
+"""g19b_predict.py - predictions for scenario G19b: the ECDSA-P256 cell of the random draw (G19) that the early-ticket model got wrong,
+measured again, and a test of the explanation found afterwards.
 
-G19, cell 56 (ECDSA-P256, request 3 203 B, response 11 150 B, RTT 150 ms, 1 Gbit/s, MTU 1400): measured 450.7 ms, early-ticket model 600.1 ms (one round trip too slow), joined-ticket model 450.2 ms.
-Explanation found AFTER G19 (post hoc): the model's NewSessionTicket is 1 349 bytes, the ticket seen on the wire (ticket_race.csv) is 1 279 bytes. At MTU 1400 (MSS 1340) the model counts two
-segments for the ticket and the wire one, so ticket and response (9 segments) fill the window of ten exactly instead of exceeding it. The model's ticket size is 54 to 70 bytes above the measured one for
-the three suites measured (ECDSA-P256 70, ML-DSA-44 61, ML-DSA-65 54). Setting it to the measured size (Model.nst_overhead lowered by the difference; here 70) changes exactly one of the 100 predictions of G19
-by more than 1 ms: cell 56, from 600.1 to 450.1.
-G19b tests that explanation on cells that were not used to find it: the same family (ECDSA-P256, request 3 203 B, RTT 150 ms, 1 Gbit/s, MTU 1400, resumed, mutual TLS, depth 2, Reno, quickack) with responses
-of 9 500, 10 400, 10 800, 11 150 (the cell of G19, n = 200), 11 600 and 12 400 B. The model with the ticket size of G19 steps from 450 to 600 ms between responses of 10 050 and 10 720 B; the model with the
-measured ticket size steps between 11 390 and 12 060 B. The cells 10 400 to 11 600 B discriminate; 9 500 and 12 400 B are controls on both sides.
-  g19b_predict.py [--force]   writes results/g19b_predictions.csv and results/g19b_cells.json; refuses to overwrite (pre-registered)
+G19, cell 56 (ECDSA-P256, request 3203 bytes, response 11 150 bytes, RTT 150 ms, 1 Gbit/s, MTU 1400): measured 450.7 ms, early-ticket
+model 600.1 ms (one round trip too slow), joined-ticket model 450.2 ms. Post hoc explanation: the NewSessionTicket of the model has 1349
+bytes, the one seen on the wire 1279. At MTU 1400 (segment size 1340) the model counts two segments for the ticket and the wire has
+one, so ticket and response (9 segments) fill the window of ten exactly instead of exceeding it. The model's ticket is 54 to 70 bytes
+too large for the three suites measured; with the measured size (Model.nst_overhead lowered by the difference, here 70) exactly one of
+the 100 predictions changes by more than 1 ms: cell 56, from 600.1 to 450.1 ms.
+G19b tests this on cells not used to find it: the same family with responses of 9500, 10 400, 10 800, 11 150 (the cell of G19, 200
+transactions), 11 600 and 12 400 bytes. The step from 450 to 600 ms lies between responses of 10 050 and 10 720 bytes with the old ticket
+size and between 11 390 and 12 060 bytes with the measured one: 10 400 to 11 600 discriminate, 9500 and 12 400 are controls.
+
+    g19b_predict.py [--force]    writes results/g19b_predictions.csv and g19b_cells.json
+Predictions are written before the measurement: the script refuses to overwrite existing files (--force only to redo deliberately).
 """
 import csv, dataclasses, hashlib, json, os, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import analyze_testbed as A  # noqa: E402
 S = A.S
+# the fixed parameters of the family; DELTA: bytes by which the modeled ticket exceeds the measured one
 SUITE, REQ, RTT, RATE, MTU, DELTA = "ECDSA-P256|X25519", 3203, 150, 1000, 1400, 70
 RESPS = [9500, 10400, 10800, 11150, 11600, 12400]
 
 
 def predict(resp, delta):
+    """Predicted latency (ms) for a response of `resp` bytes with the ticket overhead of the model lowered by `delta` bytes."""
     A.NST_EARLY = True
     m0 = S.Model(); m = dataclasses.replace(m0, nst_overhead=m0.nst_overhead - delta)
     flow = S.build_flow(SUITE, A.probe_protocol("1", str(REQ), str(resp), "2"), 2, "resumed", False, m)
@@ -31,6 +36,7 @@ def predict(resp, delta):
 
 
 def main():
+    """Predict both ticket sizes for every response, write the files and print checksums."""
     res = os.path.join(HERE, "results")
     pp, pc = os.path.join(res, "g19b_predictions.csv"), os.path.join(res, "g19b_cells.json")
     if (os.path.exists(pp) or os.path.exists(pc)) and "--force" not in sys.argv:

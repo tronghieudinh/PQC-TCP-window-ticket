@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Regenerate the figures and the numbers of the paper from the committed data, check the numbers against the shipped copy and build the PDF.
 #   bash reproduce_l1.sh          (PY=python3 by default; needs matplotlib and, for the PDF, TeX Live with acmart)
-# The measurements themselves need Linux machines (see Measurements/testbed/run_slack.py and trace_run.py); the raw kernel traces are not published
-# (see README.md): the per-acknowledgment tables derived from them are in Measurements/testbed/results.
+# The measurements themselves need Linux machines (see Measurements/testbed/run_slack.py and trace_run.py). The raw kernel traces are archived
+# separately (see README.md); the per-acknowledgment tables derived from them are in Measurements/testbed/results and are what this script reads.
 set -euo pipefail
 cd "$(dirname "$0")"
 PY=${PY:-python3}
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cp paper2_short/Latex/numbers_short.tex "$tmp/numbers_short.tex"; for t in g19_cells_table os_table details_tables g24_table; do cp paper2_short/Latex/$t.tex "$tmp/$t.tex"; done
-(cd paper2_short/Latex && $PY make_assets_short.py >/dev/null && PQC_FIG_FLAT=1 $PY make_assets_short.py >/dev/null)      # the figures of the paper are the flat variant (_v3)
+(cd paper2_short/Latex && $PY make_assets_short.py >/dev/null && PQC_FIG_FLAT=1 $PY make_assets_short.py >/dev/null)      # default size and the lower variant (suffix _v3) used by the paper
 if diff -q "$tmp/numbers_short.tex" paper2_short/Latex/numbers_short.tex >/dev/null; then echo "numbers check OK"
 else echo "numbers DIFF (regenerated against shipped):"; diff "$tmp/numbers_short.tex" paper2_short/Latex/numbers_short.tex || true; exit 1; fi
 for t in g19_cells_table os_table details_tables g24_table; do cmp -s "$tmp/$t.tex" paper2_short/Latex/$t.tex && echo "table $t OK" || { echo "table $t DIFF"; exit 1; }; done
@@ -78,7 +78,7 @@ if [ -f Measurements/testbed/results/r3d_report.txt ] && [ -f Measurements/testb
   $PY Measurements/testbed/r3d_report.py --out "$tmp/r3d_report.txt" >/dev/null
   cmp -s "$tmp/r3d_report.txt" Measurements/testbed/results/r3d_report.txt && echo "round 3d report OK" || { echo "round 3d report DIFF"; exit 1; }
 fi
-# the direction of the errors of the model over every per-cell test of L1 (supplement, table of the direction of the errors): rerun from the archived raw files
+# the direction of the errors of the model over every per-cell test of the paper (supplement, table of the direction of the errors): rerun from the archived raw files
 $PY Measurements/testbed/one_sided_errors.py --out "$tmp/one_sided.txt" >/dev/null
 cmp -s "$tmp/one_sided.txt" Measurements/testbed/results/one_sided_errors.txt && echo "direction of the errors OK" || { echo "direction of the errors DIFF"; exit 1; }
 if [ -f Measurements/testbed/results/g20/X250/g20_ecdsa_k12.csv ]; then

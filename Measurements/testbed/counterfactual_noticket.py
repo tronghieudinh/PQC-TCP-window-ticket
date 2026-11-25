@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""counterfactual_noticket.py - the counterfactual 'remove the NewSessionTicket from the server's response flight' (L1, Section 4, paragraph "Ticket").
-The first diagnosis of the two resumed configurations that the model got wrong put the ticket in the response flight (joined-ticket model). This script removes it
-altogether: the transport model of Simulation/pqc_sim.py is run unchanged on the same flow with the NewSessionTicket set to zero bytes (the ticket the client presents in
-its ClientHello stays). Cell: resumed TLS 1.3, mutual authentication, depth 2, request 14 500 B, response 12 100 B, RTT 100 ms, 100 Mbit/s, MTU 1500, initial window 10.
-Measured value: `resume_summary.csv`. Output: results/counterfactual_noticket.txt (written when --write is given).
-    python3 counterfactual_noticket.py [--write]
-Result: ML-DSA-44 is predicted right without the ticket (401.8 ms against 402.3 measured), ML-DSA-65 a round trip too fast (303.0 against 402.2); with the ticket joined to the
-response ML-DSA-44 is a round trip too slow (501.1) and ML-DSA-65 right (402.5); the early-ticket model is right for both. Written after the fact (post hoc): the variant was first run by hand on 1 Nov 2026.
+"""counterfactual_noticket.py - what the model predicts if the NewSessionTicket is removed from the server's response flight.
+
+A model in which the ticket is sent together with the response (joined ticket) gets two resumed configurations wrong. This script
+removes the ticket altogether: the transport model of Simulation/pqc_sim.py runs unchanged on the same flow with a NewSessionTicket of
+zero bytes (the ticket that the client presents in its ClientHello stays). Configuration: resumed TLS 1.3, mutual authentication,
+depth 2, request 14 500 B, response 12 100 B, RTT 100 ms, 100 Mbit/s, MTU 1500, initial window 10. Measured values:
+results/resume_summary.csv.
+
+    python3 counterfactual_noticket.py [--write]        (--write: results/counterfactual_noticket.txt)
+Result: without the ticket ML-DSA-44 is predicted right (401.8 ms against 402.3 measured) and ML-DSA-65 one round trip too fast
+(303.0 against 402.2); with the joined ticket ML-DSA-44 is one round trip too slow (501.1) and ML-DSA-65 right (402.5); the model in
+which the ticket is written early is right for both. This is a post hoc analysis.
 """
 import csv, dataclasses, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))

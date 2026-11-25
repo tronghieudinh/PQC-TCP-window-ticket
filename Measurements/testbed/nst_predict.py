@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""
-nst_predict.py - pre-registration of the stage-D test (WP5): is the session ticket its own, EARLIER write in a resumed TLS 1.3 transaction?
+"""nst_predict.py - predictions for the ticket-position test (stage D): is the session ticket its own, earlier write in a resumed TLS 1.3
+transaction?
 
-Hypothesis H_nst (Net.nst_early): an OpenSSL server writes the NewSessionTicket as soon as the client's Finished has arrived (the first
-small segment of the client's last flight), not together with the response. If the client's request flight needs an extra round trip
-(window-limited), the ticket is acknowledged before the response leaves, and the server's response flight no longer contains it; otherwise
-the ticket and the response share the server's window. The alternative H_joined (the model's default, Net.nst_early = False) always puts
-the ticket in the response flight.
-
-Test design (run_nst_tls.sh): resumed TLS 1.3, ECDSA-P256 and ML-DSA-44/-65/-87 at depth 2 (mutual TLS, the ticket embeds the client
-certificate: 1, 4, 5 and 6 segments), RTT 100 ms, MTU 1500, a small request (302 B: the client flight fits the window) and a large one
-(19,460 B: the client flight needs an extra round trip for ECDSA, ML-DSA-44 and -65, not for -87), and responses whose size gives k = 3..12
-segments. The two hypotheses disagree wherever the ticket decides whether the server flight crosses the window.
-Run once, commit the output BEFORE measuring.
+Hypothesis (Net.nst_early): an OpenSSL server writes the NewSessionTicket as soon as the client's Finished has arrived (the first small
+segment of the client's last flight), not together with the response. If the request needs an extra round trip (limited by the window),
+the ticket is acknowledged before the response leaves and the response flight no longer contains it; otherwise ticket and response share
+the server's window. The alternative "joined" (Net.nst_early = False) always puts the ticket into the response flight.
+Design: resumed TLS 1.3, ECDSA-P256 and ML-DSA-44/-65/-87 at depth 2 with mutual TLS (the ticket contains the client certificate: 1, 4, 5
+and 6 segments), RTT 100 ms, MTU 1500, a small request (302 bytes: the client's flight fits its window) and a large one (19 460 bytes:
+an extra round trip for ECDSA, ML-DSA-44 and -65, not for -87), responses of 3..12 segments. The hypotheses differ wherever the ticket
+decides whether the server's flight exceeds the window.
+Predictions are written before the measurement: the script refuses to overwrite existing files. Writes results/nst_predictions.csv.
 """
 import csv, hashlib, os, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -20,16 +18,18 @@ sys.path.insert(0, HERE)
 import analyze_testbed as A  # noqa: E402
 
 SUITES = ["ECDSA-P256|X25519", "ML-DSA-44|ML-KEM-768", "ML-DSA-65|ML-KEM-768", "ML-DSA-87|ML-KEM-1024"]
-MSS = 1440
+MSS = 1440      # segment size: MTU 1500, IPv6, no timestamps
 REQS = [302, 19460]
 KS = list(range(3, 13))
 
 
 def resp_bytes(k):
+    """Response size of k segments."""
     return k * MSS - 700
 
 
 def main():
+    """Predict every cell under both hypotheses and write the table."""
     out = os.path.join(HERE, "results", "nst_predictions.csv")
     if os.path.exists(out) and "--force" not in sys.argv:
         sys.exit(f"{out} exists (pre-registered); delete it deliberately to redo")

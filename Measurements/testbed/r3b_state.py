@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
-"""r3b_state.py - round 3b (results/r3b_design.md): the kernel-state reading of the intervention runs, from ticket_ack.bt only (AK, AKR, XQ, SEND) and the capture for n.
-Per resumed transaction: n ticket segments; a = server data segments (first flight and ticket) whose acknowledgment was processed (AKR before the XQ of the first response segment); cwnd_before and packets_out at the last AKR before it;
-maxpo = the largest packets_out seen at any tcp_ack of the connection before it; the model value min(10 + a, 2 x maxpo) (rule (1) with the kernel's own counters, nothing fitted).
+"""r3b_state.py - round 3b (results/r3b_design.md): reads the server's window from the kernel state in the runs that delay the client's
+acknowledgments (ticket_ack.bt: AK, AKR, XQ, SEND, RX) and takes the number of ticket segments from the capture.
+
+Per resumed transaction:
+  n             segments of the session ticket
+  a             server data segments (first flight and ticket) acknowledged before the first response segment is queued
+  cwnd_before, po_before   congestion window and packets_out after the last acknowledgment processed before it
+  maxpo         largest packets_out seen at any acknowledgment of the connection before it
+  model         min(10 + a, 2 x maxpo): the window rule evaluated with the kernel's own counters, nothing fitted
+  k_in          ticket acknowledgments processed after the response was queued
+It prints how often cwnd_before equals the model value and writes one CSV row per transaction.
+
     python3 r3b_state.py --runs results [--tag _rep] --csv results/r3b_<machine>_points.csv
 """
 import argparse, collections, csv, glob, os, re, statistics as st, sys
@@ -9,6 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import analyze_r3 as R, analyze_ticket_race as T
 
 def points(rundir):
+    """Rows of one run directory trace_r3<TAG>_d<delay>_m<mtu> (delay of the client's pure acknowledgments in microseconds, or off)."""
     m = re.search(r"_d(off|[0-9.]+)_m(\d+)$", rundir.rstrip("/")); delay, mtu = m.group(1), int(m.group(2)); out = []
     for f in sorted(glob.glob(os.path.join(rundir, "*_srv.pcap"))):
         g = T.TAG.search(os.path.basename(f)).groupdict(); bpf = f[:-len("_srv.pcap")] + ".bpf.txt"

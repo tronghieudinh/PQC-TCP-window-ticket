@@ -1,11 +1,11 @@
 /*
- * tls_load.c - closed-loop TLS 1.3 load generator for server-capacity tests (OpenSSL >= 3.5), paper 2 (WP2).
+ * tls_load.c - closed-loop TLS 1.3 load generator for server-capacity tests (OpenSSL >= 3.5).
  *
  * T threads, each looping: new TCP connection -> TLS 1.3 handshake (full, or resumed with --resume) -> one request of --req bytes
  * -> one response of --resp bytes -> close. It runs for --time seconds after --warmup seconds and prints ONE CSV line:
  *   threads,time_s,ok,err,reused,rate_per_s,p50_ms,p99_ms,max_ms,first_error
  * The latency of a transaction is connect() start -> last response byte. Pair it with `tls_probe server [--reuseport]` (one process
- * per server core): the harness capacity_test.py measures the CPU time of the server processes, which this program cannot see.
+ * per server core): the capacity test script measures the CPU time of the server processes, which this program cannot see.
  *
  *   tls_load --addr A --port P --ca root.pem --groups G [--cert full_chain.pem --key k.pem] [--resume]
  *            --req Q --resp R --threads T --time S [--warmup W]
@@ -45,18 +45,21 @@ typedef struct {
     char first_err[48];
 } Stat;
 
+/* Options, TLS context, server address, start of warm-up and of measurement and end of the run (ms), ticket of this thread. */
 static Opt O;
 static SSL_CTX *CTX;
 static struct addrinfo *AI;
 static double T_START, T_MEASURE, T_END;
 static __thread SSL_SESSION *tl_sess;
 
+/* Monotonic time in milliseconds. */
 static double now_ms(void) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
 
+/* Keep the newest session ticket received by this thread. */
 static int new_session_cb(SSL *ssl, SSL_SESSION *sess) {
     (void)ssl;
     if (tl_sess) SSL_SESSION_free(tl_sess);
@@ -64,6 +67,7 @@ static int new_session_cb(SSL *ssl, SSL_SESSION *sess) {
     return 1;
 }
 
+/* Read exactly n bytes of application data; -1 on error or end of connection. */
 static int read_exact(SSL *ssl, unsigned char *buf, int n) {
     int got = 0;
     while (got < n) {
@@ -74,7 +78,7 @@ static int read_exact(SSL *ssl, unsigned char *buf, int n) {
     return got;
 }
 
-/* one transaction; returns NULL on success or an error tag */
+/* One transaction on a new connection; returns NULL on success or a short error tag and sets *reused if resumed. */
 static const char *transact(unsigned char *req, unsigned char *resp, SSL_SESSION *sess, int *reused) {
     const char *err = NULL;
     int one = 1;
@@ -104,6 +108,7 @@ static const char *transact(unsigned char *req, unsigned char *resp, SSL_SESSION
     return err;
 }
 
+/* Load thread: obtain a first ticket (--resume), then run transactions until the end time and count the measured ones. */
 static void *worker(void *arg) {
     Stat *st = arg;
     unsigned char *req = calloc(O.req, 1), *resp = malloc(O.resp);
@@ -138,6 +143,7 @@ static void *worker(void *arg) {
     return NULL;
 }
 
+/* Parse the options, run the threads and merge their counters into one CSV line. */
 int main(int argc, char **argv) {
     O.addr = "127.0.0.1"; O.port = "4433"; O.req = 302; O.resp = 222; O.threads = 4; O.time_s = 10; O.warmup_s = 2;
     static struct option lo[] = {{"addr", 1, 0, 'a'}, {"port", 1, 0, 'p'}, {"cert", 1, 0, 'c'}, {"key", 1, 0, 'k'}, {"ca", 1, 0, 'A'},

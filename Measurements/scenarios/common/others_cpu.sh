@@ -5,12 +5,13 @@
 # who runs the measurement (the user behind sudo, if any) and other than root, whose CPU use is >= --min-cpu percent of one core (default 25), with
 # user, pid, %CPU, running time and the command line. Prints a one-line total. Root is skipped on purpose: the measurement itself runs as root under sudo.
 # Exit status: 0 nobody else is using the CPU; 3 somebody is (the report goes to stdout, so a caller can log it); 2 usage error.
-# Used by campaign.sh (gate, start of the official run, and each time a preflight waits) and by testbed/pqcm_lib/common.sh (while waiting for the load to fall).
+# Used by the measurement runners before a run starts and while they wait for the load of the machine to fall.
 # Test hooks: PQC_OTHERS_INCLUDE_SELF=1 (treat the current user as "other"), PQC_OTHERS_FILE=FILE (read lines "user pid cpu etime cmd" instead of top).
 set -u
-MIN=25; QUIET=0
+MIN=25; QUIET=0     # MIN: threshold in percent of one core; QUIET: report through the exit status only
 while [ $# -gt 0 ]; do case "$1" in --min-cpu) MIN=$2; shift;; --quiet) QUIET=1;; -h|--help) sed -n '2,12p' "$0"; exit 0;; *) echo "unknown option $1" >&2; exit 2;; esac; shift; done
 ME=${SUDO_USER:-$(id -un)}
+# Lines "user pid cpu elapsed command" of the processes that top shows.
 raw() {
   if [ -n "${PQC_OTHERS_FILE:-}" ]; then cat "$PQC_OTHERS_FILE"; return; fi
   # second frame of top (the first one only holds averages since boot); columns: PID USER PR NI VIRT RES SHR S %CPU %MEM TIME+ COMMAND

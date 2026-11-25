@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""analyze_nst_e.py - stage E of WP5: the server's window for the response after an acknowledged ticket (see nst_predict_e.py).
-Needs results/resume_summary_nst_e_tls.csv (analyze_resume.py --out ... results/nst_e_tls.csv)."""
+"""analyze_nst_e.py - window after the ticket (stage E): which window does the server have for the response after the ticket has been
+acknowledged? Compares the measurements with predictions for several values W (nst_predict_e.py).
+
+    python3 analyze_nst_e.py      (needs results/resume_summary_nst_e_tls.csv: analyze_resume.py --out ... results/nst_e_tls.csv)
+Prints, per suite and request size, the extra round trips as the response grows (k segments), the W that fits best with the large
+request, a control with the small request (the ticket is still in flight, so W does not matter) and the reading of the result.
+"""
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import csv, os, statistics as st
 HERE = os.path.dirname(os.path.abspath(__file__))
 RES = os.path.join(HERE, "results")
-WS = [10, 12, 14, 16, 20]
+WS = [10, 12, 14, 16, 20]      # candidate server windows after the ticket (segments)
 RTT = 100.0
 
 
 def main():
+    """Fit W per suite and print the series, the fit, the control and the conclusion."""
     summ = os.path.join(RES, "resume_summary_nst_e_tls.csv")
     if not os.path.exists(summ):
         raise SystemExit("run: python3 analyze_resume.py --out results/resume_summary_nst_e_tls.csv results/nst_e_tls.csv")

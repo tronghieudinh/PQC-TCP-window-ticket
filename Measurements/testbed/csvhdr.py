@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""csvhdr.py - the metadata header of pqcm data files.
+"""csvhdr.py - comment header of the data files: metadata lines before the CSV content.
 
-Every CSV written by a pqcm.sh step starts with a block of comment lines ("# key: value") that records the machine, kernel, OpenSSL version,
-the configuration of the step and, for every run of the step, start/end time and the CPU load before and after. The data follows
-unchanged, so an analysis script only has to ignore the lines that begin with "#":
+The measurement driver of the working repository writes, at the top of every CSV, lines that start with "#" ("# key: value"): machine,
+kernel, OpenSSL version, configuration of the step and, for every run, its start and end time and the CPU load. The data follows
+unchanged, so a program only has to skip those lines:
 
-    import csvhdr          # once, before reading; csv.DictReader / csv.reader then skip the header lines
+    import csvhdr          # once, before reading: csv.DictReader and csv.reader then skip the comment lines
 
-Command line (used by pqcm.sh):
-    csvhdr.py inject FILE --common k=v ... --step k=v ...   add/update the header; each call appends one step entry (resumed runs keep their history)
-    csvhdr.py show FILE                                      print the header
-    csvhdr.py strip FILE [...]                               print the data without the header (concatenate several files: header of the first only)
+Command line:
+    csvhdr.py inject FILE --common k=v ... --step k=v ...   add or update the header; each call appends one run entry
+    csvhdr.py show FILE                                     print the header
+    csvhdr.py strip FILE [...]                              print the data without header (several files are concatenated, one column line)
+
+Note: importing this module replaces csv.DictReader and csv.reader for the whole program.
 """
 import csv as _csv
 import sys
@@ -20,6 +22,7 @@ END = "# pqcm-header-end"
 
 
 def _skip(f):
+    """Yield the lines of a file that are not comment lines."""
     for line in f:
         if not line.startswith("#"):
             yield line
@@ -29,6 +32,7 @@ _DictReader, _reader = _csv.DictReader, _csv.reader
 
 
 def _wrap(orig):
+    """Wrap a csv reader constructor so that it skips comment lines when given a file or an iterator."""
     def inner(f, *a, **k):
         if hasattr(f, "read") or hasattr(f, "__next__"):
             f = _skip(f)
@@ -41,7 +45,7 @@ _csv.reader = _wrap(_reader)
 
 
 def split_header(lines):
-    """-> (header lines, data lines)"""
+    """Split the lines of a file into (header lines, data lines); the header is empty if the file has none."""
     if not lines or not lines[0].startswith(MAGIC):
         return [], lines
     for i, l in enumerate(lines):
@@ -51,6 +55,9 @@ def split_header(lines):
 
 
 def inject(path, common, step, max_bytes=300_000_000):
+    """Add or update the header of `path`: merge `common` into the file-level entries and append `step` as a new run entry.
+    Returns False, without changing the file, if it is larger than max_bytes.
+    """
     import os
     if os.path.getsize(path) > max_bytes:
         return False
@@ -77,6 +84,7 @@ def inject(path, common, step, max_bytes=300_000_000):
 
 
 def _kv(items):
+    """Turn a list of "key=value" strings into a dictionary."""
     d = {}
     for it in items:
         k, _, v = it.partition("=")

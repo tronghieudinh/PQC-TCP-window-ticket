@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""analyze_g19.py - evaluates the criteria R1-R5 of results/g19_random_design_predictions.md on a run of scenario G19.
+"""analyze_g19.py - random cells (scenario G19): evaluates criteria R1-R5 fixed before the measurement
+(results/g19_random_design_predictions.md).
+
     python3 analyze_g19.py --run FILE.csv [--out results/g19_analysis.txt] [--cells results/g19_cells_report.txt]
-FILE.csv is the output of run_testbed.py --configs-from results/g19_cells.csv --resume. Measured excess of a cell = median t_total_ms of the resumed transactions on the shaped link minus the
-median on the unshaped base of the same suite and sizes. A cell is 'wrong' when the prediction is off by more than half an RTT; a cell with fewer than 30 valid transactions is MISSING.
-  R1  cells wrong by more than half an RTT (early-ticket model of L1): at most 3 of 100
-  R2  cells within 2 ms of the prediction: at least 85 of 100
-  R3  mean absolute error over the 100 cells: at most 2 ms
+FILE.csv is the output of run_testbed.py --configs-from results/g19_cells.csv --resume. Excess latency of a cell: median total time of the resumed transactions on the shaped link minus the median on the unshaped link, for the same suite and sizes. A cell is wrong when the
+prediction is off by more than half an RTT; a cell with fewer than 30 valid transactions is missing.
+  R1  the early-ticket model of the paper is wrong on at most 3 of the 100 cells
+  R2  at least 85 of the 100 cells are within 2 ms of the prediction
+  R3  mean absolute error over the 100 cells at most 2 ms
   R4  data: every cell has at least 30 valid transactions
-  R5  cells where the early-ticket and joined-ticket models differ by more than half an RTT (D of them): early wrong on at most 10 % of D (rounded down), joined wrong on at least 80 % of D (rounded up)
+  R5  on the D cells where the early-ticket and joined-ticket models differ by more than half an RTT: early wrong on at most 10 % of D
+      (rounded down), joined wrong on at least 80 % of D (rounded up)
 """
 import argparse, csv, math, os, statistics as st
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -15,6 +18,7 @@ RES = os.path.join(HERE, "results")
 
 
 def load(path):
+    """Total times of the valid resumed transactions: (unshaped link by (suite, request, response), shaped link by the full network key)."""
     base, shaped = {}, {}
     for r in csv.DictReader(open(path)):
         if r["err"] or r["reused"] != "1":
@@ -28,6 +32,7 @@ def load(path):
 
 
 def evaluate(run):
+    """Cells with their measured excess and the values and outcomes of R1-R5."""
     base, shaped = load(run)
     pred = list(csv.DictReader(open(os.path.join(RES, "g19_predictions.csv"))))
     cells, miss = [], 0
@@ -50,6 +55,7 @@ def evaluate(run):
 
 
 def main():
+    """Evaluate one run, write the report and, with --cells, the table of cells ordered by error."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", required=True)
     ap.add_argument("--out", default=os.path.join(RES, "g19_analysis.txt"))

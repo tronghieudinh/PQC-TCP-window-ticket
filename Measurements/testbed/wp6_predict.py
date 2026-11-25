@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""
-wp6_predict.py - pre-registration of the WP6 tests (paper 2, further scenarios). Run once, COMMIT AND PUSH the files BEFORE measuring.
+"""wp6_predict.py - model predictions for further scenarios, written to files BEFORE the corresponding measurements (run once, commit and
+push the files, then measure). It refuses to overwrite existing files unless --force is given.
 
-  results/wp6_pred_gen.csv       B3  ticket rule and server window across RTT, rate and MTU (models: joined ticket; early ticket with window 10;
-                                     early ticket with the windows measured in stage E: ECDSA 10, ML-DSA-44 12, ML-DSA-65 15)
-  results/wp6_pred_servonly.csv  B10 the same without client authentication (the ticket does not embed a client certificate)
-  results/wp6_pred_clientalg.csv B9  mixed chains: which of the ticket (client certificate) or the server algorithm sets the server window
-  results/wp6_pred_loss.csv      B2  lossy model (fast retransmit, TLP, RTO) for full and resumed transactions: mean and percentiles of the transport time
+  results/wp6_pred_gen.csv        mutual TLS across round-trip time, rate and MTU. Three models: ticket sent with the Finished flight;
+                                  ticket written early with an initial window of 10; ticket written early with the server windows
+                                  measured in stage E (ECDSA 10, ML-DSA-44 12, ML-DSA-65 15)
+  results/wp6_pred_servonly.csv   the same without client authentication (the ticket then does not contain a client certificate)
+  results/wp6_pred_clientalg.csv  mixed chains: does the ticket (client certificate) or the server's algorithm set the server window?
+  results/wp6_pred_loss.csv       model with losses (fast retransmit, tail loss probe, retransmission timeout) for full and resumed
+                                  transactions: mean and percentiles of the transport time
 
-Cells are defined by the number k of response segments; a response of k segments is k*MSS-700 bytes (MSS = MTU - 60, IPv6, no timestamps).
+A cell is defined by the number k of response segments; a response of k segments is k*MSS - 700 bytes (MSS = MTU - 60: IPv6, no
+timestamps). Model values are total time minus CPU time, in milliseconds.
 """
 import csv, hashlib, os, statistics as st, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -19,7 +22,7 @@ import loss_sim as L  # noqa: E402
 
 S = A.S
 SUITES = ["ECDSA-P256|X25519", "ML-DSA-44|ML-KEM-768", "ML-DSA-65|ML-KEM-768"]
-WMEAS = {"ECDSA-P256|X25519": 0, "ML-DSA-44|ML-KEM-768": 12, "ML-DSA-65|ML-KEM-768": 15}          # srv_cwnd_acked; 0 = 10
+WMEAS = {"ECDSA-P256|X25519": 0, "ML-DSA-44|ML-KEM-768": 12, "ML-DSA-65|ML-KEM-768": 15}          # server window (segments) after the acknowledged ticket (srv_cwnd_acked); 0 = initial window of 10
 NETS = {"rtt5": (5.0, 100.0, 1500), "rtt30": (30.0, 100.0, 1500), "rate10": (100.0, 10.0, 1500), "mtu1280": (100.0, 100.0, 1280), "mtu9000": (100.0, 100.0, 9000)}
 KS = list(range(9, 17))
 REQS = [302, 19460]
@@ -27,10 +30,12 @@ RES = os.path.join(HERE, "results")
 
 
 def rbytes(k, mtu):
+    """Response size in bytes that occupies k segments at this MTU."""
     return k * (mtu - 60) - 700
 
 
 def model_total(suite, mtls, req, resp, rtt, rate, mtu, **kw):
+    """Transport time (ms) of one resumed transaction in the simulator; extra keyword arguments go to its network model."""
     flow = S.build_flow(suite, A.probe_protocol(str(mtls), str(req), str(resp), "2"), 2, "resumed", False)
     net = S.Net(rate, rtt, mtu, penalty_ms=0.0, thr=4, init_cwnd=10, cwnd_validation=True, segmentation="openssl", **kw)
     m = S.run_flow(flow, net)
@@ -38,6 +43,7 @@ def model_total(suite, mtls, req, resp, rtt, rate, mtu, **kw):
 
 
 def gen(mtls, name):
+    """Rows of the three ticket models over all networks (mtls=1) or one network (mtls=0); differ = the models are more than half a round trip apart."""
     rows = []
     for net_id, (rtt, rate, mtu) in NETS.items():
         if mtls == 0 and net_id != "rtt30":
@@ -57,6 +63,7 @@ def gen(mtls, name):
 
 
 def write(path, rows):
+    """Write the rows to a CSV file and return its path."""
     with open(path, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
         w.writeheader()
@@ -77,6 +84,7 @@ def clientalg():
 
 
 def lossy(trials=2000):
+    """Rows of the loss model: mean, median, p95 and p99 over the given number of trials per cell."""
     rows = []
     for mode, resume in (("full", False), ("resumed", True)):
         for su in ("ECDSA-P256|X25519", "ML-DSA-65|ML-KEM-768"):

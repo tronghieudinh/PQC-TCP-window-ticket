@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""r3d_report.py - the numbers of the paper on round 3d (the confirmation: write delayed by spinning) from the derived CSV files of the two machines and the thresholds of r3d_thresholds.json: `key value` lines.
-    python3 r3d_report.py --out results/r3d_report.txt"""
+"""r3d_report.py - the numbers the paper reports for round 3d (the confirmation with the write delayed by spinning), from the derived CSV
+files of the two machines, as `key value` lines.
+
+    python3 r3d_report.py --out results/r3d_report.txt
+Keys: Rd<A = Arm machine | X = x86 machine> + the quantities listed in r3c_report.py; DevMin/DevMax/DevWorst the smallest, largest and
+largest absolute deviation of the write shift from D (us).
+"""
 import argparse, csv, json, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); RES = os.path.join(HERE, "results")
 import r3c as C, r3d as D
 
 def machine(tag, tx, ack):
+    """The keys of one machine's runs, prefixed Rd<tag>."""
     X = C.load(os.path.join(RES, tx), "s"); E = [e for e in csv.DictReader(open(os.path.join(RES, ack))) if e.get("kind", "w") == "s"]
     Ds = C.dlist(X); L = {}; m0 = st.median(x["pw"] for x in X if x["delay"] == "0" and x["pw"] is not None)
     L[f"Rd{tag}TxN"] = len(X); L[f"Rd{tag}EvN"] = len(E); L[f"Rd{tag}EvOk"] = sum(int(e["met"]) for e in E)

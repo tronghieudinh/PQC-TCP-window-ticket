@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
-"""analyze_g11.py - evaluates the criteria Q1-Q5 of results/g11_cc_pacing_predictions.md on a run of scenario G11 (plain TCP, stage A: BBR and fq pacing).
+"""analyze_g11.py - congestion control and pacing (scenario G11, plain TCP): evaluates criteria Q1-Q5 fixed before the measurement
+(results/g11_cc_pacing_predictions.md).
+
     python3 analyze_g11.py --run DIR/slack_tcp.csv [--out results/g11_analysis.txt]
-Per configuration (base = Reno, bbr, reno_fq, cubic_fq) and burst size n1 (segments): the median window the kernel has after the burst (cwnd_pre2) and the median time of the burst
-(t_b1_ms). Rule (1): w(n) = max(w0, min(w0 + n, 2n)) with w0 = 10; hypothesis BBR: w0 + n (cwnd + acked while below its target, no test of cwnd-limitation: tcp_bbr.c bbr_set_cwnd).
+
+Per configuration (base = Reno, bbr, reno_fq, cubic_fq) and flight size n1 in segments: the median window the kernel has after the
+flight (cwnd_pre2) and the median time of the flight (t_b1_ms). Window rule: w(n) = max(w0, min(w0 + n, 2n)) with w0 = 10. Hypothesis
+for BBR: w0 + n (its window grows by the acknowledged segments while below the target, without testing whether it was the limit;
+tcp_bbr.c, bbr_set_cwnd).
   Q1  bbr: the window equals w0 + n1 for at least 18 of the 20 sizes
-  Q2  bbr: rule (1) is wrong (differs from the measured window) for at least 8 of the 9 sizes n1 <= 9
-  Q3  reno_fq and cubic_fq: the window equals rule (1) for at least 9 of the 10 sizes n1 <= 10 (the burst of fq's initial quantum, 10 packets of the MTU, is not paced)
-  Q4  reno_fq and cubic_fq: the burst time is within 3 ms of the base configuration's for at least 9 of the 10 sizes n1 <= 10
-  Q5  baseline: base (Reno, no pacing) has the window of rule (1) for at least 18 of the 20 sizes (otherwise the other results are INCONCLUSIVE)
-Not predicted, only reported: the windows and burst times above n1 = 10 under fq, and the window after 40 segments under BBR.
+  Q2  bbr: the window rule differs from the measured window for at least 8 of the 9 sizes n1 <= 9
+  Q3  reno_fq and cubic_fq: the window equals the rule for at least 9 of the 10 sizes n1 <= 10 (fq sends its first 10 packets unpaced)
+  Q4  reno_fq and cubic_fq: the flight time is within 3 ms of that of base for at least 9 of the 10 sizes n1 <= 10
+  Q5  base: the window follows the rule for at least 18 of the 20 sizes (otherwise the other results are inconclusive)
+Only reported, not predicted: windows and times above n1 = 10 with fq, and the window after 40 segments with BBR.
 """
 import argparse, csv, os, statistics as st
 HERE = os.path.dirname(os.path.abspath(__file__))
 RES = os.path.join(HERE, "results")
-W0 = 10
+W0 = 10      # initial window, segments
 rule1 = lambda n: max(W0, min(W0 + n, 2 * n))
 
 
 def load(path):
+    """{(configuration, n1): (median window, median flight time in ms, connections)} from the stage-A rows without error."""
     g = {}
     for r in csv.DictReader(open(path)):
         if r["stage"] != "A" or r["err"]:
@@ -27,6 +33,7 @@ def load(path):
 
 
 def evaluate(path):
+    """Return the outcome of Q1-Q5 and the lines of the report."""
     m = load(path)
     sizes = sorted({n for (c, n) in m if c == "base"})
     res, lines = {}, []
@@ -48,6 +55,7 @@ def evaluate(path):
 
 
 def main():
+    """Evaluate one run and write the report."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", required=True)
     ap.add_argument("--out", default=os.path.join(RES, "g11_analysis.txt"))

@@ -1,17 +1,23 @@
 /*
- * tcp_flight.c - measures how Linux grows the congestion window of a fresh connection after a flight of n1 segments,
- * and what a second flight of n2 segments then costs, with no TLS in the way. Paper 2, WP5: tests the "slack" hypothesis
- * (the model's rule cwnd < 2 x segments-in-flight, loosened by `slack` segments; Simulation/pqc_sim.py, Net.cwnd_slack).
+ * tcp_flight.c - how Linux grows the congestion window of a new connection after a first flight of n1 segments, and what a second flight
+ * of n2 segments then costs, with plain TCP (no TLS). This tests the window rule of the latency model directly (Simulation/pqc_sim.py,
+ * parameter Net.cwnd_slack: how much further than "cwnd < 2 x segments in flight" the window may be allowed to grow).
  *
  *   tcp_flight server --bind ADDR [--port 4500]
  *   tcp_flight client --connect ADDR [--port 4500] --n1 1,2,3 --n2 1,12 --reps 20 [--split] [--mss 1448] [--delay-ms 20] [--nodelay 0|1]
  *
- * One connection per (n1, n2, rep). The client writes burst 1 (n1 full segments, the first 12 bytes carry the sizes), waits for a
- * 100-byte reply (which acknowledges all of burst 1: nothing is in flight), reads TCP_INFO (snd_cwnd = the window the kernel actually
- * grew), writes burst 2 (n2 segments; with --split an 80-byte write first, like the TLS Finished before the request) and waits for a
- * 1-byte reply. This is the shape of a resumed TLS 1.3 client: ClientHello (burst 1), server flight, Finished + request (burst 2).
+ * One connection per (n1, n2, repetition). The client writes flight 1 (n1 full segments; its first 12 bytes carry the sizes) and waits
+ * for a 100-byte reply, which acknowledges all of flight 1, so that nothing is in flight. It then reads TCP_INFO (snd_cwnd is the window
+ * the kernel has grown), writes flight 2 (n2 segments; with --split an 80-byte write comes first, as the TLS Finished precedes the
+ * request) and waits for a 1-byte reply. This is the sequence of a resumed TLS 1.3 client: ClientHello, server flight, Finished + request.
  *
- * CSV on stdout: n1,n2,rep,split,snd_mss,cwnd0,cwnd_pre2,ssthresh,unacked_pre2,t_b1_ms,t_b2_ms,cwnd_end,retrans,rtt_us,err
+ * CSV on standard output, one row per connection:
+ *   n1, n2, rep, split     flight sizes in segments, repetition number, whether flight 2 was preceded by the small write
+ *   snd_mss, cwnd0         segment size and window right after the connection is established
+ *   cwnd_pre2, ssthresh, unacked_pre2   window, slow-start threshold and unacknowledged segments just before flight 2
+ *   t_b1_ms, t_b2_ms       time from writing a flight to receiving its reply, in ms
+ *   cwnd_end, retrans, rtt_us           window at the end, retransmitted segments, smoothed RTT
+ *   err                    empty, or the step that failed
  */
 #define _GNU_SOURCE
 #include <arpa/inet.h>
@@ -28,15 +34,18 @@
 #include <time.h>
 #include <unistd.h>
 
+/* HDR: bytes of flight 1 that tell the server the three sizes (flight 1, flight 2, reply 1). REPLY1: size of the first reply. */
 #define HDR 12
 #define REPLY1 100
 
+/* Monotonic time in milliseconds. */
 static double now_ms(void) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
 
+/* Read exactly n bytes; -1 if the connection ends or fails first. */
 static int rd_all(int fd, void *buf, size_t n) {
     size_t got = 0;
     while (got < n) {
@@ -47,6 +56,7 @@ static int rd_all(int fd, void *buf, size_t n) {
     return 0;
 }
 
+/* Write all n bytes; -1 on failure. */
 static int wr_all(int fd, const void *buf, size_t n) {
     size_t put = 0;
     while (put < n) {
@@ -57,6 +67,7 @@ static int wr_all(int fd, const void *buf, size_t n) {
     return 0;
 }
 
+/* Parse a comma-separated list of integers into out (at most max values); returns their number. */
 static int listen_sock(const char *addr, const char *port) {
     const int server = 1;
     struct addrinfo hints, *res, *p;
@@ -81,6 +92,7 @@ static int listen_sock(const char *addr, const char *port) {
     return fd;
 }
 
+/* Serve one connection at a time: read the sizes and flight 1, send reply 1, read flight 2, send one byte. */
 static int run_server(const char *bind_addr, const char *port, int nodelay) {
     int lfd = listen_sock(bind_addr, port);
     if (lfd < 0) { perror("tcp_flight: bind"); return 1; }
@@ -112,6 +124,7 @@ static int list(const char *s, int *out, int max) {
     return n;
 }
 
+/* Run every combination of n1, n2 and repetition on a fresh connection and print one CSV row for each. */
 static int run_client(const char *addr, const char *port, const char *n1s, const char *n2s, int reps, int split, int mss_req,
                       int delay_ms, int nodelay) {
     int n1[128], n2[128];

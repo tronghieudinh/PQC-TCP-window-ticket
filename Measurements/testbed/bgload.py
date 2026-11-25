@@ -13,6 +13,7 @@ WORKER = os.path.join(HERE, "bgload_worker.py")
 
 
 def parse(spec):
+    """PQC_LOAD specification 'udp=40,tcp=10x2,cpu=all' as a dictionary {kind: value}."""
     d = {}
     for part in [p for p in spec.split(",") if p]:
         k, _, v = part.partition("=")
@@ -21,6 +22,7 @@ def parse(spec):
 
 
 def _spawn(cmd, wait_ready):
+    """Start a load process; with wait_ready, wait until it prints READY (its sockets are open)."""
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if wait_ready:
         line = p.stdout.readline().strip()
@@ -31,6 +33,9 @@ def _spawn(cmd, wait_ready):
 
 
 def start(tb, spec):
+    """Start the load of the specification inside the namespaces of testbed tb (receivers first, then senders) and wait 1 s.
+    Returns a handle for stop(), or None without a specification or on the physical testbed.
+    """
     if not spec or getattr(tb, "physical", False):
         return None
     s = parse(spec)

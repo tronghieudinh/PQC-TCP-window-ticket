@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G10: the ticket tests of L1 on Go's crypto/tls (stage C: client window; stage D: ticket with the server's first flight). See README.md.
+# Scenario G10, Go server: the ticket tests of the paper on Go's crypto/tls (stage C: client window; stage D: ticket sent with the
+# server's first flight). See README.md.
 #   ./run.sh [--only-suite "SUITE1,SUITE2" (measure only those suites of the cells: a re-run)] [--stage C|D|CD] [--probe PATH] [--limit N (only the first N calls: smoke test)] [--no-calibration-check] [scenario_lib options: --n N --label L --yes --dry-run --preflight-only --cpus ...]
 # Any machine with netns/tc/root and the Go probe built (testbed/build_go_probe.sh). The cells are those of testbed/results/g10_go_cells.json (fixed with the predictions).
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"

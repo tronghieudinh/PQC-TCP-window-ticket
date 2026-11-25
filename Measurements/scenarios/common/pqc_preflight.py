@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""pqc_preflight.py - what device is this, how is it configured, what state is it in, and may this scenario run on it?
+"""pqc_preflight.py - which device this is, how it is configured, what state it is in, and whether a scenario may run on it.
 
-Run before EVERY measurement run (the scenario runners call it; nothing is measured if it reports FAIL).
-Standard library only.
+The scenario runners call it before every measurement run; nothing is measured if it reports FAIL. Standard library only.
 
   pqc_preflight.py [--scenario scenario.json] [--out preflight.json] [--phase before|after] [--data-root DIR]
                    [--android SERIAL | --android auto] [--expect CLASS] [--json] [--quiet]
 
-Three parts, each recorded in the JSON and printed:
-  identity  which device: host name, machine-id hash, model (DMI / device tree / Android props), CPU, kernel, OS, virtualisation,
-            matched profile from devices.json (gx10 | x250 | dell7760 | i9-10900 | android-phone | unknown)
-  config    how it is set up: governor, turbo, SMT, mitigations, TCP sysctls, tool versions, OpenSSL, NIC offload, git commit
-  state     what it is doing now: load, users logged in, top CPU users, temperature, frequency vs maximum, power, free disk and memory,
-            clock sync, leftover test namespaces / processes, certificates (key matches certificate), binaries up to date,
-            pre-registered predictions committed and pushed
-
-Then each check is ok / warn / fail. A scenario manifest (scenario.json) adds requirements: device classes, root, capabilities, tools,
-prediction files. Exit status: 0 = may run (ok or warnings), 3 = FAIL (do not run), 2 = bad usage.
+Three groups of facts, recorded in the JSON file and printed:
+  identity  which device: host name, hash of the machine id, model (DMI, device tree or Android properties), CPU, kernel, operating
+            system, virtualization, and the matching profile of devices.json (device class)
+  config    how it is set up: CPU frequency governor, turbo, SMT, security mitigations, TCP settings (sysctl), tool versions, OpenSSL,
+            network cards, git commit
+  state     what it is doing now: load, logged-in users, busiest processes, temperature, frequency relative to the maximum, power,
+            free disk space and memory, time synchronization, leftover test namespaces and processes, whether the test keys match the
+            certificates, whether the binaries are up to date, whether the prediction files are committed and pushed
+Each check is ok, warn or fail. A scenario file (scenario.json) adds requirements: device classes, root, capabilities, tools and
+prediction files, which must be fixed in the repository before the measurement.
+Exit status: 0 the scenario may run (possibly with warnings), 3 FAIL (do not run), 2 wrong usage.
 """
 import argparse, datetime, getpass, glob, hashlib, json, os, platform, re, shlex, shutil, subprocess, sys, time
 
@@ -39,6 +39,7 @@ def run(cmd, timeout=8, shell=False):
 
 
 def rd(path, default=""):
+    """Content of a (system) file without surrounding white space, or `default` if it cannot be read."""
     try:
         with open(path, errors="replace") as f:
             return f.read().strip()
@@ -47,23 +48,28 @@ def rd(path, default=""):
 
 
 def first_line(s):
+    """First line of a string, or the empty string."""
     return s.splitlines()[0] if s else ""
 
 
 class Report:
+    """The list of check results."""
     def __init__(self):
         self.checks = []
 
     def add(self, cid, level, msg):
+        """Record one check: identifier, level (ok, warn, fail) and message."""
         self.checks.append({"id": cid, "level": level, "msg": msg})
 
     def worst(self):
+        """Overall result: the most severe level among the checks."""
         lv = [c["level"] for c in self.checks]
         return FAIL if FAIL in lv else WARN if WARN in lv else OK
 
 
 # ------------------------------------------------------------------ identity
 def load_profiles():
+    """Device profiles of devices.json next to this file (empty if there is none)."""
     try:
         with open(os.path.join(HERE, "devices.json")) as f:
             return json.load(f)["profiles"]
@@ -72,6 +78,7 @@ def load_profiles():
 
 
 def host_identity():
+    """Facts that identify the machine: names, hardware model, CPU, kernel, operating system, virtualization."""
     d = {}
     d["hostname"] = platform.node()
     d["user"] = getpass.getuser()
@@ -112,6 +119,7 @@ def host_identity():
 
 
 def match_profile(ident, profiles):
+    """The most specific device profile whose architecture and text patterns all match, or None."""
     hay = " ".join([ident.get("cpu_model", ""), " ".join(ident.get("cpu_models_all", [])), ident.get("dmi_product", ""),
                     ident.get("dmi_board", ""), ident.get("devicetree_model", ""), ident.get("hostname", "")]).lower()
     best = None
@@ -137,10 +145,12 @@ def cpu_topology():
 
 
 def sysctl(name):
+    """Value of a kernel parameter, read from /proc/sys."""
     return rd("/proc/sys/" + name.replace(".", "/"))
 
 
 def tool_version(cmd):
+    """First line of the version output of a program, or the empty string if it is not installed."""
     exe = shutil.which(cmd[0])
     if not exe:
         return ""
@@ -148,6 +158,7 @@ def tool_version(cmd):
 
 
 def ossl_info():
+    """The OpenSSL of the measurement (PQC_OPENSSL, default ~/opt/openssl-3.5): directory, program and version."""
     root = os.environ.get("PQC_OPENSSL") or os.path.expanduser("~/opt/openssl-3.5")
     exe = os.path.join(root, "bin", "openssl")
     env = dict(os.environ, LD_LIBRARY_PATH=os.path.join(root, "lib") + ":" + os.path.join(root, "lib64"))
@@ -159,6 +170,7 @@ def ossl_info():
 
 
 def git_info():
+    """Commit, branch and uncommitted files of the repository."""
     def g(*a):
         return run(["git", "-C", REPO] + list(a))
     st = g("status", "--porcelain")
@@ -169,6 +181,7 @@ def git_info():
 
 
 def nic_info():
+    """Name, state, MTU and speed of up to eight physical network interfaces."""
     nics = []
     for p in sorted(glob.glob("/sys/class/net/*")):
         n = os.path.basename(p)
@@ -179,6 +192,7 @@ def nic_info():
 
 
 def host_config():
+    """All configuration facts of the machine (see the module docstring)."""
     c = {}
     c["cpus"] = cpu_topology()
     govs = sorted({x["gov"] for x in c["cpus"] if x["gov"]})
@@ -203,6 +217,7 @@ def host_config():
 
 # ------------------------------------------------------------------ state
 def host_state(data_root):
+    """The current state of the machine; data_root is the directory whose free space is reported."""
     s = {"time": datetime.datetime.now().astimezone().isoformat(timespec="seconds")}
     la = rd("/proc/loadavg").split()
     s["load"] = [float(x) for x in la[:3]] if len(la) >= 3 else []
@@ -247,7 +262,9 @@ def host_state(data_root):
 
 
 def cert_state(depth_algs=(("ECDSA-P256", 1), ("ML-DSA-65", 1), ("ML-DSA-65", 3))):
-    """Does the private key match the certificate? (the earlier 'key values mismatch' incident: certs.sh regenerates keys, git restores old .pem)."""
+    """Does each private test key match its certificate? Checked for a few algorithms and depths. certs.sh creates new keys and
+    certificates, while a git checkout can restore older .pem files, so the two can differ.
+    """
     root = os.environ.get("PQC_CERTS") or os.path.join(MEAS, "certs")
     oi = ossl_info()
     res = {"dir": root, "pairs": []}
@@ -257,6 +274,7 @@ def cert_state(depth_algs=(("ECDSA-P256", 1), ("ML-DSA-65", 1), ("ML-DSA-65", 3)
     env = dict(os.environ, LD_LIBRARY_PATH=os.path.join(oi["root"], "lib") + ":" + os.path.join(oi["root"], "lib64"))
 
     def pub(args):
+        """Output of the measurement openssl for the arguments (empty on failure)."""
         try:
             return subprocess.run([oi["exe"]] + args, capture_output=True, text=True, timeout=10, env=env).stdout.strip()
         except Exception:
@@ -275,6 +293,7 @@ def cert_state(depth_algs=(("ECDSA-P256", 1), ("ML-DSA-65", 1), ("ML-DSA-65", 3)
 
 
 def binaries_state():
+    """Is the measurement binary built, newer than its sources and linked against the OpenSSL in use?"""
     arch = platform.machine()
     root = os.environ.get("PQC_OPENSSL") or os.path.expanduser("~/opt/openssl-3.5")
     bindir = run(["make", "-s", "-C", TESTBED, "print-bin", "PQC_OPENSSL=" + root]).strip() or os.path.join("bin", arch)
@@ -301,7 +320,9 @@ def binaries_state():
 
 
 def prediction_state(files):
-    """Pre-registration: each file must exist, be tracked, unmodified, and (as far as the local refs show) contained in the upstream branch."""
+    """State of each prediction file: it must exist, be tracked by git, be unmodified and, as far as the local references show, be
+    contained in the upstream branch, so that the predictions were fixed before the measurement.
+    """
     out = []
     for f in files:
         p = f if os.path.isabs(f) else os.path.join(TESTBED, f)
@@ -322,11 +343,13 @@ def prediction_state(files):
 
 # ------------------------------------------------------------------ Android (adb)
 def adb(serial, *args, timeout=15):
+    """Output of an adb command for one phone."""
     cmd = ["adb"] + (["-s", serial] if serial else []) + list(args)
     return run(cmd, timeout=timeout).replace("\r", "")
 
 
 def adb_devices():
+    """(serial, state) of the phones that adb lists."""
     out = run(["adb", "devices"], timeout=10)
     res = []
     for line in out.splitlines()[1:]:
@@ -337,6 +360,7 @@ def adb_devices():
 
 
 def android_collect(serial):
+    """Identity, configuration and state of an Android phone, read over adb."""
     sh = lambda c: adb(serial, "shell", c)
     gp = lambda k: sh("getprop " + k)
     ident = {"serial_hash": hashlib.sha256(serial.encode()).hexdigest()[:10], "model": gp("ro.product.model"), "manufacturer": gp("ro.product.manufacturer"),
@@ -375,6 +399,9 @@ def android_collect(serial):
 
 # ------------------------------------------------------------------ evaluation
 def evaluate_host(rep, ident, prof, cfg, st, cert, binst, preds, man, expect, data_root):
+    """Turn the facts about a computer into checks (added to rep) according to the scenario requirements `man`: device class, root
+    rights, tools, OpenSSL version, build, certificates, prediction files, configuration and current state.
+    """
     cls = prof["class"] if prof else "unknown"
     rep.add("identity.profile", OK if prof else WARN, f"device matched as '{prof['label']}' (class {cls})" if prof else
             f"no profile in devices.json matches this machine ({ident['cpu_model']}); treated as class 'unknown'")
@@ -508,6 +535,7 @@ def evaluate_host(rep, ident, prof, cfg, st, cert, binst, preds, man, expect, da
 
 
 def evaluate_android(rep, ident, cfg, st, man, expect):
+    """The corresponding checks for an Android phone (software, battery, temperature, files on the phone)."""
     allowed = (man or {}).get("device_classes") or ([expect] if expect else [])
     if allowed and "android" not in allowed and "any" not in allowed:
         rep.add("identity.scenario", FAIL, f"scenario is for {allowed}, not an Android phone")
@@ -547,6 +575,7 @@ SYM = {OK: " ok ", WARN: "WARN", FAIL: "FAIL"}
 
 
 def print_report(rep, ident, cfg, st, phase, android):
+    """Print the summary and every check that is not ok (all checks with PQC_PREFLIGHT_VERBOSE)."""
     p = lambda *a: print(*a, file=sys.stderr)
     p(f"== preflight ({phase}) {st['time']} ==")
     if android:
@@ -569,6 +598,7 @@ def print_report(rep, ident, cfg, st, phase, android):
 
 
 def main():
+    """Parse the options, collect the facts, evaluate them, write the JSON record and return the exit status."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--scenario", help="scenario.json (requirements)")
     ap.add_argument("--out", help="write the full record here (JSON)")

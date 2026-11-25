@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G12: the ticket-timing test of L1 on new cells (other RTTs, other request sizes, n = 40). See README.md.
+# Scenario G12, the ticket-timing test of the paper on new cells (other round-trip times and request sizes, 40 transactions per cell).
+# A cell is one combination of suite, RTT, request size and response size. See README.md.
 #   ./run.sh [--limit N (only the first N calls: smoke test)] [scenario_lib options: --n N --label L --yes --dry-run --preflight-only --cpus ...]
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
 TB=$(cd "$HERE/../../../testbed" && pwd)
@@ -10,6 +11,7 @@ N=${SC_N:-40}
 D="$SC_RUNDIR/data"; mkdir -p "$D"
 RT=(python3 "$SC_TESTBED/run_testbed.py" --profile core --resume --depths 2 --rates 100 --mtus 1500 --icws 10 --n "$N")
 sc_tune_on
+# PLAN: one line per testbed call, "RTT request response suite,suite,...", from the cells fixed in results/g12_cells.json.
 PLAN=$(python3 - "$TB/results/g12_cells.json" <<'PY'
 import json, sys
 g = {}

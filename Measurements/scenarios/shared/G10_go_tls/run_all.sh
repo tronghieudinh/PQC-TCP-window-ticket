@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# G10 in one call, on ANY measuring machine (X250 first): build the Go probe, check that its write pattern equals the calibrated one, preflight, measure, analyse.
+# Scenario G10 (Go server) in one call, on any measurement machine: build the Go probe, check that its write pattern equals the calibrated one, preflight, measure, analyse.
 # Run it inside tmux (about 2 hours with n = 30):
 #   ./run_all.sh                   # everything
 #   ./run_all.sh --smoke           # 3 calls, n = 3, label smoke: checks that the chain works (a few minutes); its data are not the measurement
@@ -19,6 +19,7 @@ CERTS=${PQC_CERTS:-}; N=30; DRY=0; SMOKE=0; INSTALL=""; STAGE=CD; LABEL=""; CPUS
 while [ $# -gt 0 ]; do case "$1" in
   --certs) CERTS=$2; shift;; --n) N=$2; shift;; --dry-run) DRY=1;; --smoke) SMOKE=1;; --install-go) INSTALL=--install-go;; --stage) STAGE=$2; shift;; --label) LABEL=$2; shift;; --cpus) CPUS=$2; shift;; --only-suite) ONLY=$2; shift;; --quiet-services) QUIET=--quiet-services;;
   -h|--help) sed -n '2,10p' "${BASH_SOURCE[0]}"; exit 0;; *) echo "unknown option: $1"; exit 2;; esac; shift; done
+# Certificates (default locations), state file of finished machines and log file.
 if [ -z "$CERTS" ]; then for c in "$HOME/meas_copy/certs" "$HOME/pqc_certs_local/certs"; do [ -d "$c/ML-DSA-65/d1" ] && { CERTS=$c; break; }; done; fi
 export PQC_CERTS=$CERTS
 HOST=$(hostname -s); STATE=$HOME/pqc_measurements/G10_state_$HOST.tsv; mkdir -p "$(dirname "$STATE")"; touch "$STATE"
@@ -49,7 +50,7 @@ say "=== G10: run ${ARGS[*]} (stage $STAGE) ==="
 dir=$(grep -o "record in [^ ]*" /tmp/g10_run_$HOST.log | tail -1 | cut -d' ' -f3)
 [ -z "$dir" ] && dir=$(grep -o "run directory: [^ ]*" /tmp/g10_run_$HOST.log | tail -1 | cut -d' ' -f3)
 if [ "$SMOKE" = 1 ]; then
-  # the smoke run must have produced rows, with an empty err and reused = 1, for EVERY suite in its calls (a missing suite once went unnoticed: group name of the ECDSA suites)
+  # the smoke run must have produced rows, with an empty err and reused = 1, for every suite in its calls
   python3 - "$dir/data" <<'PY' || { say "SMOKE FAILED: see above; nothing else was measured"; exit 1; }
 import csv, os, sys, collections
 d = sys.argv[1]; bad = 0

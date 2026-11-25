@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# G13-lite preflight: checks the pair of machines before the run. Run it on the CLIENT host; nothing is changed except two short ping tests and the test addresses it adds and removes.
+# Real-link scenario (G13-lite), preflight: checks the pair of machines before the run. Run it on the client host; nothing is changed
+# except for the test addresses that it adds for a short ping test and removes again.
 #   PHYS_SERVER=user@host PHYS_IFC=nic_here PHYS_IFS=nic_there bash preflight_phys.sh
 set -u
 : "${PHYS_SERVER:?set PHYS_SERVER (user@host of the server host)}" "${PHYS_IFC:?set PHYS_IFC}" "${PHYS_IFS:?set PHYS_IFS}"

@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
-"""
-analyze_trace.py - what the SERVER's TCP did in a traced transaction (tcp:tcp_probe), paper 2, WP6 B1.
+"""analyze_trace.py - what the server's TCP did in a traced transaction (kernel tracepoint tcp:tcp_probe).
 
-    python3 analyze_trace.py results/trace_window/*.trace.txt [--mss 1440] [--port 4433]
-
-tcp_probe fires when a socket receives a segment and prints the state of the RECEIVING socket. Lines whose destination port is the server's
-port therefore show the server's own snd_cwnd, snd_una and snd_nxt each time a client segment (data or ACK) arrives.
-NOTE (corrected 2026-11-02): tcp_probe prints the address of the RECEIVING socket as `src` (its local end) and the sender as `dest`. The server's state is
-therefore on the lines whose `src` port is the server port; the lines whose `dest` port is the server port show the CLIENT's state. Use --side to choose. For every server
-connection it reports the peak number of segments in flight (snd_nxt - snd_una, in segments of --mss) and the largest snd_cwnd seen, and the
-sequence of distinct cwnd values with the time (ms from the first segment). Connections come in pairs (full transaction that obtains the
-ticket, then the resumed one): the resumed ones are marked R. The peak in flight of the RESPONSE is the window the server really had when it
-sent the response, if the response was larger than the window.
+    python3 analyze_trace.py results/trace_window/*.trace.txt [--mss 1440] [--port 4433] [--side server|client]
+tcp_probe fires when a socket receives a segment and prints the state of the receiving socket: `src` is its local end and `dest` the
+sender. The server's state is therefore on the lines whose source port is the server port; lines whose destination port is the server
+port show the client's state (--side selects). For every connection the script finds the peak number of segments in flight
+(snd_nxt - snd_una, in units of --mss), the largest snd_cwnd and the sequence of distinct cwnd values with their time (ms from the first
+segment). Connections come in pairs (a full transaction that obtains the ticket, marked F, then the resumed one, marked R). The peak in
+flight of the response is the window the server really had, if the response was larger than the window.
 """
 import argparse, collections, re, statistics as st, sys
 
+# fields of a tcp_probe line: time, addresses and ports, data length, snd_nxt, snd_una, cwnd, ssthresh
 LINE = re.compile(r"\s(\d+\.\d+): tcp_probe: .*?src=\[?([0-9a-f:.]+)\]?:(\d+) dest=\[?([0-9a-f:.]+)\]?:(\d+) .*?data_len=(\d+) snd_nxt=0x([0-9a-f]+) snd_una=0x([0-9a-f]+) snd_cwnd=(\d+) ssthresh=(\d+)")
 
 
 def parse(path, port, side="server"):
+    """{peer port: [(time s, data length, bytes in flight, cwnd)]} of the sockets of one side."""
     conns = collections.OrderedDict()
     for line in open(path, errors="ignore"):
         m = LINE.search(line)
@@ -34,6 +32,7 @@ def parse(path, port, side="server"):
 
 
 def main():
+    """Print the summary of every trace file."""
     ap = argparse.ArgumentParser()
     ap.add_argument("files", nargs="+")
     ap.add_argument("--mss", type=int, default=1440)

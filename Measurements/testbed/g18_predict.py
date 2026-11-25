@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""
-g18_predict.py - pre-registration of scenario G18: a test of the pipelined (partial-flight) variant of the model on Go's crypto/tls with new cells.
+"""g18_predict.py - predictions for scenario G18: a test, on new cells, of the pipelined (partial-flight) variant of the model on Go's
+crypto/tls.
 
-Background: in G10 the model of L1 (a flight is complete before the next step) was wrong on all 20 ML-DSA-87 cells, always a round trip too slow, because Go's first
-server flight for ML-DSA-87 (17 715 B, 13 segments) is longer than the window of ten and the client answers after the first ten segments. A variant formulated AFTER seeing
-the data (`g10_posthoc_pipeline.py`: the client waits only for the first w = 10 segments of that flight) brought the wrong cells from 20 to 1. G18 tests that variant on cells that were
-not used to find it: ML-DSA-87 at RTT 30, 50 and 200 ms (G10: 100 ms only), requests of 302, 6 000, 12 000 and 19 460 B, responses of 3, 6, 9 and 12 segments (48 cells);
-controls: ML-DSA-65, whose first flight (13 351 B, 9.3 segments) fits the window, so both variants must agree, at RTT 30 and 200 ms, requests 302 and 19 460 B, responses of 3, 6 and 9 segments (12 cells).
-Go crypto/tls, certificate depth 1 (the depth of the calibration), mutual TLS, resumed, 100 Mbit/s, MTU 1500, initial window 10, Reno, quickack, n = 30 per cell.
-Predictions (latency without CPU): the pre-registered 'go' model of G10 (first-flight ticket, flight complete before the next step) and the pipelined variant.
+In scenario G10 the paper's model (a flight is complete before the next step) was wrong on all 20 ML-DSA-87 cells, always one round trip
+too slow, because Go's first server flight for ML-DSA-87 (17 715 bytes, 13 segments) is longer than the window of ten and the client
+answers after the first ten segments. The variant formulated after seeing the data (g10_posthoc_pipeline.py) reduced the wrong cells
+from 20 to 1. G18 tests it on cells not used to find it: ML-DSA-87 at RTT 30, 50 and 200 ms (G10: 100 ms only), requests of 302, 6000,
+12 000 and 19 460 bytes, responses of 3, 6, 9 and 12 segments (48 cells); controls: ML-DSA-65, whose first flight (13 351 bytes) fits
+the window, so both models must agree (12 cells). Certificate depth 1 (that of the calibration), mutual TLS, resumed, 100 Mbit/s,
+MTU 1500, initial window 10, Reno, quickack, 30 transactions per cell. Predicted latencies exclude CPU time.
 
-  g18_predict.py [--force]   writes results/g18_predictions.csv and results/g18_cells.json; refuses to overwrite (pre-registered)
+    g18_predict.py [--force]     writes results/g18_predictions.csv and g18_cells.json
+Predictions are written before the measurement: the script refuses to overwrite existing files (--force only to redo deliberately).
 """
 import csv, hashlib, json, os, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -18,11 +19,13 @@ sys.path.insert(0, HERE)
 import go_predict as G  # noqa: E402
 import g10_posthoc_pipeline as P  # noqa: E402
 
+# (suite, RTTs in ms, request sizes in bytes, response sizes in segments)
 CELLS87 = [("ML-DSA-87|ML-KEM-1024", [30, 50, 200], [302, 6000, 12000, 19460], [3, 6, 9, 12])]
 CELLS65 = [("ML-DSA-65|ML-KEM-768", [30, 200], [302, 19460], [3, 6, 9])]
 
 
 def predict(cal, su, rq, rs, rtt):
+    """(latency of the earlier "go" model, latency of the pipelined variant) in ms for one cell."""
     G.NET["rtt"] = rtt
     go = G.latency(G.go_flow(cal[su], rq, rs, "go"), cwnd_validation=True)
     pp = G.latency(P.pipelined_flow(cal[su], rq, rs), cwnd_validation=True)
@@ -30,6 +33,7 @@ def predict(cal, su, rq, rs, rtt):
 
 
 def main():
+    """Write the predictions and the testbed calls and print checksums of the inputs and outputs."""
     res = os.path.join(HERE, "results")
     pp_, pc = os.path.join(res, "g18_predictions.csv"), os.path.join(res, "g18_cells.json")
     if (os.path.exists(pp_) or os.path.exists(pc)) and "--force" not in sys.argv:

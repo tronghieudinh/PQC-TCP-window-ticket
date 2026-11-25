@@ -6,6 +6,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"   # absolute: later steps cd elsewhere
 cd "$HERE"
+# OSSL_VER: OpenSSL release to build. PREFIX: where it is installed (PQC_OPENSSL overrides).
 OSSL_VER=${OSSL_VER:-3.5.4}
 PREFIX=${PQC_OPENSSL:-$HOME/opt/openssl-3.5}
 
@@ -45,8 +46,8 @@ make -C "$HERE" PQC_OPENSSL="$PREFIX"      # ONE multi-call binary bin/<arch>/pq
 
 echo "== certificates (real DER chains, depth 1-4; takes a few minutes, SLH-DSA is slow)"
 # the repository holds the .pem files but NOT the private test keys (*.key are git-ignored): test the key
-# SKIP_CERTS=1: do not touch ../certs (its .pem files are tracked by git; certs.sh overwrites them). Generate the certificates in a COPY of
-# Measurements and point PQC_CERTS at it (see scenarios/mint/RUNBOOK_I9_VA_GX10.md, phase 1).
+# SKIP_CERTS=1: do not touch ../certs (its .pem files are tracked by git; certs.sh overwrites them). Generate the certificates in a copy of
+# the directory Measurements and point PQC_CERTS at it.
 if [ "${SKIP_CERTS:-0}" = 1 ]; then echo "skipped (SKIP_CERTS=1): use PQC_CERTS=<copy>/certs"
 elif [ ! -f ../certs/ML-DSA-65/d4/server.key ] || [ ! -f ../certs/ECDSA-P256/d4/server.key ]; then
   (cd "$HERE/.." && ./certs.sh)      # regenerates all keys and certificates (overwrites the committed .pem files)

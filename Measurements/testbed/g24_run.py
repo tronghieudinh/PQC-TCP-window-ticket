@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
-"""g24_run.py - measures the cells of results/g24_cells.csv with the kernel probe ticket_ack2.bt and the capture of the server's link (root; called by run_g24.sh).
+"""g24_run.py - measure the server's congestion window in selected cells of the random design (root; called by run_g24.sh).
+
+The cells of results/g24_cells.csv are the configurations among 100 random ones in which a server window larger than 10 segments would
+save a round trip (group U), plus control cells (group K). Resumed TLS 1.3 with mutual authentication.
+
     sudo python3 g24_run.py --out DIR --rep a --n 30 [--cells 10,32]
-Per cell: DIR/base_g24<rep>_c<cell>/ (unshaped link, no probe, n = 10) and DIR/trace_g24<rep>_c<cell>_doff_m<mtu>/ (shaped, probe and capture, n transactions)."""
+
+For every cell:
+  DIR/base_g24<rep>_c<cell>/               base run on an unshaped link without probe (n = 10): time spent outside the network
+  DIR/trace_g24<rep>_c<cell>_doff_m<mtu>/  shaped run with the kernel probe ticket_ack2.bt and a capture of the server's interface
+Analysis: analyze_g24.py (registered criteria) and analyze_g24_posthoc.py.
+"""
 import argparse, csv, os, shutil, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import trace_run as TR
@@ -9,6 +18,7 @@ import tbnet
 
 
 def main():
+    """Run the base and the traced measurement of every selected cell, replacing earlier output of the same repetition."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True); ap.add_argument("--rep", default="a"); ap.add_argument("--n", type=int, default=30); ap.add_argument("--cells", default="")
     a = ap.parse_args()

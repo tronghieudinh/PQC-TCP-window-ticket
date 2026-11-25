@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
-"""
-analyze_rwnd.py - is the MTU 9000 anomaly a receive-window limit? (paper 2, WP6 B5b). No root.
+"""analyze_rwnd.py - is the deviation at MTU 9000 a limit of the receive window?
 
     python3 analyze_rwnd.py [--dir results]
-
-Hypothesis H_rwnd (pre-registered in results/wp6_pred_mtu9000_rwnd.txt): with the default initial receive buffer (tcp_rmem[1] = 131072 bytes) the receiver advertises about
-63,000 bytes, which is 7 segments of 8,940 bytes at MTU 9000 (against 45 at MTU 1500), below the congestion window of 10; the sender is then limited by the receive window, not
-by cwnd, `tcp_is_cwnd_limited` is false and the window does not grow by the rule. With tcp_rmem[1] raised (default 131072 -> 1048576) the MTU 9000 behaviour should follow the
-closed form max(w0, min(w0 + n, 2n)) and the model of the TLS cells.
-Reads results/rwnd_default/slack.csv and results/rwnd_large/slack.csv (run_slack.py stage A, configurations base and mtu9000), their tcp_probe traces (snd_wnd) and, for the TLS
-cells, results/resume_summary_wp6_mtu9000_{default,large}.csv with results/wp6_pred_gen.csv. Prints the evidence and a verdict.
+Hypothesis, fixed beforehand (results/wp6_pred_mtu9000_rwnd.txt): with the default initial receive buffer (tcp_rmem[1] = 131 072
+bytes) the receiver advertises about 63 000 bytes, which is 7 segments of 8 940 bytes at MTU 9000 (45 at MTU 1500), below the
+congestion window of 10; the sender is then limited by the receive window, tcp_is_cwnd_limited is false and the window does not grow by
+the rule. With a larger initial buffer (1 048 576) the behavior at MTU 9000 should follow max(w0, min(w0 + n, 2n)) and the model of the
+TLS cells.
+Reads results/rwnd_default/ and results/rwnd_large/ (run_slack.py stage A, configurations base and mtu9000, with their tcp_probe traces
+for the advertised window) and, for TLS, results/resume_summary_wp6_mtu9000_{default,large}.csv with results/wp6_pred_gen.csv.
+Prints the evidence and a verdict.
 """
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import argparse, collections, csv, os, re, statistics as st
 
 def closed(n, w0=10):
+    """The window rule: window after a flight of n segments with initial window w0."""
     return max(w0, min(w0 + n, 2 * n))
 
 def stage_a(path):
+    """{configuration: {flight size: measured windows}} of the stage-A rows of a plain-TCP run."""
     if not os.path.exists(path):
         return {}
     out = collections.defaultdict(lambda: collections.defaultdict(list))
@@ -27,6 +29,7 @@ def stage_a(path):
     return out
 
 def share(cfgd):
+    """(flight sizes whose median window follows the rule, flight sizes)."""
     ok = tot = 0
     for n, v in cfgd.items():
         m = st.median(v)
@@ -34,12 +37,14 @@ def share(cfgd):
     return ok, tot
 
 def wnd(path):
+    """The three most frequent advertised windows (snd_wnd, bytes) in a tcp_probe trace."""
     if not os.path.exists(path):
         return None
     c = collections.Counter(re.findall(r"snd_wnd=(\d+)", open(path, errors="ignore").read()))
     return c.most_common(3)
 
 def tls(summ, pred):
+    """Per model: (mean absolute error, cells off by more than 50 ms, cells) over the TLS cells at MTU 9000."""
     if not (os.path.exists(summ) and os.path.exists(pred)):
         return None
     f = float
@@ -55,6 +60,7 @@ def tls(summ, pred):
     return res
 
 def main():
+    """Print the plain-TCP and TLS evidence for both buffer settings and the verdict."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "results"))
     a = ap.parse_args()

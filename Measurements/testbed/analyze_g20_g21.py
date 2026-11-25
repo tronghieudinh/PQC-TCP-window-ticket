@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""analyze_g20_g21.py - criteria S1-S2 (G20) and T1-T2 (G21) of results/phase2_predictions.md.
-    python3 analyze_g20_g21.py --exp g20|g21 --run DIR [--out FILE]      DIR holds the csv files written by the run.sh of the scenario
-G20: excess of each of three cells (BBR) = median shaped - median base, against the value of G14 (results/g14/bbr/nst_tls.csv).
-     S1 each of the three is within 5 ms of its G14 value;  S2 each has at least 190 valid shaped transactions
-G21: per cell (n = 1000): median, P90, P95, P99, P99.9, maximum of t_total_ms on the shaped link.
-     T1 in every cell at most 1 % of the transactions exceed the median by more than 20 ms;  T2 every cell has at least 950 valid transactions
+"""analyze_g20_g21.py - criteria S1-S2 (resampling, scenario G20) and T1-T2 (latency tail, scenario G21), fixed before the measurements
+(results/phase2_predictions.md).
+
+    python3 analyze_g20_g21.py --exp g20|g21 --run DIR [--out FILE]      DIR holds the CSV files written by the run.sh of the scenario
+G20: the excess latency of each of three BBR cells (median shaped minus median unshaped), compared with its value in G14
+     (results/g14/bbr/nst_tls.csv). S1: each of the three within 5 ms of that value; S2: each at least 190 valid transactions.
+G21: per cell (1000 transactions): median, percentiles 90, 95, 99 and 99.9 and maximum of the total time on the shaped link.
+     T1: in every cell at most 1 % of the transactions exceed the median by more than 20 ms; T2: every cell at least 950 valid ones.
 """
 import argparse, csv, glob, os, statistics as st
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -12,6 +14,7 @@ RES = os.path.join(HERE, "results")
 
 
 def rows(path):
+    """((suite, request, response), times on the unshaped link, times on the shaped link) of one single-cell CSV file."""
     base, shaped, key = [], [], None
     for r in csv.DictReader(open(path)):
         if r["err"] or r["reused"] != "1":
@@ -22,10 +25,12 @@ def rows(path):
 
 
 def pct(v, p):
+    """The p-th percentile of the values (nearest rank)."""
     v = sorted(v); i = min(len(v) - 1, max(0, int(round(p / 100 * len(v) + 0.5)) - 1)); return v[i]
 
 
 def g20(d):
+    """Report lines of G20 for a run directory."""
     ref = {}
     for r in csv.DictReader(open(os.path.join(RES, "g14", "bbr", "nst_tls.csv"))):
         pass
@@ -43,6 +48,7 @@ def g20(d):
 
 
 def g21(d):
+    """Report lines of G21 for a run directory."""
     lines, t1, t2 = ["G21 (tails, shaped link, ms)", "  cell                          valid  median   P90    P95    P99   P99.9    max  share > median + 20 ms"], [], []
     for f in sorted(x for x in glob.glob(os.path.join(d, "g21_*.csv")) if not x.endswith(".netem.csv")):
         k, b, s = rows(f)
@@ -54,6 +60,7 @@ def g21(d):
 
 
 def main():
+    """Run the chosen analysis and write the report."""
     ap = argparse.ArgumentParser(); ap.add_argument("--exp", required=True, choices=["g20", "g21"]); ap.add_argument("--run", required=True); ap.add_argument("--out", default="")
     a = ap.parse_args()
     lines = (g20 if a.exp == "g20" else g21)(os.path.expanduser(a.run))

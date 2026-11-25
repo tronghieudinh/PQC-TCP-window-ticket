@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Scenario G19b: the ECDSA-P256 cell of G19 that the early-ticket model got wrong, measured again (n = 200), and six cells that test the explanation found afterwards (ticket size). See README.md.
+# Scenario G19b, ticket size: the ECDSA-P256 cell of the random draw (G19) that the early-ticket model got wrong, measured again with
+# 200 transactions, and six cells that test the explanation found afterwards (the size of the ticket). See README.md.
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
 TB=$(cd "$HERE/../../../testbed" && pwd)
 sc_start "$HERE" "$@"
 D="$SC_RUNDIR/data"; mkdir -p "$D"
 sc_tune_on
+# PLAN: one line per testbed call, "response transactions", from results/g19b_cells.json.
 PLAN=$(python3 - "$TB/results/g19b_cells.json" <<'PY'
 import json, sys
 for c in json.load(open(sys.argv[1])):

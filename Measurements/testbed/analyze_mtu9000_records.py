@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""
-analyze_mtu9000_records.py - the MTU 9000 anomaly of the TLS cells is the write pattern of OpenSSL (paper 2, WP6 B5b). No root.
+"""analyze_mtu9000_records.py - the deviation of the TLS cells at MTU 9000 comes from the write pattern of OpenSSL.
 
     python3 analyze_mtu9000_records.py
 
-OpenSSL sends application data as one write() per TLS record of up to 16,384 bytes. With TCP_NODELAY, every record that ends in a partial segment leaves that partial segment at once if the
-window has room. At MTU 1500 a 16-KB record is 11.4 segments and the partial tail is small; at MTU 9000 it is 1.8 segments: a response flight shows 8,940, 7,466, 8,940, 7,466, ... bytes on the wire
-(server capture of the race run), so five records use ten segments of the window although they hold 82 KB, not 89 KB. The model option Model(app_records=True) writes the messages record by
-record. The option is off by default (Paper 1: its application messages are below one record in the validated cases, 0 of 32 flows differ). No parameter is fitted.
-Compares the resumed MTU-9000 cells of the receive-buffer test (default and raised tcp_rmem) and the 240 cells of the `gen` scenario with and without the option.
+OpenSSL writes application data with one write() per TLS record of up to 16 384 bytes. With TCP_NODELAY, every record that ends in a
+partial segment sends that segment at once if the window has room. At MTU 1500 a 16-KB record is 11.4 segments and the partial tail is
+small; at MTU 9000 it is 1.8 segments: a response flight shows 8 940, 7 466, 8 940, 7 466, ... bytes on the wire (server capture), so
+five records use ten segments of the window although they hold 82 KB, not 89 KB. The model option Model(app_records=True) writes the
+messages record by record; it is off by default (for application messages below one record it changes nothing). No parameter is fitted.
+Compares, with and without the option, the resumed MTU-9000 cells of the receive-buffer test (default and raised tcp_rmem) and the 240
+cells of the general configuration set ("gen").
 """
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import csv, os, statistics as st, sys
@@ -17,21 +18,25 @@ sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(HERE, "..", "..", "Sim
 import analyze_testbed as A  # noqa: E402
 import pqc_sim as S  # noqa: E402
 f = float
+# measured server window after the ticket, per suite (segments)
 WM = {"ECDSA-P256|X25519": 0, "ML-DSA-44|ML-KEM-768": 12, "ML-DSA-65|ML-KEM-768": 15}
 
 def pred(su, rq, rs, rtt, rate, mtu, flag, wm=0):
+    """Predicted excess latency (ms) of one resumed cell with app_records = flag and server window wm after the ticket (0 = default)."""
     flow = S.build_flow(su, A.probe_protocol("1", str(rq), str(rs), "2"), 2, "resumed", False, S.Model(app_records=flag))
     net = S.Net(rate, rtt, mtu, penalty_ms=0.0, thr=4, init_cwnd=10, cwnd_validation=True, segmentation="openssl", nst_early=True, srv_cwnd_acked=wm)
     m = S.run_flow(flow, net)
     return m["total"] - m["cpu"]
 
 def report(label, rows, wmeas=False):
+    """Print mean and largest error and the number of cells wrong by half an RTT, with and without the option."""
     for flag in (False, True):
         e = [pred(r["suite"], int(r["req"]), int(r["resp"]), f(r["rtt_ms"]), f(r["rate_mbps"]), int(r["mtu"]), flag, WM[r["suite"]] if wmeas else 0) - f(r["resumed_excess"]) for r in rows]
         w = sum(abs(x) > 0.5 * f(r["rtt_ms"]) for x, r in zip(e, rows))
         print(f"{label:48s} app_records={flag!s:5s}: n={len(e):3d}  MAE {st.mean(abs(x) for x in e):6.2f} ms  max {max(abs(x) for x in e):6.1f}  wrong by a round trip: {w}")
 
 def main():
+    """Report every available summary file and count the flows of other message sizes whose writes the option changes."""
     R = os.path.join(HERE, "results")
     for tag in ("default", "large"):
         p = os.path.join(R, f"resume_summary_wp6_mtu9000_{tag}.csv")

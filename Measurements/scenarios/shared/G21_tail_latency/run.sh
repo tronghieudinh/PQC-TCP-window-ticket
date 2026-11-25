@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G21: tail of the latency of six key cells, n = 1000 resumed transactions each (RTT 100 ms, 100 Mbit/s, MTU 1500, Reno, quickack). See README.md.
+# Scenario G21, latency tail: six key cells with 1000 resumed transactions each (RTT 100 ms, 100 Mbit/s, MTU 1500, Reno, quickack).
+# One output file per cell (g21_c1.csv .. g21_c6.csv). See README.md.
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
 sc_start "$HERE" "$@"
 N=${SC_N:-1000}

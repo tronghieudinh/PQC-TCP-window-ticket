@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
-"""
-go_predict.py - pre-registration of scenario G10: the ticket tests of L1 on a second TLS library (Go crypto/tls).
+"""go_predict.py - predictions for the Go server scenario (G10): the ticket tests of the paper on a second TLS library (Go crypto/tls).
 
-The model of L1 (Simulation/pqc_sim.py: segments, Linux window rule (1), one write() pattern per flight) is NOT changed. What is library-specific is its
-input: the sizes and the positions of the writes. For Go they are MEASURED, not assumed: results/go_calibration.json (go_calibrate.py: write() sizes of
-tls_probe_go on the loopback, one full and one resumed transaction per suite). The predictions below are a deterministic function of that file, of
-pqc_sim.py and of this script (sha256 of the three are printed and go into g10_go_predictions.md).
+The paper's model (Simulation/pqc_sim.py: segments, Linux window rule, one write pattern per flight) is not changed. Specific to a
+library is its input, the sizes and positions of the writes; for Go they are measured, not assumed: results/go_calibration.json
+(go_calibrate.py). The predictions are a deterministic function of that file, pqc_sim.py and this script (their checksums are printed).
+Ticket positions compared in stage D (the response after a resumed handshake):
+  go      the ticket is written with the server's first flight (what Go's source does when no client certificate is requested:
+          crypto/tls/handshake_server_tls13.go calls sendSessionTickets after the server's Finished, before reading the client's;
+          confirmed by the calibration: one write holds ServerHello .. Finished and the ticket)
+  joined  the ticket is written together with the response (the position the model started from, refuted for OpenSSL)
+Stage C (client window) compares the validated window rule with the rule loosened by two segments and with textbook slow start; the
+client's window is set by Go's ClientHello (which carries the ticket, and under mutual TLS Go's ticket holds the client's chain).
+Settings: latency without CPU time, RTT 100 ms, 100 Mbit/s, MTU 1500 (segment size 1440), initial window 10, mutual TLS, certificate depth
+of the calibration, four suites. A cell is wrong when the prediction is off by more than 50 ms.
 
-Two ticket positions are compared for every cell of stage D (the response flight after a resumed handshake):
-  go     the ticket is written with the server's first flight on the resumed connection (what Go's source does when no client certificate is requested:
-         crypto/tls/handshake_server_tls13.go, sendSessionTickets after the server Finished, before the client's Finished is read; confirmed by the
-         calibration: ONE write holding ServerHello ... Finished and the ticket);
-  joined the ticket is written together with the response (the position the model of L1 started from, before it was refuted for OpenSSL).
-Stage C (client window) compares the validated rule (1) with the rule loosened by two segments and with textbook slow start, with the client's window
-set by Go's ClientHello (which carries the ticket and, under mutual TLS, Go's ticket holds the client's certificate chain).
-
-Predictions: latency without CPU (as for G9), 100 ms RTT, 100 Mbit/s, MTU 1500 (MSS 1440), initial window 10, mutual TLS, certificate depth = depth of the
-calibration, 4 suites. A cell is "wrong" when the prediction is off by more than 50 ms (half the RTT), as in G9.
-
-  go_predict.py                       # writes results/g10_go_predictions_{c,d}.csv, results/g10_go_cells.json and prints the summary; refuses to overwrite
-  go_predict.py --outdir DIR          # writes the same three files into DIR (reproduce_l1.sh compares them with the shipped ones)
+  go_predict.py                   writes results/g10_go_predictions_{c,d}.csv and results/g10_go_cells.json and prints a summary
+  go_predict.py --outdir DIR      the same files in DIR (reproduce_l1.sh compares them with the shipped ones)
+Predictions are written before the measurement: the script refuses to overwrite existing files.
 """
 import csv, dataclasses, hashlib, json, os, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -30,21 +27,24 @@ S = A.S
 RES = os.path.join(HERE, "results")
 MSS = 1440
 SUITES = ["ECDSA-P256|X25519", "ML-DSA-44|ML-KEM-768", "ML-DSA-65|ML-KEM-768", "ML-DSA-87|ML-KEM-1024"]
-KS_D = list(range(3, 25))            # stage D: response of k segments
+KS_D = list(range(3, 25))            # stage D: response of k segments (REQS_D: request sizes)
 REQS_D = [302, 19460]
 KS_C_SPAN = (-3, 4)                  # stage C: request flights around the client window predicted by (1)
-NET = dict(bw=100.0, rtt=100.0, mtu=1500)
+NET = dict(bw=100.0, rtt=100.0, mtu=1500)      # Mbit/s, ms, bytes
 
 
 def req_bytes(k):                    # Finished + request flight of k segments (as slack_predict.py)
+    """Request size such that the flight Finished + request has k segments."""
     return (k - 1) * MSS - 700
 
 
 def resp_bytes(k):                   # response flight of k segments (as nst_predict_e.py)
+    """Response size of k segments."""
     return k * MSS - 700
 
 
 def net(**kw):
+    """The emulated network of NET as a model object."""
     return S.Net(NET["bw"], NET["rtt"], NET["mtu"], 0.0, 4, init_cwnd=10, segmentation="openssl", **kw)
 
 
@@ -70,6 +70,7 @@ def go_flow(cal, req, resp, ticket_position):
 
 
 def latency(flow, **kw):
+    """Predicted latency without CPU time (ms) of a flow."""
     m = S.run_flow(flow, net(**kw))
     return round(m["total"] - m["cpu"], 2)
 
@@ -81,6 +82,7 @@ def client_window(cal):
 
 
 def main():
+    """Predict both stages, choose the cells to measure and write the files."""
     cal_path = os.path.join(RES, "go_calibration.json")
     cal_all = json.load(open(cal_path))
     od = sys.argv[sys.argv.index("--outdir") + 1] if "--outdir" in sys.argv else RES

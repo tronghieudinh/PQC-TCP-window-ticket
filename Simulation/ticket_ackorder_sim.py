@@ -1,31 +1,39 @@
 #!/usr/bin/env python3
-"""ticket_ackorder_sim.py - a more general model of the server's window after the session ticket (answer to the review of CCR_v4, items 3.1 and 3.2).
+"""ticket_ackorder_sim.py - packet-level replay of one resumed mutual-TLS transaction, to obtain the server's window after the session
+ticket from the order of acknowledgments instead of assuming it.
 
-The paper's model gives the server a window of ten for the response after a ticket (or a table value per suite). Here the window is not an input: it is the outcome of a
-packet-level replay of the exchange of one resumed mutual-TLS transaction, with the Linux sender state of both ends replayed ACK by ACK:
+In the paper's model the window available to the response after a ticket is an input (ten segments, or a value per suite). Here it is an
+outcome: the exchange is replayed with the state of the Linux TCP sender at both ends, acknowledgment by acknowledgment:
+  per endpoint   snd_cwnd, ssthresh, packets_out, max_packets_out and is_cwnd_limited (set after every send as in tcp_cwnd_validate),
+                 and Reno slow start as in tcp_reno_cong_avoid, tcp_slow_start and tcp_is_cwnd_limited (the rule of
+                 window_from_kernel.py, here in time order, with acknowledgments as events)
+  per direction  a first-in first-out link of the given rate (a frame waits for the frames before it, so a data segment of the client
+                 delays the acknowledgments the client sends after it) and a delay of RTT/2
+  receiver       one acknowledgment per segment (quickack), put on the reverse link after the segment has arrived
+  application    client: ClientHello (n_ch segments); when the server's flight arrives, a small Finished segment followed by the
+                 request. Server: when the Finished segment arrives it writes the ticket (n_t segments) after p_t; when the last byte
+                 of the request has arrived it writes the response (R segments) after p_w
+The machine-dependent quantities are times in microseconds: c_ack (arrival to acknowledgment), p_t, p_w and d_tkt (extra delay of a
+ticket acknowledgment). Everything else follows from the segment counts, rate, MTU and RTT. The results are the gap g = (arrival of the
+last ticket acknowledgment) - (arrival of the last request segment) and the server's first burst of response segments, which shows the
+window the response got. This analysis was done after the measurements and is exploratory.
 
-  per endpoint   snd_cwnd, ssthresh, packets_out, max_packets_out, is_cwnd_limited (set after every send as in tcp_cwnd_validate), Reno slow start through
-                 tcp_reno_cong_avoid / tcp_slow_start / tcp_is_cwnd_limited (the code of window_from_kernel.py, now in time order, with the ACKs arriving as events)
-  per direction a FIFO of rate `rate` (every frame waits for the frames before it: a data segment of the client delays the ACKs the client sends behind it) and a delay RTT/2
-  receiver       one ACK per segment (quickack), handed to the reverse FIFO `c_ack` after the segment arrived
-  application    client: ClientHello (n_ch segments), then, when the server's flight arrives, a small Finished segment followed by the request;
-                 server: when the Finished segment arrives it writes the ticket (n_t segments) after `p_t`; when the last byte of the request has arrived it writes the response
-                 (R segments) after `p_w`
-
-Three numbers are the machine's (not the network's): c_ack, p_t, p_w (microseconds). Everything else follows from the segment counts, the rate, the MTU and the RTT. The output
-that the paper cannot predict is the gap g = (arrival of the last ticket ACK) - (arrival of the last request segment) and the server's burst, i.e. the window the response gets.
-
-    python3 Simulation/ticket_ackorder_sim.py                    # the replay against the 29 classes of the first traces (nothing fitted)
-    python3 Simulation/ticket_ackorder_sim.py --fit --cells      # + the machine parameters fitted on the clock-safe repeats, + the 100 random cells of G19 (not pre-registered: exploratory)
+    python3 Simulation/ticket_ackorder_sim.py                    # the replay against the classes of the first traces, nothing fitted
+    python3 Simulation/ticket_ackorder_sim.py --fit --cells      # also: machine parameters fitted on repeated traces, and the 100
+                                                                 # random cells (scenario G19)
+Output: printed and written to Measurements/testbed/results/ticket_ackorder_sim_result.txt.
 """
 import heapq, itertools, os, sys
 
-ACK_BYTES = 66            # a pure ACK with timestamps off: 60 B of headers plus link overhead, as in pqc_sim.IP_TCP_HDR (60) + 6
+ACK_BYTES = 66            # bytes of a pure ACK on the link (timestamps off): 60 of headers, as pqc_sim.IP_TCP_HDR, plus 6
 
 
 class Sender:
-    """Linux sender state, replayed. Segments are counted, not bytes: a segment is one MSS (the last of a write may be shorter)."""
+    """Congestion-control state of one Linux TCP sender. Segments are counted, not bytes: a segment is one MSS (the last segment of a
+    write may be shorter).
+    """
     def __init__(self, w0=10):
+        """New connection with initial window w0 and unlimited slow-start threshold."""
         self.cwnd, self.ssthresh = w0, 1 << 30
         self.out = 0                 # packets_out
         self.max_out = 0             # tp->max_packets_out
@@ -33,6 +41,7 @@ class Sender:
         self.queue = []              # segments written by the application, not yet sent (sizes)
 
     def can_send(self):
+        """Number of further segments the window allows."""
         return self.cwnd - self.out
 
     def after_send(self):
@@ -42,24 +51,27 @@ class Sender:
             self.max_out = self.out
 
     def cwnd_limited(self):
+        """tcp_is_cwnd_limited(): the flag, or slow start with cwnd < 2 x max_packets_out."""
         return self.lim or (self.cwnd < self.ssthresh and self.cwnd < 2 * self.max_out)       # tcp_is_cwnd_limited()
 
     def on_ack(self, acked):
-        """tcp_reno_cong_avoid(): grow only if limited; slow start adds the acknowledged segments (capped at ssthresh)."""
+        """tcp_reno_cong_avoid(): the window grows only if the sender is limited; in slow start by the acknowledged segments."""
         self.out -= acked
         if self.cwnd_limited() and self.cwnd < self.ssthresh:
             self.cwnd = min(self.cwnd + acked, self.ssthresh)
 
 
 class Net:
-    """Two FIFOs (client to server, server to client): a frame leaves when the link is free and arrives RTT/2 later."""
+    """The two directions of the link: a frame starts when the link is free and arrives RTT/2 after it has been sent."""
     def __init__(self, rate_mbps, rtt_ms, hdr):
+        """Rate in Mbit/s, round-trip time in ms, header bytes added to every frame."""
         self.bit_ms = 1.0 / (rate_mbps * 1e3)      # ms per bit
         self.half = rtt_ms / 2.0
         self.free = {0: 0.0, 1: 0.0}               # per direction: time the link is free (0 = client to server)
         self.hdr = hdr
 
     def send(self, d, now, payload):
+        """Send a frame of `payload` bytes in direction d (0 = client to server) at time `now` (ms); return its arrival time."""
         start = max(now, self.free[d])
         end = start + (payload + self.hdr) * 8 * self.bit_ms
         self.free[d] = end
@@ -67,7 +79,12 @@ class Net:
 
 
 def simulate(suite, rtt_ms, rate_mbps, mtu, req_bytes, resp_segs, n_t, c_ack_us=5.0, p_t_us=20.0, p_w_us=50.0, hdr=60, n_ch=None, w0=10, d_tkt_us=0.0):
-    """One resumed mutual-TLS transaction. Times in ms. Returns the ticket ACK times, the request end and the response burst."""
+    """Replay one resumed transaction of `suite`: request of req_bytes, response of resp_segs segments, ticket of n_t segments, on the
+    given network; the machine times are in microseconds and n_ch is the number of ClientHello segments (default per suite).
+    Returns a dictionary (times in ms): gap_ms (last ticket ACK minus last request segment, None if undefined), burst (response
+    segments sent within RTT/2 of the first one), t_req (arrival of the last request segment), tkt_acks (arrival times of the ticket
+    ACKs), t_resp (time of the response write), srv_cwnd and cli_cwnd (final windows).
+    """
     mss = mtu - hdr
     n_ch = n_ch or {"ECDSA-P256": 2, "ML-DSA-44": 5, "ML-DSA-65": 6, "ML-DSA-87": 8}[suite]
     net = Net(rate_mbps, rtt_ms, hdr)
@@ -75,7 +92,9 @@ def simulate(suite, rtt_ms, rate_mbps, mtu, req_bytes, resp_segs, n_t, c_ack_us=
     d_tkt = d_tkt_us / 1000.0
     snd = {0: Sender(w0), 1: Sender(w0)}                     # client, server
     ev, cnt = [], itertools.count()
-    def push(t, evk, **kw): heapq.heappush(ev, (t, next(cnt), evk, kw))
+    def push(t, evk, **kw):
+        """Schedule an event at time t."""
+        heapq.heappush(ev, (t, next(cnt), evk, kw))
     # application state
     st = dict(ch_rx=0, sh_sent=False, fin_rx=False, req_rx=0, req_total=0, req_started=False, resp_started=False, tkt_sent=False,
               tkt_ack_t=[], t_req_last=None, t_resp=None, t_fin=None, burst_end=None, sent_resp=0, resp_burst=0, resp_window=None)
@@ -157,15 +176,20 @@ def simulate(suite, rtt_ms, rate_mbps, mtu, req_bytes, resp_segs, n_t, c_ack_us=
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-# Machine parameters: fitted ONLY on the race classes of the clock-safe repeats (ML-DSA and ECDSA, request 19 460 B, 100 Mbit/s, RTT 10 ms and more; 21 classes per run):
+# Machine parameters, fitted only on the traces taken with all events on one clock (ML-DSA and ECDSA, request 19 460 bytes, 100 Mbit/s,
+# RTT 10 ms and more; 21 classes per run):
 #   d_tkt  the time a ticket ACK waits at the client before it joins the transmit queue (us), p_w  the time from the last request byte to the first response segment (us)
-# fitted by grid search on the gap (d_tkt) and on the class of the burst (p_w). At 10 Mbit/s and at RTT 5 ms the first traces need d_tkt = 0 (6 classes of 6 within 0.1 ms).
-MACHINES = {"X250": dict(d_tkt_us=360.0, p_w_us=25.0), "Optiplex": dict(d_tkt_us=125.0, p_w_us=75.0), "GX10": dict(d_tkt_us=125.0, p_w_us=75.0)}      # the result of --fit (X250: mean of the three runs, 350, 375 and 350; p_w: the smallest value with the most classes right)
+# fitted by grid search on the gap (d_tkt) and on the class of the burst, more than ten segments or not (p_w). At 10 Mbit/s and at RTT
+# 5 ms the first traces need d_tkt = 0.
+MACHINES = {"X250": dict(d_tkt_us=360.0, p_w_us=25.0), "Optiplex": dict(d_tkt_us=125.0, p_w_us=75.0), "GX10": dict(d_tkt_us=125.0, p_w_us=75.0)}      # results of --fit, per measurement machine (X250: mean of three runs; p_w: smallest value with the most classes right)
 
 
 def fit_machine(csv_name):
-    """Fit d_tkt (on the gap, 25 us grid) and p_w (on the class of the burst, 25 us grid) of one machine from its clock-safe race run (wp6_k7_points_*.csv: suite, MTU, RTT, burst, gap).
-    Only the classes with 100 Mbit/s and RTT 10 ms or more are used (gap above -1 ms, at least three transactions); the request is 19 460 B and the response 13 segments."""
+    """Fit d_tkt (to the gap) and p_w (to the burst class), both on a 25 us grid, from the trace points of one machine
+    (results/wp6_k7_points_*.csv: suite, MTU, RTT, burst, gap). Uses the classes with RTT 10 ms or more, gap above -1 ms and at least
+    three transactions, at 100 Mbit/s with request 19 460 bytes and response 13 segments.
+    Returns (d_tkt, p_w, mean absolute gap error in ms, classes with the right burst class, number of classes).
+    """
     import csv, collections, statistics as st
     here = os.path.dirname(os.path.abspath(__file__))
     nt = {("ECDSA-P256", 1500): 1, ("ECDSA-P256", 1280): 2, ("ML-DSA-44", 1500): 4, ("ML-DSA-44", 1280): 4, ("ML-DSA-65", 1500): 5, ("ML-DSA-65", 1280): 6}
@@ -184,7 +208,9 @@ def fit_machine(csv_name):
 
 
 def cell_prediction(cell, machine, old_only=False):
-    """Model of the paper (early ticket, server window ten after the ticket) and the replay's window, for one cell of G19: returns (old_ms, new_ms, window)."""
+    """Predicted latency of one random cell by the paper's early-ticket model (server window of ten after the ticket) and with the
+    window obtained from the replay, using the parameters of `machine`. Returns (old ms, new ms, burst, ticket segments, response segments).
+    """
     here = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, os.path.join(here, "..", "Measurements", "testbed"))
     import analyze_testbed as A
@@ -207,7 +233,9 @@ def cell_prediction(cell, machine, old_only=False):
 
 
 def cells_test(out):
-    """The 100 random cells of G19: the replay's window instead of the fixed ten, machine parameters from the race classes only. Compared with the measured excess of each run."""
+    """The 100 random cells (scenario G19): compare both predictions with the measured values of each run (results/g19_*_cells.txt) and
+    report the cells off by more than RTT/2, the mean absolute errors and the cells whose prediction changed. Appends to `out`.
+    """
     import csv, re, statistics as st
     here = os.path.dirname(os.path.abspath(__file__)); res = os.path.join(here, "..", "Measurements", "testbed", "results")
     cells = list(csv.DictReader(open(os.path.join(res, "g19_cells.csv"))))
@@ -241,7 +269,9 @@ def cells_test(out):
 
 
 def classes_of_first_traces():
-    """the 29 classes of the first traces (ticket_race.csv: suite, RTT, rate, MTU, ticket segments, response segments), MTU 9000 left out, with the medians of the gap and of the burst"""
+    """The classes of the first traces (results/ticket_race.csv; MTU 9000 left out, at least three transactions): for each combination of
+    suite, RTT, rate, MTU, ticket segments and response segments, the median gap and burst and the number of transactions.
+    """
     import csv, collections, statistics as st
     here = os.path.dirname(os.path.abspath(__file__))
     rows = list(csv.DictReader(open(os.path.join(here, "..", "Measurements", "testbed", "results", "ticket_race.csv"))))
@@ -253,7 +283,9 @@ def classes_of_first_traces():
 
 
 def main():
-    """Compare the replay with the medians of the first traces (221 transactions, request 19 460 B), without fitting anything: c_ack = 5 us, p_t = 20 us, p_w = 50 us (round numbers)."""
+    """Compare the replay with the medians of the first traces (request 19 460 bytes) without fitting anything (c_ack = 5 us, p_t = 20 us,
+    p_w = 50 us); with --fit also fit the machine parameters, with --cells also predict the random cells.
+    """
     out = []
     say = lambda x="": (print(x), out.append(x))
     say("class (suite, RTT ms, rate Mbit/s, MTU, ticket segments, response segments): observed gap and burst (median of the class) against the replay")

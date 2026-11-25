@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
-"""analyze_g13_lite.py - evaluates G13-lite: criteria F1-F3 for the plain-TCP part and criteria D1-D5 of G14 (arm delack, unchanged) for the TLS part.
-    python3 analyze_g13_lite.py --run DIR [--out FILE]      DIR holds slack_tcp.csv (part A), slack_tls.csv and nst_tls.csv (part B) of one run
-  F1  plain TCP, stage A: in each of the two configurations (base = RTT 100 ms, rtt30) at least 18 of the 20 flight sizes have the median window equal to rule (1)
-  F2  plain TCP: at least 95 % of the individual connections have the window of rule (1)
-  F3  every (configuration, size) cell has at least 15 valid repetitions
-  D1-D5  see analyze_g14.py --arm delack (client-window cells wrong at most 2 of 28; early-ticket model wrong at most 2 of 10 discriminating cells; joined at least 8 of 10; at most 7 of 32 design cells; data)
+"""analyze_g13_lite.py - real link between two machines (scenario G13-lite): criteria F1-F3 for the plain-TCP part and, for the TLS part,
+criteria D1-D5 of the delayed-acknowledgment arm of scenario G14, unchanged.
+
+    python3 analyze_g13_lite.py --run DIR [--out FILE]     DIR holds slack_tcp.csv (part A), slack_tls.csv and nst_tls.csv (part B)
+
+  F1  plain TCP: in both configurations (base = RTT 100 ms, rtt30) at least 18 of the 20 flight sizes have a median window equal to the
+      window rule
+  F2  plain TCP: at least 95 % of the connections have the window of the rule
+  F3  every (configuration, flight size) has at least 15 valid repetitions
+  D1-D5  see analyze_g14.py --arm delack
 """
 import argparse, csv, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+# The window rule: window after a flight of n segments with initial window w0.
 rule = lambda w0, n: max(w0, min(w0 + n, 2 * n))
 
 
 def part_a(path):
+    """Plain-TCP part: ({configuration: (sizes whose median window follows the rule, sizes)}, connections that follow it, connections,
+    (configuration, size) pairs with fewer than 15 repetitions).
+    """
     cells, tot, ok = {}, 0, 0
     for r in csv.DictReader(open(path)):
         if r["stage"] != "A" or r["err"] or r["cfg"] not in ("base", "rtt30"):
@@ -28,6 +36,7 @@ def part_a(path):
 
 
 def main():
+    """Evaluate both parts and write the report."""
     ap = argparse.ArgumentParser(); ap.add_argument("--run", required=True); ap.add_argument("--out", default=""); a = ap.parse_args()
     d = os.path.expanduser(a.run)
     res, ok, tot, few = part_a(os.path.join(d, "slack_tcp.csv"))

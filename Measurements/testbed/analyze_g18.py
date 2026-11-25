@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""analyze_g18.py - evaluates the criteria P1-P4 of results/phase2_predictions.md (section G18) on a run of scenario G18.
+"""analyze_g18.py - Go server, pipelined variant (scenario G18): evaluates criteria P1-P4 fixed before the measurement
+(results/phase2_predictions.md, section G18).
+
     python3 analyze_g18.py --run FILE.csv [--out results/g18_analysis.txt]
-FILE.csv: output of run_testbed.py (Go probe, depth 1, resumed) for the calls of results/g18_cells.json. Measured excess = median shaped - median base (same suite and sizes).
-A cell is wrong when the prediction is off by more than half the RTT. A cell with fewer than 30 valid transactions is MISSING.
+FILE.csv: output of run_testbed.py (Go probe, chain depth 1, resumed) for the calls of results/g18_cells.json. Excess latency of a cell: median total time of the resumed transactions on the shaped link minus the median on the unshaped link, for the same suite and sizes. A cell is
+wrong when the prediction is off by more than half the RTT; a cell with fewer than 30 valid transactions is missing.
   P1  the pipelined variant is wrong on at most 4 of the 48 ML-DSA-87 cells
-  P2  the pre-registered 'go' model (flight complete before the next step) is wrong on at least 43 of the 48 ML-DSA-87 cells
-  P3  controls (ML-DSA-65, 12 cells, first flight within the window): each of the two predictions is wrong on at most 1
-  P4  data: every one of the 60 cells has at least 30 valid transactions
+  P2  the earlier "go" model (a flight is complete before the next step) is wrong on at least 43 of the 48 ML-DSA-87 cells
+  P3  controls (ML-DSA-65, 12 cells, first flight within the window): each of the two models is wrong on at most 1
+  P4  data: each of the 60 cells has at least 30 valid transactions
 """
 import argparse, csv, os, statistics as st
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -14,6 +16,7 @@ RES = os.path.join(HERE, "results")
 
 
 def evaluate(run):
+    """Measured and predicted values per cell, the numbers of wrong cells of both models and the outcome of P1-P4."""
     base, sh = {}, {}
     for r in csv.DictReader(open(run)):
         if r["err"] or r["reused"] != "1":
@@ -40,6 +43,7 @@ def evaluate(run):
 
 
 def main():
+    """Evaluate one run and write the report."""
     ap = argparse.ArgumentParser(); ap.add_argument("--run", required=True); ap.add_argument("--out", default=os.path.join(RES, "g18_analysis.txt")); a = ap.parse_args()
     r = evaluate(os.path.expanduser(a.run))
     lines = [f"G18 (Go crypto/tls, new cells): {len(r['cells'])} of 60 cells measured ({r['miss']} missing or with fewer than 30 valid transactions)",

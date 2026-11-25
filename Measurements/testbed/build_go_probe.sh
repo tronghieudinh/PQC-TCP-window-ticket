@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build tls_probe_go (the Go counterpart of tls_probe, scenario G10) for THIS machine, or cross-compile for another one.
+# Build tls_probe_go (the Go counterpart of tls_probe, Go server scenario G10) for this machine, or cross-compile for another one.
 #   ./build_go_probe.sh                       # uses go from $GO, PATH, ~/opt/runtimes/go/bin, /usr/local/go/bin; output testbed/tls_probe_go
 #   ./build_go_probe.sh --install-go          # no Go on this machine: download the official toolchain into ~/opt/runtimes/go first (needs network)
 #   ./build_go_probe.sh --goarch amd64 --out /tmp/tls_probe_go_amd64     # cross-compile (static, no cgo), then copy the file to the other machine
@@ -10,6 +10,7 @@ GOVER_WANT=${GOVER_WANT:-1.27.4}; OUT=$HERE/tls_probe_go; GOARCH_REQ=""; INSTALL
 while [ $# -gt 0 ]; do case "$1" in
   --install-go) INSTALL=1;; --goarch) GOARCH_REQ=$2; shift;; --out) OUT=$2; shift;;
   -h|--help) sed -n '2,8p' "${BASH_SOURCE[0]}"; exit 0;; *) echo "unknown option: $1"; exit 2;; esac; shift; done
+# First usable Go compiler: $GO, then go in PATH, ~/opt/runtimes/go, /usr/local/go.
 find_go() { for g in "${GO:-}" "$(command -v go 2>/dev/null || true)" "$HOME/opt/runtimes/go/bin/go" /usr/local/go/bin/go; do [ -n "$g" ] && [ -x "$g" ] && { echo "$g"; return; }; done; }
 GOBIN=$(find_go || true)
 if [ -z "$GOBIN" ] && [ "$INSTALL" = 1 ]; then

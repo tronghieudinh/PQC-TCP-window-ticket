@@ -1,5 +1,5 @@
 /*
- * tls_serve.c - event-driven (epoll, non-blocking) TLS 1.3 server for capacity tests, paper 2 (WP2).
+ * tls_serve.c - event-driven (epoll, non-blocking) TLS 1.3 server for capacity tests.
  *
  * One thread per process, as many connections in flight as the clients open: unlike the blocking tls_probe server, a core is kept busy
  * by interleaving handshakes, which is how production servers (nginx, HAProxy, Envoy) work. Per connection: TLS 1.3 handshake, read
@@ -31,19 +31,23 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+/* State of a connection: TLS handshake, reading the request, writing the response, closing. */
 enum { ST_HS, ST_READ, ST_WRITE, ST_SHUT };
 
+/* One open connection: socket, state, request bytes read, response bytes written. */
 typedef struct Conn {
     int fd, state, got, put;
     SSL *ssl;
 } Conn;
 
+/* Request and response size in bytes (--req, --resp), their buffers, and the flag set by SIGUSR1. */
 static int REQ = 302, RESP = 222;
 static unsigned char *RBUF, *WBUF;
 static volatile sig_atomic_t g_stats;
 static unsigned long g_hs_done;     /* handshakes that completed on the server (SSL_accept returned 1) */
 static void on_usr1(int s) { (void)s; g_stats = 1; }
 
+/* Remove a connection from the event loop and release it. */
 static void conn_free(int ep, Conn *c) {
     epoll_ctl(ep, EPOLL_CTL_DEL, c->fd, NULL);
     SSL_free(c->ssl);
@@ -51,12 +55,13 @@ static void conn_free(int ep, Conn *c) {
     free(c);
 }
 
+/* Wait for the next read or write readiness of a connection. */
 static void rearm(int ep, Conn *c, unsigned events) {
     struct epoll_event ev = {.events = events, .data.ptr = c};
     epoll_ctl(ep, EPOLL_CTL_MOD, c->fd, &ev);
 }
 
-/* advance one connection as far as it goes; returns 1 when it completed a transaction */
+/* Advance one connection as far as possible without blocking; returns 1 when it has completed a transaction. */
 static int drive(int ep, Conn *c, unsigned long *done) {
     for (;;) {
         int r, e;
@@ -115,6 +120,7 @@ static int drive(int ep, Conn *c, unsigned long *done) {
     }
 }
 
+/* Parse the options, create the TLS context and the listening socket, and run the event loop. */
 int main(int argc, char **argv) {
     const char *addr = "127.0.0.1", *port = "4433", *cert = NULL, *key = NULL, *ca = NULL, *groups = NULL;
     int mtls = 0, resume = 0, reuseport = 0, c;

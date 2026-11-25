@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-"""one_sided_errors.py - in which direction does the model of L1 err? (analysis of existing data; nothing is measured)
+"""one_sided_errors.py - in which direction does the paper's model err? (analysis of existing data; nothing is measured)
 
-Claim to test: the model of L1 (rule (1) for the client's flight, the early ticket and a server window of ten for the response) is a CONSERVATIVE bound: when it is wrong by more than half an RTT it is
-always too slow (pessimistic: measured < predicted), never too fast (optimistic: measured > predicted). Reason: ten is the least window the server can have after the ticket (the ticket can only enlarge it).
-Exceptions are expected outside the model's range (loss, a receive-limited sender at MTU 9 000, BBR), and are not in the data below.
+Claim tested: the model (rule (1) for the client's flight, the early ticket, and a server window of ten segments for the response) is a
+CONSERVATIVE bound: when it is wrong by more than half a round-trip time (RTT) it is too slow (pessimistic: measured < predicted),
+never too fast (optimistic: measured > predicted). Reason: ten is the smallest window the server can have after the ticket (the
+ticket can only enlarge it). Exceptions are expected outside the model's range (loss, a receive-limited sender at MTU 9000, BBR); loss
+and MTU 9000 are not in the data below.
 
-For every test that has a per-cell prediction file of the model of L1 and its raw run file: measured excess of a cell = median t_total_ms (resumed, shaped) - median t_total_ms (resumed, unshaped base of the same
-suite and sizes), at least 30 valid transactions on the shaped cell. A cell is wrong when |prediction - measured| > RTT / 2. We count wrong cells by direction and report the largest error in each direction.
+For every test that has a file of per-cell predictions of the model and a raw file of its run: measured excess of a cell = median
+t_total_ms (resumed, shaped network) - median t_total_ms (resumed, unshaped base with the same suite and sizes), at least 30 valid
+transactions on the shaped cell. A cell is wrong when |prediction - measured| > RTT / 2. Wrong cells are counted by direction, with the
+largest error in each direction. A "cell-run" is one cell in one run.
 
-    python3 one_sided_errors.py [--out results/one_sided_errors.txt]
+    python3 one_sided_errors.py [--out results/one_sided_errors.txt] [--with-g22 | --g22-only]
 
-NOT covered (different model or a different question, listed so that the claim is not stretched): Go crypto/tls (own model), the BBR model of the client window, the pipelined variant, loss (G16), MTU 9 000, full handshakes,
-the first-run captures. The statement of the paper about the Go cells (every wrong cell one round trip faster than predicted) is its own count, not rechecked here.
+NOT covered (a different model or a different question, listed so that the claim is not stretched): Go crypto/tls (own model), the BBR
+model of the client window, the pipelined variant, loss (G16), MTU 9000, full handshakes, the first-run captures. What the paper states
+about the Go cells is a separate count that is not repeated here.
 """
 import argparse, csv, os, re, statistics as st
 
@@ -58,6 +63,7 @@ def pairs_nst(raw, predfile, col, design_only=False, with_rtt=False):
 
 
 def pairs_g19(cellsfile, col):
+    """(cell label, RTT, prediction, measured excess) from the per-cell table of an analysis of the random cells; col selects the measured column."""
     rx = re.compile(r"^\s*(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)")
     out = []
     for ln in open(os.path.join(RES, cellsfile)):
@@ -68,6 +74,7 @@ def pairs_g19(cellsfile, col):
 
 
 def pairs_g22(run, machine):
+    """(cell label, RTT, prediction, measured excess) of a run of the second random draw, computed by analyze_g22."""
     import sys
     sys.path.insert(0, HERE)
     import analyze_g22 as G
@@ -76,6 +83,7 @@ def pairs_g22(run, machine):
 
 
 def pairs_g17(level):
+    """(cell label, RTT, prediction, measured excess) of one background-load level of the X250."""
     pred = [r for r in rd(os.path.join(RES, "g17_predictions.csv"))]
     m = excess(os.path.join(RES, "g17", "X250", f"g17_{level}.csv")); out = []
     for r in pred:
@@ -102,6 +110,7 @@ def repo(mdir, scen, suffix=""):
 
 
 def sets(with_g22=False):
+    """All tests as (test, run, function returning the pairs); with_g22 adds the second random draw."""
     X = lambda *p: os.path.join(RES, *p)
     S = []
     S.append(("client window (rule 1), 28 cells", "X250, OpenSSL 3.5 (original)", lambda: pairs_slack(X("slack_tls.csv"), "slack_predictions.csv", "model_slack0_ms")))
@@ -134,7 +143,7 @@ def sets(with_g22=False):
     S.append(("ticket timing under BBR (G14)", "i9", lambda: pairs_nst(os.path.join(repo("i9-10900", "G14", "-bbr"), "nst_tls.csv"), "g14_predictions_bbr_d.csv", "model_early_ms", design_only=True)))
     S.append(("100 random cells (G19)", "i9", lambda: pairs_g19("g19_i9_cells.txt", 8)))
     g22 = os.path.expanduser("~/pqc_measurements/scenarios/G22/20261122-040058-gx10/data/g22.csv")
-    if with_g22:                                # G22 (round 2) is reported apart; the totals of the paper are those of the tests of L1, all in the archive
+    if with_g22:                                # G22 (round 2) is reported apart; the totals of the paper are those of its own tests, all in the archive
         gx = sorted(glob.glob(os.path.expanduser("~/pqc_measurements/scenarios/G22/*gx10*/data/g22.csv")) + glob.glob(os.path.join(REPO, "data", "gx10", "scenarios", "G22", "*", "data", "g22.csv")) + glob.glob(os.path.expanduser("~/PQC-data-repo/gx10/scenarios/G22/*/data/g22.csv")))
         x2 = sorted(glob.glob(os.path.join(REPO, "data", "x250", "scenarios", "G22", "*", "data", "g22.csv")) + glob.glob(os.path.expanduser("~/PQC-data-repo/x250/scenarios/G22/*/data/g22.csv")))
         x2r1 = [f for f in x2 if "-run2" not in f]       # run 1 only; the declared exploratory run 2 of the X250 (noise floor) is reported apart
@@ -146,6 +155,7 @@ def sets(with_g22=False):
 
 
 def main():
+    """Count the wrong cells of every test by direction, print the table with totals and write it to --out."""
     ap = argparse.ArgumentParser(); ap.add_argument("--out", default=os.path.join(RES, "one_sided_errors.txt")); ap.add_argument("--with-g22", action="store_true", help="add G22 (not part of the totals of the paper)"); ap.add_argument("--g22-only", action="store_true", help="only G22 (results/one_sided_errors_g22.txt)"); a = ap.parse_args()
     L = ["test | run | cells | wrong, optimistic (measured slower) | wrong, pessimistic (model slower) | largest measured-minus-prediction (ms) | largest prediction-minus-measured (ms)"]
     distinct = set(); tot = tn = to = tp = 0; tnb = tob = tpb = 0; mxo = mxp = -1e9; skipped = []
@@ -165,7 +175,7 @@ def main():
         gg = groups.setdefault(test, [0, 0, 0, 0]); gg[0] += 1; gg[1] += len(pr); gg[2] += len(opt); gg[3] += len(pes)
         if "BBR" not in test and "delayed" not in test: mxo_nodelack = max(mxo_nodelack, max(x - p for _, _, p, x in pr))
         if "BBR" not in test:
-            distinct |= {(re.sub(r' \(G\d+[^)]*\)', '', test).split(',')[0], k, rtt) for k, rtt, _, _ in pr}                                   # BBR is outside the model of L1 (the window is w0 + n, not rule (1)): counted apart
+            distinct |= {(re.sub(r' \(G\d+[^)]*\)', '', test).split(',')[0], k, rtt) for k, rtt, _, _ in pr}                                   # BBR is outside the paper's model (the window is w0 + n, not rule (1)): counted apart
             tnb += len(pr); tob += len(opt); tpb += len(pes); mxo = max(mxo, max(x - p for _, _, p, x in pr)); mxp = max(mxp, max(p - x for _, _, p, x in pr))
     L.append(f"TOTAL, all tests: {tn} cell-runs; wrong and optimistic {to}; wrong and pessimistic {tp}")
     L.append(f"TOTAL without the BBR arm (outside the model of L1): {tnb} cell-runs ({len(distinct)} distinct cells, a cell counted once across runs and machines); wrong and optimistic {tob}; wrong and pessimistic {tpb}; the measured excess exceeded the prediction by at most {mxo:+.1f} ms (any cell), the prediction exceeded the measured excess by at most {mxp:+.1f} ms")

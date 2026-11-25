@@ -51,17 +51,21 @@
 #include <time.h>
 #include <unistd.h>
 
+/* Command-line options (see the header). */
 typedef struct {
     const char *addr, *port, *cert, *key, *ca, *groups;
     int mtls, req, resp, n, warmup, resume, reuseport, no_resumed_ticket, pre_write_delay_us, pre_write_spin_us;
     double gap_ms;
 } Opt;
 
-static volatile sig_atomic_t g_stats_req;   /* SIGUSR1: the server prints STATS (capacity tests) */
+/* Set by SIGUSR1: the server then prints a STATS line (capacity tests). */
+static volatile sig_atomic_t g_stats_req;
 static void on_usr1(int sig) { (void)sig; g_stats_req = 1; }
 
-static SSL_SESSION *g_sess;    /* the newest ticket received by the client (--resume) */
+/* The newest session ticket received by the client (--resume). */
+static SSL_SESSION *g_sess;
 
+/* Called by OpenSSL when a session ticket arrives; keeps only the latest one. */
 static int new_session_cb(SSL *ssl, SSL_SESSION *sess) {
     (void)ssl;
     if (g_sess) SSL_SESSION_free(g_sess);
@@ -69,7 +73,8 @@ static int new_session_cb(SSL *ssl, SSL_SESSION *sess) {
     return 1;
 }
 
-/* round 3d: --pre-write-spin-us waits by spinning on CLOCK_MONOTONIC until the deadline (no timer slack): the write is later by D within a few microseconds, on any machine */
+/* Busy-wait for `us` microseconds on CLOCK_MONOTONIC. Used by --pre-write-spin-us: unlike a sleep it has no timer slack,
+ * so the response write is delayed by the requested time to within a few microseconds on any machine. */
 static void spin_us(int us) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
@@ -77,18 +82,21 @@ static void spin_us(int us) {
     do clock_gettime(CLOCK_MONOTONIC, &t); while (t.tv_sec * 1000000000LL + t.tv_nsec < end);
 }
 
+/* Monotonic time in milliseconds. */
 static double now_ms(void) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
 
+/* Receive and send timeout of a socket, so that a lost connection cannot block the probe. */
 static void set_timeouts(int fd, int sec) {
     struct timeval tv = {sec, 0};
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
 }
 
+/* Read exactly n bytes of application data; -1 on error or end of connection. */
 static int read_exact(SSL *ssl, unsigned char *buf, int n) {
     int got = 0;
     while (got < n) {
@@ -99,6 +107,7 @@ static int read_exact(SSL *ssl, unsigned char *buf, int n) {
     return got;
 }
 
+/* Write all n bytes of application data; -1 on error. */
 static int write_all(SSL *ssl, const unsigned char *buf, int n) {
     int done = 0;
     while (done < n) {
@@ -109,14 +118,15 @@ static int write_all(SSL *ssl, const unsigned char *buf, int n) {
     return done;
 }
 
+/* Report an error with the OpenSSL error queue; returns 1 (the exit status). */
 static int fail(const char *what) {
     fprintf(stderr, "tls_probe: %s\n", what);
     ERR_print_errors_fp(stderr);
     return 1;
 }
 
-/* --no-resumed-ticket (server): a connection whose ClientHello offers a PSK (a resumption) gets no new ticket; full handshakes still issue one.
-   Intervention of WP6 part G: removes the separate ticket write from the resumed transaction. */
+/* --no-resumed-ticket (server): a connection whose ClientHello offers a pre-shared key (a resumption) gets no new
+ * ticket; full handshakes still issue one. This intervention removes the separate ticket write from the resumed transaction. */
 static int hello_cb(SSL *s, int *al, void *arg) {
     const unsigned char *ext; size_t len;
     (void)al; (void)arg;
@@ -124,6 +134,8 @@ static int hello_cb(SSL *s, int *al, void *arg) {
     return SSL_CLIENT_HELLO_SUCCESS;
 }
 
+/* TLS 1.3 context of the server or the client: resumption or no tickets, certificate chain exactly as in the file,
+ * key-exchange group, trust anchor and peer verification. */
 static SSL_CTX *make_ctx(const Opt *o, int server) {
     SSL_CTX *ctx = SSL_CTX_new(server ? TLS_server_method() : TLS_client_method());
     if (!ctx) return NULL;
@@ -166,6 +178,8 @@ static SSL_CTX *make_ctx(const Opt *o, int server) {
     return ctx;
 }
 
+/* Accept one connection at a time: handshake, read the request (--req bytes), optional delay, write the response
+ * (--resp bytes). Prints READY, then SRVINFO (segment size and window of the first connection). */
 static int run_server(const Opt *o) {
     SSL_CTX *ctx = make_ctx(o, 1);
     if (!ctx) return 1;
@@ -209,7 +223,7 @@ static int run_server(const Opt *o) {
         }
         SSL *ssl = SSL_new(ctx);
         SSL_set_fd(ssl, fd);
-        if (SSL_accept(ssl) == 1 && read_exact(ssl, req, o->req) == o->req && (o->pre_write_spin_us <= 0 || (spin_us(o->pre_write_spin_us), 1)) && (o->pre_write_delay_us <= 0 || (nanosleep(&(struct timespec){o->pre_write_delay_us / 1000000, (long)(o->pre_write_delay_us % 1000000) * 1000L}, NULL), 1)) && write_all(ssl, resp, o->resp) == o->resp) {   /* round 3c: --pre-write-delay-us waits between the end of the request and the response */
+        if (SSL_accept(ssl) == 1 && read_exact(ssl, req, o->req) == o->req && (o->pre_write_spin_us <= 0 || (spin_us(o->pre_write_spin_us), 1)) && (o->pre_write_delay_us <= 0 || (nanosleep(&(struct timespec){o->pre_write_delay_us / 1000000, (long)(o->pre_write_delay_us % 1000000) * 1000L}, NULL), 1)) && write_all(ssl, resp, o->resp) == o->resp) {   /* --pre-write-spin-us / --pre-write-delay-us wait between the end of the request and the response */
             hs_ok++;
             SSL_shutdown(ssl);
         } else
@@ -219,6 +233,8 @@ static int run_server(const Opt *o) {
     }
 }
 
+/* Result of one transaction: t0 start, t1 TCP connected, t2 TLS handshake done, t3 response received (ms); then TCP_INFO
+ * values, bytes written and read, whether the session was resumed, and the error (empty if none). */
 typedef struct {
     double t0, t1, t2, t3;
     unsigned mss, cwnd0, retr, rtt, dso, dsi;
@@ -227,7 +243,8 @@ typedef struct {
     const char *err;
 } Result;
 
-/* One transaction on a new TCP connection; sess != NULL offers that session (PSK resumption). */
+/* One transaction on a new TCP connection; sess != NULL offers that session (resumption with a pre-shared key).
+ * Fills r with the time stamps (ms) and the client's TCP_INFO counters. */
 static void transact(SSL_CTX *ctx, const struct addrinfo *ai, const Opt *o, unsigned char *req, unsigned char *resp,
                      SSL_SESSION *sess, Result *r) {
     int one = 1;
@@ -276,6 +293,8 @@ static void transact(SSL_CTX *ctx, const struct addrinfo *ai, const Opt *o, unsi
     close(fd);
 }
 
+/* Run warmup + n transactions (with --resume each is preceded by a full handshake that obtains the ticket) and print
+ * one CSV row per measured transaction. */
 static int run_client(const Opt *o) {
     SSL_CTX *ctx = make_ctx(o, 0);
     if (!ctx) return 1;
@@ -286,7 +305,7 @@ static int run_client(const Opt *o) {
     unsigned char *req = calloc(o->req, 1), *resp = malloc(o->resp);
     printf("i,t_tcp_ms,t_hs_ms,t_total_ms,bytes_w,bytes_r,snd_mss,snd_cwnd0,retrans,rtt_us,data_segs_out,data_segs_in,err,reused,prime_ms\n");
     int consec_err = 0;
-    /* PQC_PROBE_MAX_CONSEC_ERR: stop after this many consecutive failed transactions (default 3; 0 = never stop). Scenario G8 (bursty loss) sets 0: with
+    /* PQC_PROBE_MAX_CONSEC_ERR: stop after this many consecutive failed transactions (default 3; 0 = never stop). The bursty-loss test sets 0: with
        netem's per-packet Gilbert state a connect can lose every SYN retry, and a failed transaction is a result to count, not a reason to give up the cell. */
     int max_consec_err = 3;
     { const char *e = getenv("PQC_PROBE_MAX_CONSEC_ERR"); if (e && *e) { max_consec_err = atoi(e); if (max_consec_err < 0) max_consec_err = 3; } }

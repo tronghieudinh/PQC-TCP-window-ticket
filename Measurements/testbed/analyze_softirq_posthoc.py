@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""analyze_softirq_posthoc.py - POST HOC look at the part H data (not registered): how long after the first response write returned were the late ticket ACKs queued to the server, and what does the capture say?
+"""analyze_softirq_posthoc.py - post hoc look at the softirq traces (not one of the criteria fixed beforehand): how long after the first
+write of the response returned were the late ticket acknowledgments queued to the server, and what does the capture show?
 
     python3 analyze_softirq_posthoc.py results/trace_softirq > results/wp6_analysis_softirq_posthoc.txt
-ENQ - write return: bpftrace clock (netif_rx of the ACK minus return of the first >= 16,000-byte tcp_sendmsg). pcap-based rel_write: capture clock (ACK minus first response segment on the wire).
+"ENQ - write return": bpftrace clock (netif_rx of the ACK minus the return of the first tcp_sendmsg of at least 16 000 bytes).
+"rel_write" from the capture: capture clock (ACK minus the first response segment on the wire).
 """
 import sys, glob, os, collections, statistics as st
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
-"""
-g19_predict.py - pre-registration of scenario G19: a held-out test of the model of L1 on cells drawn at random from a stated design space.
+"""g19_predict.py - cells and predictions for scenario G19: a test of the paper's model on cells drawn at random from a stated design
+space, so that nobody chose the cells that are predicted.
 
-Why: the tests of L1 so far use cells chosen by the authors (grids of sizes, cells where two models differ). A reviewer can ask whether the model predicts cells nobody picked.
-Design space (resumed TLS 1.3, mutual authentication, certificate chain depth 2, initial window 10, Reno, quickack, OpenSSL 3.5):
-    suite   one of ECDSA-P256, ML-DSA-44, ML-DSA-65, ML-DSA-87 (with their key exchange, as in L1)
-    request uniform integer 302..22 000 bytes;  response uniform integer 222..20 000 bytes   (not aligned with segment boundaries)
-    RTT     one of 20, 30, 50, 80, 100, 150, 200 ms;  rate one of 10, 50, 100, 500, 1000 Mbit/s;  MTU one of 1280, 1400, 1500   (MTU 9000 is excluded: documented as receive-window limited)
-100 cells, seed 20261121. The prediction is the model of L1 (rule (1), ticket written on the Finished, OpenSSL write pattern), no parameter fitted, `pqc_sim.py` unchanged.
-For context the file also holds the joined-ticket prediction and the number of cells where the two models differ by more than half an RTT.
+Design space (resumed TLS 1.3, mutual authentication, certificate-chain depth 2, initial window 10, Reno, quickack, OpenSSL 3.5):
+  suite     ECDSA-P256, ML-DSA-44, ML-DSA-65 or ML-DSA-87, with its key exchange
+  request   uniform integer 302..22 000 bytes; response uniform integer 222..20 000 bytes (not aligned with segment boundaries)
+  network   RTT 20, 30, 50, 80, 100, 150 or 200 ms; rate 10, 50, 100, 500 or 1000 Mbit/s; MTU 1280, 1400 or 1500 (MTU 9000 excluded:
+            limited by the receive window)
+100 cells, random seed 20261121. Prediction: the paper's model (window rule, ticket written when the Finished arrives, write pattern of
+OpenSSL), no parameter fitted. The file also holds the joined-ticket prediction.
 
-  g19_predict.py [--force]   writes results/g19_cells.csv (input of run_testbed.py --configs-from) and results/g19_predictions.csv; refuses to overwrite (pre-registered)
+    g19_predict.py [--force]     writes results/g19_cells.csv (input of run_testbed.py --configs-from) and g19_predictions.csv
+Predictions are written before the measurement: the script refuses to overwrite existing files (--force only to redo deliberately).
 """
 import csv, hashlib, os, random, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import analyze_testbed as A  # noqa: E402
 
-SEED, N = 20261121, 100
+SEED, N = 20261121, 100      # random seed and number of cells
 SUITES = ["ECDSA-P256|X25519", "ML-DSA-44|ML-KEM-768", "ML-DSA-65|ML-KEM-768", "ML-DSA-87|ML-KEM-1024"]
 RTTS, RATES, MTUS = [20, 30, 50, 80, 100, 150, 200], [10, 50, 100, 500, 1000], [1280, 1400, 1500]
 
 
 def draw():
+    """The N cells drawn with the fixed seed."""
     rng = random.Random(SEED)
     cells = []
     for i in range(N):
@@ -32,6 +34,7 @@ def draw():
 
 
 def predict(c, early):
+    """Predicted latency without CPU time (ms) of one cell, with the ticket written early or joined with the response."""
     A.NST_EARLY = early
     d = {k: str(v) for k, v in c.items()}
     d["resume"] = "1"
@@ -40,6 +43,7 @@ def predict(c, early):
 
 
 def main():
+    """Draw the cells, predict both models, write the files and print their checksums."""
     res = os.path.join(HERE, "results")
     pc, pp = os.path.join(res, "g19_cells.csv"), os.path.join(res, "g19_predictions.csv")
     if (os.path.exists(pc) or os.path.exists(pp)) and "--force" not in sys.argv:

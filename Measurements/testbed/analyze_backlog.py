@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""WP6 part G1: are the ACKs of the session ticket processed from the socket backlog? (the point the Letter infers but did not trace). No root.
+"""analyze_backlog.py - are the acknowledgments of the session ticket processed from the socket backlog, that is, after the server's
+application has released the socket?
 
     python3 analyze_backlog.py [results/trace_backlog/*_srv.pcap] [--csv results/ticket_backlog.csv]
 
-Input: <tag>_srv.pcap and <tag>.bpf.txt written by run_wp6g.sh (ticket_backlog.bt). The ACKs of the ticket are found in the capture exactly as in analyze_state.py (client port,
-acknowledgment number) and joined with the RENO events of the trace. An ACK is DEFERRED if its RENO event lies, on the same thread, between RELS and RELE (__release_sock: the
-backlog is being processed after the application let go of the socket); otherwise it was processed on arrival (softirq). Reported: shares of deferred ACKs, and for each
-group the share that called tcp_slow_start, by the arrival of the ACK relative to the write of the response (rel_write_ms <= 0: it had arrived before the write).
-Pre-registered (results/wp6_pred_backlog.txt):
-  G1a  of the ticket ACKs that arrived (on the wire) before the response was written and still called tcp_slow_start, >= 90 % were deferred (processed in __release_sock);
-  G1b  of the ticket ACKs processed on arrival (not deferred), >= 90 % did not call tcp_slow_start.
+Input: per run <tag>_srv.pcap (capture on the server) and <tag>.bpf.txt (probe ticket_backlog.bt). The ticket acknowledgments are found
+in the capture as in analyze_state.py (client port, acknowledgment number) and joined with the RENO events of the trace. An
+acknowledgment is "deferred" if its RENO event lies, on the same thread, between RELS and RELE (__release_sock processes the backlog
+after the application has let go of the socket); otherwise it was processed on arrival (softirq).
+Output: the share of deferred acknowledgments and, per group, the share for which tcp_slow_start was called, with the arrival time
+relative to the write of the response (rel_write_ms <= 0: the acknowledgment had arrived before the write).
+Criteria fixed before the measurement (results/wp6_pred_backlog.txt):
+  G1a  of the ticket ACKs that arrived (on the wire) before the response was written and still called tcp_slow_start, >= 90 % were
+       deferred;
+  G1b  of the ticket ACKs processed on arrival, >= 90 % did not call tcp_slow_start.
 """
 import argparse, collections, csv, glob, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -18,6 +22,9 @@ from analyze_state import _ticket_acks  # noqa: E402
 from pcap_summary import read_pcap  # noqa: E402
 
 def parse(path):
+    """Read the trace of one run: {(client port, acknowledgment number): state at tcp_reno_cong_avoid (time in ns, thread, cwnd,
+    packets_out, max_packets_out, is_cwnd_limited, whether tcp_slow_start followed, whether processed from the backlog)}.
+    """
     reno, windows, ss_after, last = {}, collections.defaultdict(list), set(), {}
     open_rel = {}
     for line in open(path, errors="ignore"):
@@ -34,6 +41,7 @@ def parse(path):
     return reno
 
 def main():
+    """Join capture and trace for every run (resumed connections are every second one), print the shares and the criteria; optional CSV."""
     ap = argparse.ArgumentParser(); ap.add_argument("files", nargs="*"); ap.add_argument("--csv", default="")
     a = ap.parse_args()
     files = a.files or sorted(glob.glob(os.path.join(HERE, "results", "trace_backlog", "*_srv.pcap")))

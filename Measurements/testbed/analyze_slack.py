@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""
-analyze_slack.py - Paper 2, WP5: does the data support the slack rule  cwnd < 2 x peak + slack  of the transport model?
+"""analyze_slack.py - does the data support a "slack" form of the window rule, cwnd < 2 x peak + slack, in the transport model?
 
-Reads results/slack_tcp.csv (run_slack.py; plain TCP) and results/slack_tls.csv (run_slack_tls.sh; resumed TLS, predictions in
-results/slack_predictions.csv). Prints, per stage and per factor:
-  A  the window the kernel grew after n1 segments against grow_cwnd(icw, n1, slack) for slack 0..4: exact-match share and mean error
-  B  the time of a second flight of n2 segments (n1 = 1..12) against the model's time with the window the kernel actually had, and with the window the
-     rule predicts for each slack: which slack explains the extra round trips
-  C  the TLS-level latency against the pre-registered predictions for slack 0..3
-Verdict: the hypothesis (constant slack, 2) is SUPPORTED if one slack fits stage A in the base configuration and the factors the model
-covers (RTT, rate, MTU, icw) and stages B and C agree; it is REFUTED if no constant slack fits, or the best slack differs between stages;
-and a factor on which the best slack changes (delayed ACK, offload, congestion control) is reported as a limit of the rule.
+Reads results/slack_tcp.csv (run_slack.py, plain TCP) and results/resume_summary_slack_tls.csv (resumed TLS, predictions in
+results/slack_predictions.csv). Per stage and per factor it prints:
+  A  the window the kernel had grown after n1 segments against grow_cwnd(icw, n1, slack) for slack 0..4: share of exact matches
+  B  the time of a second flight of n2 segments against the model's time with the window the kernel actually had and with the window the
+     rule gives for each slack: which slack explains the extra round trips
+  C  the TLS latency against the predictions fixed beforehand for slack 0..3
+Verdict: a constant slack would be supported if one value fitted stage A for all factors the model covers (RTT, rate, MTU, initial
+window) and stages B and C agreed; it is refuted if none fits or the best value differs between stages. Factors on which the best value
+changes (delayed ACK, offload, congestion control) are reported as limits of the rule.
+    python3 analyze_slack.py [--tcp results/slack_tcp.csv]
 """
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import collections, csv, math, os, statistics as st, sys
@@ -20,14 +20,16 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "Simulation"))
 import pqc_sim as S  # noqa: E402
 
 RES = os.path.join(HERE, "results")
-SLACKS = range(5)
+SLACKS = range(5)      # slack values compared (segments)
 
 
 def fl(x):
+    """float() with a short name."""
     return float(x)
 
 
 def stage_a(rows):
+    """Compare the measured window after a flight with the rule for each slack; returns the best slack per configuration (None if none matches 90 %)."""
     print("== A: window after n1 segments (plain TCP) ==")
     by = collections.defaultdict(list)
     for r in rows:
@@ -48,7 +50,7 @@ def stage_a(rows):
             pred = {n: S.grow_cwnd(icw, n, s) for n in obs}
             sc[s] = (sum(obs[n] == pred[n] for n in obs) / len(obs), st.mean(abs(obs[n] - pred[n]) for n in obs))
         b = max(SLACKS, key=lambda s: (sc[s][0], -sc[s][1]))
-        cf = sum(obs[n] == max(icw, min(icw + n, 2 * n)) for n in obs) / len(obs)     # closed form of the kernel rule seen in WP5
+        cf = sum(obs[n] == max(icw, min(icw + n, 2 * n)) for n in obs) / len(obs)     # closed form of the kernel's window rule (rule (1))
         closed[cfg] = cf
         best[cfg] = b if sc[b][0] >= 0.9 else None      # no constant slack fits if even the best matches < 90% of the n1 values
         print(f"{cfg:9s} icw={icw:2d} exact-match by slack " + " ".join(f"{s}:{sc[s][0]:.2f}" for s in SLACKS) + f"  best slack {b}{'' if sc[b][0] >= 0.9 else ' (< 90% match: none fits)'}; closed form max(icw, min(icw+n, 2n)): {cf:.2f}  (rep spread up to {spread})")
@@ -58,6 +60,7 @@ def stage_a(rows):
 
 
 def stage_b(rows):
+    """Compare the time of the second flight with the model for each slack; returns the best slack per configuration."""
     print("\n== B: second flight of n2 segments after n1 (plain TCP, Finished-first write) ==")
     by = collections.defaultdict(list)
     for r in rows:
@@ -91,6 +94,7 @@ def stage_b(rows):
 
 
 def stage_c():
+    """Errors of the predictions per slack on the TLS cells; returns the best slack, or None if the data are not available."""
     p = os.path.join(RES, "resume_summary_slack_tls.csv")
     pred = os.path.join(RES, "slack_predictions.csv")
     if not (os.path.exists(p) and os.path.exists(pred)):
@@ -115,6 +119,7 @@ def stage_c():
 
 
 def main():
+    """Run the three stages and print the verdict."""
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--tcp", default=os.path.join(RES, "slack_tcp.csv"), help="plain-TCP results (WP6 B6: results from another kernel)")

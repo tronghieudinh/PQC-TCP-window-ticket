@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""analyze_backlog_posthoc.py - POST HOC look at the part G1 data (not registered): is tcp_slow_start called for a ticket ACK iff the ACK is processed after the first write of the response returned? No root.
+"""analyze_backlog_posthoc.py - post hoc analysis of the backlog traces: is tcp_slow_start called for a ticket acknowledgment exactly if
+that acknowledgment is processed after the first write of the response has returned? Not one of the criteria fixed beforehand.
 
-    python3 analyze_backlog_posthoc.py > results/wp6_analysis_backlog_posthoc.txt
+    python3 analyze_backlog_posthoc.py > results/wp6_analysis_backlog_posthoc.txt      (run in Measurements/testbed)
 
-Uses the SEND events of ticket_backlog.bt (return of tcp_sendmsg, a write of at least 16,000 bytes is the response) and the RENO events joined with the capture as in analyze_backlog.py.
-The last line counts where the ACKs were processed: tid 0 = softirq, otherwise the application thread (inside __release_sock when deferred).
+Uses the SEND events of ticket_backlog.bt (return of tcp_sendmsg; a write of at least 16 000 bytes is the response) and the RENO events
+joined with the capture as in analyze_backlog.py. The last line counts where the acknowledgments were processed: thread id 0 =
+interrupt context (softirq), otherwise the application thread (inside __release_sock when deferred).
 """
 import sys, glob, os, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import analyze_backlog as AB, analyze_ticket_race as T
 from analyze_state import _ticket_acks
 from pcap_summary import read_pcap
+# tab: (suite, processed after the write returned, slow start called) -> count; tid0: (softirq, deferred, slow start called) -> count
 tab=collections.Counter(); tid0=collections.Counter()
 for f in sorted(glob.glob('results/trace_backlog/*_srv.pcap')):
     m=T.TAG.search(os.path.basename(f)); base=os.path.basename(f)[:-9]; bpf=f[:-9]+'.bpf.txt'

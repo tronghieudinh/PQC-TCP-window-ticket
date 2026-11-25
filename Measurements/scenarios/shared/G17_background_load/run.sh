@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G17: the window rule and the ticket model of L1 under background load (cross traffic on the link, CPU load on every CPU). See README.md.
+# Scenario G17, background load: the window rule and the ticket model of the paper with cross traffic on the link, load on every CPU,
+# or both (levels L0..L3 of results/g17_levels.json; the load is passed to the testbed in PQC_LOAD). See README.md.
 #   ./run.sh [--limit N (only the first N calls of each level: smoke test)] [--levels "L0,L1,L2,L3"] [scenario_lib options]
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
 TB=$(cd "$HERE/../../../testbed" && pwd)
@@ -10,6 +11,7 @@ N=${SC_N:-30}
 D="$SC_RUNDIR/data"; mkdir -p "$D"
 sc_tune_on
 RT=(python3 "$SC_TESTBED/run_testbed.py" --profile core --resume --depths 2 --rtts 100 --rates 100 --mtus 1500 --icws 10 --n "$N")
+# PLAN: one line per testbed call, "request response suite,suite,...", from results/g17_cells.json.
 PLAN=$(python3 - "$TB/results/g17_cells.json" <<'PY'
 import json, sys
 for c in json.load(open(sys.argv[1])):

@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
-"""r3d.py - round 3d (results/r3d_design.md): a registered confirmation of round 3c with the write delayed by SPINNING (tls_probe --pre-write-spin-us) and the prediction made with the DISTRIBUTION of the measured shifts of the write.
+"""r3d.py - round 3d (results/r3d_design.md): a registered confirmation of round 3c with the write of the response delayed by SPINNING
+(tls_probe --pre-write-spin-us) and a prediction that uses the DISTRIBUTION of the measured shifts of the write.
+
     python3 r3d.py thresholds --out results/r3d_thresholds          # from the data of round 3c (both machines are the training data)
     python3 r3d.py test --tx results/r3d_x250_test.csv --ack results/r3d_x250_test_ack.csv --machine X250 [--out ...]
-Prediction (no fitted parameter): for the transactions measured at D = 0 (same series: suite, MTU) and the measured shifts of the write at delay D (p_w of each transaction at D minus the median p_w at D = 0: readings of the
-instrument), the predicted late share at D is the share of pairs (baseline transaction, shift) in which the last ticket acknowledgment of the baseline transaction was processed after the shifted write."""
+Prediction (no fitted parameter): take the transactions measured at D = 0 of the same series (suite, MTU) and the measured shifts of the
+write at delay D (p_w of each transaction at D minus the median p_w at D = 0). The predicted late share at D is the share of the pairs
+(D = 0 transaction, shift) in which the last ticket acknowledgment of that transaction was processed after the shifted write.
+Criteria C1 to C4 as in round 3c, with thresholds derived from the 3c data.
+"""
 import argparse, json, math, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); RES = os.path.join(HERE, "results")
 import r3c as C
 from r3b_thresholds import cp_lower, max_failures
 
 def predict(X, su, mt, d, m0):
+    """Predicted late share (%) of series (su, mt) at delay d; m0 is the median write time at D = 0."""
     base = C.at(X, su, mt, 0); v = C.at(X, su, mt, d); sh = [x["pw"] - m0 for x in v if x["pw"] is not None]
     if not sh: return float("nan")
     return 100.0 * sum((max(b["ak"]) if b["ak"] else -1e9) > s for b in base for s in sh) / (len(base) * len(sh))
 
 def cells(X):
+    """One tuple (suite, MTU, D, measured late share, predicted late share, n) per series and delay."""
     m0 = st.median(x["pw"] for x in X if x["delay"] == "0" and x["pw"] is not None); out = []
     for su, mt in C.series(X):
         for d in C.dlist(X):
@@ -23,6 +30,7 @@ def cells(X):
     return out
 
 def thresholds(a):
+    """Derive the thresholds from the round-3c data and write the JSON and Markdown files."""
     tr = {"Arm (3c pilot)": C.load(os.path.join(RES, "r3c_gx10_pilot.csv")), "x86 (3c test)": C.load(os.path.join(RES, "r3c_x250_test.csv"))}
     tot = inside = 0; means = {}; nulls = {}
     for name, X in tr.items():
@@ -45,6 +53,7 @@ def thresholds(a):
     open(a.out + ".md", "w").write("\n".join(L) + "\n"); print("\n".join(L))
 
 def test(a):
+    """Apply the thresholds to the runs of one machine and print the verdict of each criterion with the reading."""
     T = json.load(open(a.thresholds)); X = C.load(a.tx, "s"); D = C.dlist(X); dmax = max(D); ok = {}; L = [f"Round 3d test, machine {a.machine}: {len(X)} resumed transactions"]
     m0 = st.median(x["pw"] for x in X if x["delay"] == "0" and x["pw"] is not None)
     sp = lambda d: (lambda v: sorted(v)[9 * len(v) // 10] - sorted(v)[len(v) // 10])([x["pw"] for x in X if x["delay"] == f"{d:g}" and x["pw"] is not None])

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""g24_predict.py - the cells and model values of G24 (results/g24_design.md): the cells of the random draw (G19) in which a server window above ten would shorten the transaction by a round trip.
-    python3 g24_predict.py [--force]      writes results/g24_cells.csv; refuses to overwrite (registered before the measurement)
-No measurement is read to choose the cells: a cell is chosen iff the model with a server window of 30 after an acknowledged ticket differs from the model of the paper by more than half an RTT."""
+"""g24_predict.py - selects the cells of scenario G24 and their model values (results/g24_design.md): the cells of the random draw (G19) in
+which a server window above ten would shorten the transaction by a round trip.
+
+    python3 g24_predict.py [--force]      writes results/g24_cells.csv
+No measurement is read to choose the cells: a cell is chosen exactly if the model with a server window of 30 after an acknowledged ticket
+differs from the paper's model by more than half an RTT.
+Predictions are written before the measurement: the script refuses to overwrite existing files (--force only to redo deliberately).
+"""
 import csv, hashlib, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import analyze_testbed as A
@@ -10,6 +15,7 @@ EARLIER_WRONG = {10, 32, 66, 72}          # wrong in at least one of the four ea
 
 
 def model(c, w):
+    """Predicted latency (ms) of a cell with server window w after the acknowledged ticket (0 = the paper's model)."""
     flow = S.build_flow(c["suite"], A.probe_protocol(1, c["req"], c["resp"], c["depth"]), int(c["depth"]), "resumed", False)
     net = S.Net(float(c["rate_mbps"]), float(c["rtt_ms"]), int(c["mtu"]), init_cwnd=10, cwnd_validation=True, segmentation="openssl", cwnd_slack=0, nst_early=True, srv_cwnd_acked=w)
     r = S.run_flow(flow, net)
@@ -17,6 +23,7 @@ def model(c, w):
 
 
 def main():
+    """Select the cells, with the smallest window that changes each prediction (k_segments), and write the table."""
     out = os.path.join(HERE, "results", "g24_cells.csv")
     if os.path.exists(out) and "--force" not in sys.argv:
         sys.exit("g24_cells.csv exists (registered); delete deliberately to redo")

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""
-slack_predict.py - writes the predictions of the model for the TLS-level slack test BEFORE it is measured (pre-registration).
+"""slack_predict.py - predictions for the client-window test with TLS, written before it is measured.
 
-The test (run_slack_tls.sh) keeps the server flight small (222-byte response) and varies the client's request flight from 9 to 15
-segments with four suites, whose ClientHello (it carries the ticket, which embeds the client certificate) is 2, 5, 6 and 8 segments:
-so the extra round trip of the request flight depends on how far the client's window grew after the ClientHello. The model predicts it
-for slack = 0 (validated for Paper 1) .. 3. Run once, commit the file and its sha256 with the code, then measure.
+The server's flight is kept small (222-byte response) and the client's flight (Finished + request) varies from 9 to 15 segments with four
+suites whose ClientHello (it carries the ticket, which contains the client certificate) has 2, 5, 6 and 8 segments: whether the request
+needs an extra round trip depends on how far the client's window grew after the ClientHello. The model is evaluated for a loosening of
+the window rule by 0 (the validated rule) to 3 segments ("slack").
+Predictions are written before the measurement: the script refuses to overwrite existing files. Writes results/slack_predictions.csv.
 """
 import csv, hashlib, os, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -18,10 +18,12 @@ KS = list(range(9, 16))          # total segments of the Finished + request flig
 
 
 def req_bytes(k):
+    """Request size such that the flight Finished + request has k segments."""
     return (k - 1) * MSS - 700
 
 
 def main():
+    """Predict every cell for slack 0..3 and write the table."""
     out = os.path.join(HERE, "results", "slack_predictions.csv")
     if os.path.exists(out) and "--force" not in sys.argv:
         sys.exit(f"{out} exists (pre-registered); delete it deliberately to redo")

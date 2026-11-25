@@ -1,20 +1,20 @@
 /*
- * pqcbench.c - dispatcher of the single measurement binary (multi-call, like busybox).
+ * pqcbench.c - the single measurement binary: it contains all measurement programs and runs one of them.
  *
- * The five measurement programs of the testbed are compiled into ONE executable; each keeps its own source file and its own
- * command line, only its main() is renamed (Makefile: -Dmain=<tool>_main). The program is chosen by
- *   pqcbench <tool> [tool options]            or by the name it is called with (symlinks tls_probe, tls_serve, ... -> pqcbench)
+ * The programs are compiled into one executable. Each keeps its own source file and command line; only its main() is renamed
+ * (Makefile: -Dmain=<tool>_main). The program is chosen by
+ *   pqcbench <tool> [options]      or by the name under which it is called (symlinks tls_probe, tls_serve, ... -> pqcbench)
  *
- *   tls_probe      TLS 1.3 client/server probe: full or resumed transactions (latency campaigns, WP1..WP6 stages)
- *   tls_serve      event-driven TLS server (capacity campaigns)
- *   tls_load       closed-loop load generator (capacity)
- *   tls_load_open  open-loop (Poisson) load generator (latency under load)
- *   tcp_flight     plain-TCP window test, no TLS (stages A, B, kernel)
- *   bench_pqc      CPU cost per primitive operation (../bench_pqc.c)
- *   tls_client_time  one handshake to a public server with a forced group (../tls_client_time.c)
+ *   tls_probe        TLS 1.3 client and server probe: full or resumed transactions (latency measurements)
+ *   tls_serve        event-driven TLS server (capacity measurements)
+ *   tls_load         closed-loop load generator (capacity)
+ *   tls_load_open    open-loop load generator with Poisson arrivals (latency under load)
+ *   tcp_flight       window test with plain TCP, no TLS
+ *   bench_pqc        CPU time per cryptographic operation (../bench_pqc.c)
+ *   tls_client_time  one handshake with a public server and a chosen key-exchange group (../tls_client_time.c)
  *
- * What is measured, with which parameters, is decided at run time by the arguments (see pqcm.sh); nothing is recompiled between
- * campaigns. The HSM emulation is the separate shared object hsm_shim.so, configured through PQC_HSM_US / PQC_HSM_SLOTS.
+ * All parameters are given on the command line at run time; nothing is recompiled between measurements. The emulation of a hardware
+ * security module is a separate shared object, hsm_shim.so, configured through PQC_HSM_US and PQC_HSM_SLOTS.
  */
 #include <stdio.h>
 #include <string.h>

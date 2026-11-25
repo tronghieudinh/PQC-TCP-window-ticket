@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""
-analyze_wp6.py - analysis of the WP6 scenarios (paper 2). One subcommand per scenario; each prints what it answers.
+"""analyze_wp6.py - analyses of the scenarios on the ticket rule and the server under load; one subcommand per scenario.
 
-  python3 analyze_wp6.py gen        # B3: ticket rule and server window across RTT, rate, MTU (needs analyze_resume.py --out results/resume_summary_wp6_gen.csv ...)
-  python3 analyze_wp6.py servonly   # B10
-  python3 analyze_wp6.py clientalg  # B9
-  python3 analyze_wp6.py latency    # B4
-  python3 analyze_wp6.py capacity   # B7 (repeats) and B8 (perf profile)
-Loss (B2) has its own script: analyze_loss.py [--resume]. Traces (B1, B5, B11): analyze_trace.py and pcap_summary.py.
+  python3 analyze_wp6.py gen        # ticket rule and server window across RTT, rate and MTU
+                                    #   (needs analyze_resume.py --out results/resume_summary_wp6_gen.csv ...)
+  python3 analyze_wp6.py servonly   # the same with server authentication only
+  python3 analyze_wp6.py clientalg  # different algorithms of client and server certificate: whose size sets the window?
+  python3 analyze_wp6.py latency    # latency under load
+  python3 analyze_wp6.py capacity   # repeated capacity measurements and the CPU profile
+Traces are analyzed by analyze_trace.py and pcap_summary.py.
 """
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import collections, csv, glob, os, statistics as st, sys
@@ -17,6 +17,7 @@ f = float
 
 
 def rd(p):
+    """Rows of a CSV file."""
     return list(csv.DictReader(open(p)))
 
 
@@ -29,6 +30,7 @@ def series_fit(ser, rtt):
 
 
 def gen(kind):
+    """Errors of three ticket models per network and the largest response without an extra round trip, for scenario `kind` (gen or servonly)."""
     pred = os.path.join(RES, f"wp6_pred_{kind}.csv")
     summ = os.path.join(RES, f"resume_summary_wp6_{kind}.csv")
     if not (os.path.exists(pred) and os.path.exists(summ)):
@@ -67,6 +69,7 @@ def gen(kind):
 
 
 def clientalg():
+    """For each (server, client) certificate pair, which hypothesis predicts the measured window: size of the ticket (client) or the server's algorithm."""
     pred = rd(os.path.join(RES, "wp6_pred_clientalg.csv"))
     print("pair (server / client)                 measured fit  H_ticket (client)  H_server")
     for r in pred:
@@ -83,6 +86,7 @@ def clientalg():
 
 
 def latency():
+    """Print the latency percentiles at each fraction of capacity and the ratio of the 99th percentiles at 0.95 and 0.5."""
     fs = sorted(glob.glob(os.path.join(RES, "wp6_latency_load_*.csv")))
     if not fs:
         sys.exit("no results/wp6_latency_load_*.csv")
@@ -97,6 +101,7 @@ def latency():
 
 
 def capacity():
+    """Mean and coefficient of variation of the repeated capacity runs, and the perf profiles."""
     g = collections.defaultdict(list)
     for p in sorted(glob.glob(os.path.join(RES, "wp6_capacity_repeat_*.csv"))):
         for r in rd(p):
@@ -111,6 +116,7 @@ def capacity():
 
 
 def main():
+    """Run the subcommand named on the command line."""
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     {"gen": lambda: gen("gen"), "servonly": lambda: gen("servonly"), "clientalg": clientalg, "latency": latency, "capacity": capacity}[sys.argv[1]]()

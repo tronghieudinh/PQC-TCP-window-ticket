@@ -1,21 +1,30 @@
 #!/usr/bin/env python3
-"""analyze_dubetskyy_segments.py - do the server segment counts published by Dubetskyy and Cano (Information 2026, 17, 1098, doi 10.3390/info17111098, Table 6 and Figure 2)
-follow from the write pattern of the stack model (a handshake flight written through a 4096-byte OpenSSL buffer, every write cut into MSS-sized segments, the partial tail leaving at once)?
-POST HOC calculation (not pre-registered), made after the numbers were published; the data below are theirs, copied from Table 6 (record lengths, MTU 1500, OpenSSL 3.5.0) and Figure 2 (left).
-Assumptions, stated by the authors where they exist: each connection carries the server flight (ServerHello to Finished, with record headers), two NewSessionTicket messages and a close_notify alert.
-Not stated by the authors, so varied here: the header bytes (IPv4 or IPv6, with or without TCP timestamps) and how many segments tickets and alert occupy.
-    python3 analyze_dubetskyy_segments.py"""
+"""analyze_dubetskyy_segments.py - do the server segment counts published by Dubetskyy and Cano (Information 2026, 17, 1098,
+doi 10.3390/info17111098, Table 6 and Figure 2) follow from the write pattern of the model: a handshake flight written through the
+4096-byte buffer of OpenSSL, every write cut into MSS-sized segments, the partial last segment leaving at once?
+
+A post hoc calculation, made after the numbers were published; the input data below are theirs (record lengths, MTU 1500, OpenSSL
+3.5.0, Table 6; segment counts, Figure 2, left). Assumption stated by those authors: each connection carries the server flight
+(ServerHello to Finished, with record headers), two NewSessionTicket messages and a close_notify alert. Not stated by them, therefore
+varied here: the header bytes (IPv4 or IPv6, with or without TCP timestamps) and the number of segments of the tickets and the alert.
+
+    python3 analyze_dubetskyy_segments.py
+"""
 import math
 FLIGHT = {"X25519 + RSA": 1305, "X25519MLKEM768 + RSA": 2393, "ML-KEM-768 + RSA": 2361, "X25519 + ML-DSA-65": 9087, "ML-KEM-768 + ML-DSA-65": 10143}   # server flight in bytes (Table 6)
 SEGS = {"X25519 + RSA": (4, 4, 5), "X25519MLKEM768 + RSA": (5, 5, 5), "ML-KEM-768 + RSA": (5, 5, 5), "X25519 + ML-DSA-65": (10, 12, 12), "ML-KEM-768 + ML-DSA-65": (11, 13, 13)}   # payload segments per connection at MTU 1500 / 1400 / 1280 (Fig. 2)
-MTUS = (1500, 1400, 1280)
+MTUS = (1500, 1400, 1280)      # the MTUs of the published counts
 def segments(flight, mss, extra, buffered=True):
+    """Number of segments for a flight of `flight` bytes: written in 4096-byte pieces (buffered) or at once, each write cut into
+    segments of mss bytes, plus `extra` segments for tickets and alert.
+    """
     w, r = [], flight
     if buffered:
         while r > 0: w.append(min(4096, r)); r -= 4096
     else: w = [flight]
     return sum(math.ceil(x / mss) for x in w) + extra
 def matches(hdr, extra, buffered):
+    """Number of the published scenarios whose segment counts are reproduced at all three MTUs, for the given header bytes and extra segments."""
     return sum(tuple(segments(f, m - hdr, extra, buffered) for m in MTUS) == SEGS[k] for k, f in FLIGHT.items())
 print("Server payload segments per connection (published) against the model: 4096-byte writes, MSS = MTU - 52 (IPv4 + timestamps), tickets 1 + 1 and alert 1 segment")
 for k, f in FLIGHT.items():

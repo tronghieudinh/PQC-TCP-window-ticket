@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""g23_report.py - the numbers of the paper's paragraph on the third library (GnuTLS, scenario G23) from the archived data of the two machines.
+"""g23_report.py - the numbers of the paper's paragraph on the third TLS library (GnuTLS, scenario G23), from the archived data of the two
+machines.
+
     python3 g23_report.py --gx10 DIR/data --x250 DIR/data [--out results/g23_report.txt]
-Writes `key value` lines (make_assets_short.py turns them into macros; reproduce_l1.sh compares the file with the shipped one). Everything is a function of the archived CSV files,
-results/gnutls_calibration.json and the registered predictions: nothing is fitted. The H_ack lines are the exploratory follow-up (gnutls_explore.py), labelled as such."""
+Writes "key value" lines (make_assets_short.py turns them into LaTeX macros; reproduce_l1.sh compares the file with the shipped one).
+Everything is computed from the archived CSV files, results/gnutls_calibration.json and the predictions fixed beforehand; nothing is
+fitted. The keys containing "Hack" belong to the exploratory follow-up (gnutls_explore.py) and are labelled as such in the paper.
+In the keys, A stands for the Arm machine (GX10) and X for the X250.
+"""
 import argparse, json, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -12,6 +17,7 @@ RES = os.path.join(HERE, "results")
 
 
 def one(tag, d, cal):
+    """Result of analyze_g23.evaluate() for one machine and its key-value pairs (counts of cells and wrong cells per stage)."""
     r = A.evaluate(d, cal)
     L = {}
     L[f"Gtls{tag}CN"], L[f"Gtls{tag}CWrong"] = r["n"]["c"], r["c0"]
@@ -39,6 +45,7 @@ def one(tag, d, cal):
 
 
 def explore(tag, d):
+    """Key-value pairs of the exploratory model: cells wrong without and with it, cells fixed and cells broken."""
     out = {}
     for st in ("d", "r"):
         M = A.excess(os.path.join(d, f"g23_{st}.csv"))
@@ -56,6 +63,7 @@ def explore(tag, d):
 
 
 def main():
+    """Compute the numbers of both machines and their agreement and write them."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--gx10", required=True); ap.add_argument("--x250", required=True); ap.add_argument("--out", default=os.path.join(RES, "g23_report.txt"))
     a = ap.parse_args()

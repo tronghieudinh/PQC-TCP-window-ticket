@@ -1,31 +1,30 @@
 #!/usr/bin/env python3
-"""
-go_calibrate.py - the write pattern of tls_probe_go (Go crypto/tls) on one machine, for scenario G10.
+"""go_calibrate.py - the write pattern of tls_probe_go (Go crypto/tls) on one machine, for scenario G10.
 
-Runs tls_probe_go server and client on the loopback (no network emulation, no root: the sizes of the write() calls do not depend on the link), one full
-and one resumed transaction per suite with the small request/response of stage D (302 / 222 B), and records from the probe's own trace
-(PQC_PROBE_TRACE_FILE) the sizes of every write() of the TLS connection:
-  client, resumed connection : ClientHello (all writes before the Finished), Finished, request records, close_notify
-  server, resumed connection : first flight (ServerHello ... Finished, and the NewSessionTicket when Go writes it there), response records, close_notify
-  server, full connection    : first flight, the writes between it and the response (the NewSessionTicket), response, close_notify
-and the leaf/chain sizes of the certificates used (so that another machine's certificate files can be compared).
+Runs server and client of the probe on the loopback (no network emulation, no root: the sizes of the write() calls do not depend on the
+link), one full and one resumed transaction per suite with request 302 and response 222 bytes, and reads from the probe's own trace
+(PQC_PROBE_TRACE_FILE) the size of every write() of the TLS connection:
+  client, resumed connection  ClientHello (all writes before the Finished), Finished, request records, close_notify
+  server, resumed connection  first flight (ServerHello .. Finished, with the NewSessionTicket where Go writes it), response, close_notify
+  server, full connection     first flight, the writes between it and the response (the NewSessionTicket), response, close_notify
+Certificate sizes and checksums are recorded so that another machine's files can be compared.
 
-  go_calibrate.py --out results/go_calibration.json                 # measure and write
-  go_calibrate.py --check results/go_calibration.json               # measure again and compare with a reference (every write within --tol bytes)
-
-The calibration is an input of the G10 predictions (go_predict.py): the predictions use the sizes measured HERE, not sizes assumed.
+  go_calibrate.py --out results/go_calibration.json        # measure and write
+  go_calibrate.py --check results/go_calibration.json      # measure again and compare (every write within --tol bytes)
+The calibration is an input of the G10 predictions (go_predict.py), which use the sizes measured here, not assumed ones.
 """
 import argparse, glob, hashlib, json, os, socket, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SUITES = {"ECDSA-P256|X25519": ("ECDSA-P256", "X25519"), "ML-DSA-44|ML-KEM-768": ("ML-DSA-44", "ML-KEM-768"),
           "ML-DSA-65|ML-KEM-768": ("ML-DSA-65", "ML-KEM-768"), "ML-DSA-87|ML-KEM-1024": ("ML-DSA-87", "ML-KEM-1024")}
-REQ, RESP = 302, 222
+REQ, RESP = 302, 222      # request and response of the calibration transaction (bytes)
 DEPTH = 1   # certificate chain depth (leaf only); --depth overrides
 TLS_REC_OVH = 22  # 5 B header + 1 B content type + 16 B tag (TLS 1.3 AEAD record)
 
 
 def certs_dir():
+    """Directory of the test certificates: PQC_CERTS, else one of the default places that has the needed chain depth."""
     for d in (os.environ.get("PQC_CERTS"), os.path.expanduser("~/meas_copy/certs"), os.path.expanduser("~/pqc_certs_local/certs"),
               os.path.join(HERE, "..", "certs")):
         if d and os.path.isdir(os.path.join(d, "ML-DSA-65", f"d{DEPTH}")):
@@ -34,6 +33,7 @@ def certs_dir():
 
 
 def free_port():
+    """A free TCP port on the IPv6 loopback."""
     s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     s.bind(("::1", 0))
     p = s.getsockname()[1]
@@ -42,10 +42,12 @@ def free_port():
 
 
 def sha(path):
+    """SHA-256 of a file."""
     return hashlib.sha256(open(path, "rb").read()).hexdigest()
 
 
 def one_suite(probe, certs, suite, tmp):
+    """Write sizes of one suite from one full and one resumed transaction."""
     alg, grp = SUITES[suite]
     d = os.path.join(certs, alg, f"d{DEPTH}")
     sfull, cfull = os.path.join(tmp, f"{alg}_s.pem"), os.path.join(tmp, f"{alg}_c.pem")
@@ -96,6 +98,7 @@ def one_suite(probe, certs, suite, tmp):
 
 
 def measure(probe):
+    """Write sizes of every suite and the identification of the probe (checksum, version)."""
     certs = certs_dir()
     res = dict(request=REQ, response=RESP, depth=DEPTH, probe_sha256=sha(probe),
                probe_version=subprocess.run([probe, "version"], capture_output=True, text=True).stdout.strip(), suites={})
@@ -106,6 +109,7 @@ def measure(probe):
 
 
 def flat(r):
+    """All integer values of a calibration as {"suite/key[index]": value}, for comparison."""
     o = {}
     for su, d in r["suites"].items():
         for k, v in d.items():
@@ -119,6 +123,7 @@ def flat(r):
 
 
 def main():
+    """Measure, optionally write the result (--out) and compare it with a reference (--check; exit status 1 if a size differs by more than --tol)."""
     global DEPTH
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--probe", default=os.path.join(HERE, "tls_probe_go"))

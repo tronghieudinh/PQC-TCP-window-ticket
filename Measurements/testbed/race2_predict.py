@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
-"""
-race2_predict.py - pre-registration of the confirmatory ticket-timing test (paper 2, WP6 part B2). Run once; COMMIT AND PUSH results/wp6_pred_race2.csv BEFORE measuring.
+"""race2_predict.py - predictions for the confirmatory test of the ticket-timing threshold on a sweep of request sizes; written before the
+measurement.
 
-Rule found in the first race run (exploratory, 134 transactions): the server's window for its response is above 10 segments when the last ACK of the ticket arrives MORE THAN
-0.049 ms AFTER the last request segment, and 10 when it arrives before. Test: grow or shrink the request by whole segments. Every segment of 1,440 bytes added to the request
-moves the arrival of its last segment later by its serialization time (1,500 bytes at the link rate; 0.12 ms at 100 Mbit/s), while the ticket's ACK, paced by the round trip,
-does not move. So for a request of 19,460 + 1,440 j bytes (j = -3 ... +6) the rule predicts
+Rule found in the first traces (exploratory): the server's window for its response is above 10 segments when the last acknowledgment of
+the ticket arrives more than 0.049 ms after the last request segment, and 10 when it arrives earlier. Test: change the request by whole
+segments. Each added segment of 1440 bytes delays the arrival of the last request segment by its serialization time (1500 bytes at the
+link rate, 0.12 ms at 100 Mbit/s), while the ticket's acknowledgment, paced by the round trip, does not move. For a request of
+19 460 + 1440 j bytes (j = -3 .. +6) the rule predicts m(j) = m(0) - 0.12 ms x j, where m(0) is the median of (last ticket ACK - last
+request segment) of the first traces on the same network and suite: burst above 10 if m(j) > 0.049 ms, else 10; cells within 0.06 ms of
+the threshold are borderline and not scored. Suites ML-DSA-44 and -65, RTT 30 and 100 ms at 100 Mbit/s, MTU 1500, response of 16
+segments. Success: at least 90 % of the scored cells in the predicted class, and the first request size with a burst of 10 within one
+segment of the predicted one.
 
-    m(j) = m(0) - 0.12 ms * j          m(0): the median of (last ticket ACK - last request segment) of the first run at the same network and suite, request 19,460 B
-    burst > 10  if m(j) > 0.049 ms + band,   burst = 10  if m(j) < 0.049 ms - band,   cells within +-band = 0.06 ms are 'borderline' and not scored.
-
-For j < 0 the request needs fewer segments in its second flight, or none (a request of at most 12 segments is sent in the first flight): the tail then arrives even earlier, so the rule
-predicts a burst above 10 (m(j) larger still). Suites: ML-DSA-44 and ML-DSA-65 (tickets of 4 and 5 segments); networks 30 ms and 100 ms at 100 Mbit/s, MTU 1500; response 16 segments.
-Success criterion: at least 90 % of the scored cells have the predicted class, and the first request size with burst 10 is within one segment of the predicted one.
+Reads results/ticket_race.csv and writes results/wp6_pred_race2.csv (commit it before measuring; a new run overwrites the file).
 """
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import csv, os, statistics as st
 HERE = os.path.dirname(os.path.abspath(__file__))
 SLOPE_MS = 0.12          # (1,440 + 60) bytes at 100 Mbit/s
-THRESH, BAND = 0.049, 0.06
+THRESH, BAND = 0.049, 0.06      # threshold of the rule and half-width of the borderline band (ms)
 SUITES = ["ML-DSA-44", "ML-DSA-65"]
 NETS = [(30.0, 100.0, 1500), (100.0, 100.0, 1500)]
-JS = list(range(-3, 7))
+JS = list(range(-3, 7))      # request sizes: 19 460 + 1440 j bytes
 
 def main():
+    """Compute m(0) per suite and network from the first traces, predict every request size and write the table."""
     rows = [r for r in csv.DictReader(open(os.path.join(HERE, "results", "ticket_race.csv")))]
     out = [["suite", "rtt", "rate", "mtu", "j", "req", "m0_ms", "pred_m_ms", "pred_class", "scored", "first_req_burst10_pred"]]
     for su in SUITES:

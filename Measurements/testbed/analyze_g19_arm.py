@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
-"""analyze_g19_arm.py - the random-draw test G19 repeated on a second machine (the Arm GX10 or the Optiplex), or a second time on the X250 (--mode repeat, criteria V1-V3), against the first run (the X250). Criteria A1-A4 of results/phase2_predictions.md (section "Arm replication").
-    python3 analyze_g19_arm.py --run FILE_ARM.csv [--ref results/g19/X250/g19.csv] [--out results/g19_gx10_analysis.txt] [--cells results/g19_gx10_cells.txt]
-The 100 cells and the predictions are those of G19 (g19_cells.csv, g19_predictions.csv): nothing is drawn or fitted again. A cell is wrong when the early-ticket model is off by more than half an RTT.
-  A1  on the Arm machine the early-ticket model is wrong on at most 7 of the 100 cells (the X250 run: 5)
-  A2  at least 4 of the cells that were wrong on the X250 are wrong on the Arm machine too (the failure region does not depend on the machine)
-  A3  at most 2 cells are wrong on the Arm machine that were right on the X250
-  A4  data: every cell of the Arm run has at least 30 valid transactions
-Reported without a criterion: R1-R5 of G19 for the Arm run, the mean and the largest difference between the two machines' measured excess, and whether the wrong cells are one round trip too slow.
+"""analyze_g19_arm.py - the random-cell test (scenario G19) repeated on another machine, or a second time on the first one (--mode repeat),
+compared with a reference run (default: the first run, on the X250).
+
+    python3 analyze_g19_arm.py --run FILE.csv [--ref results/g19/X250/g19.csv] [--mode machine|repeat]
+                               [--out results/g19_gx10_analysis.txt] [--cells results/g19_gx10_cells.txt]
+The 100 cells and the predictions are those of G19 (g19_cells.csv, g19_predictions.csv); nothing is drawn or fitted again. A cell is
+wrong when the early-ticket model is off by more than half an RTT. Criteria fixed beforehand (results/phase2_predictions.md); the first
+set was written for the Arm machine, hence "Arm" in names and output:
+  A1  on the other machine the early-ticket model is wrong on at most 7 of the 100 cells (reference run: 5)
+  A2  at least 4 of the cells wrong in the reference run are wrong again (the failures do not depend on the machine)
+  A3  at most 2 cells are wrong that were right in the reference run
+  A4  data: every cell has at least 30 valid transactions
+  V1-V3 (--mode repeat): the same as A2, A3 and A4 for a second run on the same machine
+Also reported: R1-R5 of G19 for the new run, mean and largest difference of the measured excess between the runs, and how many wrong
+cells are one round trip off.
 """
 import argparse, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -19,6 +26,7 @@ ap.add_argument("--out", default=os.path.join(G.RES, "g19_gx10_analysis.txt"))
 ap.add_argument("--cells", default="")
 ap.add_argument("--mode", choices=("machine", "repeat"), default="machine", help="machine: criteria A1-A4 (a second machine); repeat: criteria V1-V3 (a second run on the same machine)")
 a = ap.parse_args()
+# arm: the new run; ref: the reference run. wa, wr: numbers of their wrong cells; byc: reference cells by number
 arm, ref = G.evaluate(os.path.expanduser(a.run)), G.evaluate(os.path.expanduser(a.ref))
 wrong = lambda c: abs(float(c["model_early_ms"]) - c["meas"]) > 0.5 * float(c["rtt_ms"])
 wa = {c["cell"] for c in arm["cells"] if wrong(c)}; wr = {c["cell"] for c in ref["cells"] if wrong(c)}

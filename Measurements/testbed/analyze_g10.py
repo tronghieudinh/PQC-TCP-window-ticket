@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""analyze_g10.py - evaluates the criteria of results/g10_go_predictions.md on runs of scenario G10 (Go crypto/tls).
-    python3 analyze_g10.py --run DIR [--run DIR2 ...] [--out results/g10_analysis.txt]
-DIR holds slack_tls.csv (stage C) and nst_tls.csv (stage D) of one run (the `data` directory of the run), as written by scenario G10 on ONE machine.
-Measured excess latency of a cell = median of t_total_ms of the resumed transactions on the shaped link minus the median on the unshaped base (rtt 0), as in analyze_testbed.py:
-the CPU time of the library cancels. A cell is 'wrong' when the prediction is off by more than 50 ms (half the RTT). Cells not measured (or with fewer than 20 valid
-transactions) count as MISSING, not as right.
-Criteria (as approved in g10_go_predictions.md; thresholds are not adjusted here):
-  H1  stage C: the validated rule (1) wrong on at most 2 of the 32 cells
-  H2  stage C: the rule loosened by two segments wrong on at least 2 of its 3 discriminating cells, textbook slow start wrong on at least 4 of its 5
-  H3  stage D, cells where 'go' and 'joined' differ by a round trip (74): 'go' wrong on at most 12
-  H4  stage D, all 114 cells of the design: 'go' wrong on at most 17
-  H5  data: every cell has at least 20 valid transactions and the bytes read by the client equal the calibrated flights (+-16 B)
+"""analyze_g10.py - Go server (scenario G10, crypto/tls): evaluates the criteria fixed before the measurement (results/g10_go_predictions.md).
+
+    python3 analyze_g10.py --run DIR [--run DIR2 ...] [--merge] [--out results/g10_analysis.txt]
+
+DIR holds slack_tls.csv (stage C, client window) and nst_tls.csv (stage D, ticket position) of one run on one machine (the `data`
+directory of the run). Excess latency of a cell: median total time of the resumed transactions on the shaped link minus the median on the unshaped link (round-trip time 0). A cell is "wrong" when the prediction is off by more than 50 ms (half the RTT). Cells not
+measured, or with fewer than 20 valid transactions, count as missing, not as right.
+Criteria (thresholds as fixed beforehand):
+  H1  stage C: the validated window rule wrong on at most 2 of the 32 cells
+  H2  stage C: the rule loosened by two segments wrong on at least 2 of its 3 discriminating cells; textbook slow start on at least 4 of its 5
+  H3  stage D, the 74 cells where the models "go" (ticket as Go writes it) and "joined" differ by a round trip: "go" wrong on at most 12
+  H4  stage D, all 114 cells of the design: "go" wrong on at most 17
+  H5  data: every cell has at least 20 valid transactions and the bytes read by the client equal the calibrated flights (within 16 bytes)
 """
 import argparse, csv, json, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +23,7 @@ MIN_VALID = 20
 
 
 def excess(path):
-    """{(suite, req, resp): (excess_ms, n_valid_shaped, median bytes_w, median bytes_r)}"""
+    """{(suite, request, response): (excess latency in ms, valid transactions on the shaped link, median bytes written, median bytes read)} of one CSV file."""
     g = {}
     for r in rd(path):
         if r["err"] or r["reused"] != "1":
@@ -40,6 +41,7 @@ def excess(path):
 
 
 def expected_bytes(cal, su, req, resp):
+    """Bytes the client should write and read in one resumed transaction, from the calibrated write sizes and the TLS records of request and response."""
     c = cal["suites"][su]
     w = sum(c["resumed_client_hello_writes"]) + c["resumed_client_finished"] + sum(pqc_sim.record_writes(req))
     r = sum(c["resumed_server_flight_writes"]) + sum(pqc_sim.record_writes(resp))
@@ -47,6 +49,9 @@ def expected_bytes(cal, su, req, resp):
 
 
 def evaluate(d, cal):
+    """Evaluate one run directory against the predictions and the calibration; returns the counts of measured, missing and wrong cells,
+    the mean absolute error (mae_go), the lists of suspicious cells and the outcome of each criterion.
+    """
     mc, md = excess(os.path.join(d, "slack_tls.csv")), excess(os.path.join(d, "nst_tls.csv"))
     pc = rd(os.path.join(RES, "g10_go_predictions_c.csv"))
     pd = [r for r in rd(os.path.join(RES, "g10_go_predictions_d.csv")) if r["in_design"] == "1"]
@@ -81,7 +86,7 @@ def evaluate(d, cal):
             ew, er = expected_bytes(cal, su, rq, rs)
             if abs(v[2] - ew) > 16 or abs(v[3] - er) > 16:
                 badbytes.append((su, rq, rs, v[2], ew, v[3], er))
-    # the client sometimes also reads the server's close_notify record (24 B) before it counts the bytes: reported separately, the criterion as approved is the strict one
+    # the client sometimes also reads the server's close_notify record (24 B) before it counts the bytes: reported separately, the criterion as fixed before the measurement is the strict one
     badbytes_cn = [x for x in badbytes if not (abs(x[3] - x[4]) <= 16 and abs(x[5] - x[6] - 24) <= 16)]
     r["badbytes_cn"] = badbytes_cn
     r["lowvalid"], r["badbytes"] = nvalid_low, badbytes
@@ -95,6 +100,7 @@ def evaluate(d, cal):
 
 
 def main():
+    """Evaluate every --run directory (or their concatenation with --merge) and write the report."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", action="append", required=True, help="DIR with slack_tls.csv and nst_tls.csv (one run, one machine); repeat for several machines")
     ap.add_argument("--out", default=os.path.join(RES, "g10_analysis.txt"))

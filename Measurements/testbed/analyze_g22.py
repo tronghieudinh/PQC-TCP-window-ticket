@@ -1,26 +1,31 @@
 #!/usr/bin/env python3
-"""analyze_g22.py - evaluates the criteria C1-C5 of results/g22_round2_predictions.md on a run of scenario G22, for ONE machine.
-    python3 analyze_g22.py --run FILE.csv --machine X250|Optiplex|GX10 [--run2 FILE2.csv] [--pred results/g22_predictions.csv] [--out results/g22_<machine>_analysis.txt] [--cells FILE.txt]
-FILE.csv is the output of run_testbed.py --configs-from results/g22_cells.csv --resume. Measured excess of a cell = median t_total_ms of the resumed transactions on the shaped link minus the
-median on the unshaped base of the same suite and sizes. A cell is 'wrong' when the prediction is off by more than half an RTT; a cell with fewer than 30 valid transactions is MISSING.
-Per machine, on the 100 random cells (R) and the 30 focus cells (F); r1 = the model of L1, r2 = the replay of the machine:
+"""analyze_g22.py - replay model against the paper's model on new random cells (scenario G22): evaluates criteria C1-C5 fixed before the
+measurement (results/g22_round2_predictions.md), for one machine.
+
+    python3 analyze_g22.py --run FILE.csv --machine X250|Optiplex|GX10 [--run2 FILE2.csv] [--pred results/g22_predictions.csv]
+                           [--out results/g22_<machine>_analysis.txt] [--cells FILE.txt]
+FILE.csv is the output of run_testbed.py --configs-from results/g22_cells.csv --resume. Excess latency of a cell: median total time of the resumed transactions on the shaped link minus the median on the unshaped link, for the same suite and sizes. A cell is wrong when the
+prediction is off by more than half an RTT; a cell with fewer than 30 valid transactions is missing. The cells are 100 random ones and
+30 "focus" ones. r1 = the paper's model, r2 = the replay model with the parameters of the machine (ticket_ackorder_sim.py).
   C1  r2 wrong on at most 2 of the 100 random cells
-  C2  mean absolute error of r2 over the 100 random cells at most 2 ms
-  C3  improvement over r1 on the random cells: mean absolute error of r2 at most 0.7 times that of r1 (at least 30 % lower), and r2 wrong on no more random cells than r1
+  C2  mean absolute error of r2 over the random cells at most 2 ms
+  C3  improvement on the random cells: mean absolute error of r2 at most 0.7 times that of r1, and r2 wrong on no more cells than r1
   C4  focus cells: r2 wrong on no more of the 30 than r1
   C5  data: every cell has at least 30 valid transactions
-Reported, no criterion: cells that change class (wrong or right) between r1 and r2; with --run2 (a second run of the same machine) the cells whose measured excess differs between the two runs by more
-than half an RTT (the noise floor of the class), and the counts of wrong cells without them.
-Round decision (METHOD_ITERATIVE.md, section 2 step 6), over the three machines: KEPT if C1-C5 are met on all three; IMPROVEMENT ONLY if C3, C4 and C5 are met on all three but not all of C1 and C2;
-NOT SUPPORTED otherwise.
+Reported without a criterion: cells that are wrong under one model and right under the other; with --run2 (a second run on the same
+machine) the cells whose measured excess differs between the two runs by more than half an RTT (the noise level of the classification),
+and the numbers of wrong cells without them.
+Decision rule over the three machines: the replay model is kept if C1-C5 hold on all three; it counts as an improvement only if C3-C5
+hold on all three but not C1 and C2; otherwise it is not supported.
 """
 import argparse, csv, os, statistics as st
 HERE = os.path.dirname(os.path.abspath(__file__))
 RES = os.path.join(HERE, "results")
-MACH = ["x250", "optiplex", "gx10"]
+MACH = ["x250", "optiplex", "gx10"]      # the measurement machines
 
 
 def load(path):
+    """Total times of the valid resumed transactions: (unshaped link by (suite, request, response), shaped link by the full network key)."""
     base, shaped = {}, {}
     for r in csv.DictReader(open(path)):
         if r["err"] or r["reused"] != "1":
@@ -34,6 +39,7 @@ def load(path):
 
 
 def measured(run, pred):
+    """({cell number: measured excess in ms}, number of cells with fewer than 30 valid transactions) of one run."""
     base, shaped = load(run)
     out, miss = {}, 0
     for p in pred:
@@ -46,6 +52,7 @@ def measured(run, pred):
 
 
 def evaluate(run, machine, pred_path, run2=None):
+    """Errors and wrong cells of both models on the random and focus cells, the outcome of C1-C5 and, with run2, the unstable cells."""
     m = machine.lower()
     pred = list(csv.DictReader(open(pred_path)))
     meas, miss = measured(os.path.expanduser(run), pred)
@@ -70,6 +77,7 @@ def evaluate(run, machine, pred_path, run2=None):
 
 
 def lines_of(machine, r, runtxt):
+    """The report lines for the result of evaluate()."""
     L = [f"G22 round 2, machine {machine} ({runtxt}): {r['nR']} random and {r['nF']} focus cells measured, {r['miss']} missing or with fewer than 30 valid transactions",
          f"  C1 r2 wrong by more than half an RTT on {r['w2R']} of {r['nR']} random cells (at most 2)  [r1: {r['w1R']}]",
          f"  C2 r2 mean absolute error over the random cells {r['mae2']:.2f} ms (at most 2)  [r1: {r['mae1']:.2f}]",
@@ -84,6 +92,7 @@ def lines_of(machine, r, runtxt):
 
 
 def main():
+    """Evaluate one run and write the report and, with --cells, the table of cells."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", required=True); ap.add_argument("--machine", required=True, choices=["X250", "Optiplex", "GX10"]); ap.add_argument("--run2", default="")
     ap.add_argument("--pred", default=os.path.join(RES, "g22_predictions.csv")); ap.add_argument("--out", default=""); ap.add_argument("--cells", default="")

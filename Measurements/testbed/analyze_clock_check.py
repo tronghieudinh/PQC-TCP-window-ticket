@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""analyze_clock_check.py - POST HOC (not registered): how well do the capture clock and the bpftrace clock agree in the softirq run (part H)?
+"""analyze_clock_check.py - post hoc: how well do the clock of the packet capture and the clock of bpftrace agree in the softirq traces?
 
     python3 analyze_clock_check.py results/trace_softirq > results/wp6_clock_check.txt
 
-Two clocks: the capture (tcpdump on vs0: wall clock, C>S packets stamped on arrival, S>C packets stamped after the netem egress delay and moved back by the nominal RTT/2)
-and bpftrace (nsecs, monotonic).  For every ticket ACK that is on both, the offset is  capture time - ENQ time  (ENQ = netif_rx, where the arrival stamp is taken).
-Reported: the spread of that offset inside one connection and inside one file (the precision of the alignment), and, with the offset of the same file, the first segment of
-the response on the capture clock moved to the bpftrace clock and compared with the return of the first write of 16,000 bytes or more.
+Two clocks are used: the capture (tcpdump on the server link, wall clock; segments from the client are stamped on arrival, segments of
+the server after the emulated delay and moved back by the nominal RTT/2) and bpftrace (nsecs, monotonic). For every ticket
+acknowledgment that appears in both, the offset is capture time minus ENQ time (ENQ = netif_rx, where the arrival is stamped).
+Output: the spread of that offset inside a connection and inside a file (the precision of the alignment) and, using the offset of the
+file, the first response segment on the capture clock moved to the bpftrace clock and compared with the return of the first write of
+16 000 bytes or more.
 """
 import sys, glob, os, collections, statistics as st
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -15,6 +17,7 @@ from analyze_state import _ticket_acks
 from pcap_summary import read_pcap
 
 def q(v, p):
+    """The p-quantile of the values (nearest rank)."""
     v = sorted(v); return v[min(len(v) - 1, int(p * len(v)))]
 
 d = sys.argv[1]; per_file = {}; rows = []

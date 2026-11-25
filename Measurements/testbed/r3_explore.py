@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
-"""r3_explore.py - step 1 of round 3 (results/r3_design.md): EXPLORATION of the archived race traces, no new data, no criterion.
-For every resumed transaction of the race designs (clock-safe repeats, r2x, r2y; X250, Optiplex, GX10) it takes from analyze_ticket_race.analyse_conn the number of ticket segments n, the number of ticket
-segments acknowledged before the response is written (k_pre, on the capture's stamps), the number acknowledged while the burst is being sent (k_in), and the observed burst, and writes one CSV row each.
+"""r3_explore.py - round 3, step 1 (results/r3_design.md): EXPLORATION of the archived traces of the race between the session ticket's
+acknowledgments and the write of the response. No new measurement and no criterion.
+
+For every resumed transaction of the race runs it takes from analyze_ticket_race.analyse_conn:
+  n       number of segments of the session ticket
+  k_pre   ticket segments acknowledged before the response is written (on the capture's time stamps)
+  k_in    ticket segments acknowledged while the server's burst is being sent
+  burst   segments of the response sent before the next acknowledgment can arrive (observed)
+and writes one CSV row per transaction, then prints a summary by suite, MTU and n.
+
     python3 r3_explore.py DIR [DIR ...] --csv results/r3_explore_points.csv     # DIR: a directory of *_srv.pcap files (trace_clock_race*)
 """
 import argparse, collections, csv, glob, os, sys
@@ -11,6 +18,7 @@ from pcap_summary import read_pcap
 PORT = 4433
 
 def conns(pcap):
+    """Packets of a server-side capture grouped by client port, in order of first appearance (one list per connection)."""
     d = collections.OrderedDict()
     for p in read_pcap(pcap):
         cp = p[2] if p[1] == PORT else (p[1] if p[2] == PORT else None)

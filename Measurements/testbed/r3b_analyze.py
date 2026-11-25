@@ -1,18 +1,35 @@
 #!/usr/bin/env python3
-"""r3b_analyze.py - round 3b (results/r3b_design.md): the kernel's window rule read ACK by ACK, and the quantities from which the thresholds are derived, from runs made with ticket_ack2.bt.
+"""r3b_analyze.py - round 3b (results/r3b_design.md): checks the kernel's window rule acknowledgment by acknowledgment and extracts, per
+transaction, what the accounting of the response burst needs, from runs traced with ticket_ack2.bt.
+
     python3 r3b_analyze.py --runs DIR --tag _p [--machine NAME] --csv results/r3b_<machine>_events.csv --out results/r3b_<machine>_analysis.txt
-For every tcp_ack call of a server socket in a resumed transaction (AK entry, AKR return: v2 lines carry snd_una, packets_out, snd_cwnd, max_packets_out, snd_ssthresh, is_cwnd_limited):
+
+Window events: every tcp_ack() call of a server socket in a resumed transaction (AK at entry, AKR at return; each carries snd_una,
+packets_out, snd_cwnd, max_packets_out, snd_ssthresh, is_cwnd_limited) that acknowledges new data.
   acked = server data segments (XQ) whose end lies in (snd_una before, snd_una after]
-  rule  = cwnd before + acked  if (is_cwnd_limited before or cwnd before < 2 x max_packets_out before) and cwnd before < ssthresh, capped at ssthresh; else cwnd before      (tcp_reno_cong_avoid, tcp_slow_start, tcp_is_cwnd_limited)
-  B1 event is met when cwnd after == rule.
-Per transaction (CSV): suite, MTU, delay, n, the late share (ticket ACKs processed after the XQ of the first response segment), cwnd, packets_out and max_packets_out after the last event before the first response ACK
-can return, the burst from the capture, the median shift AK - RX of the ticket's ACKs: the inputs of the accounting of the burst that the pilot has to discover.
+  rule  = cwnd before + acked, capped at ssthresh, if (is_cwnd_limited before or cwnd before < 2 x max_packets_out before) and
+          cwnd before < ssthresh; else cwnd before   (tcp_reno_cong_avoid, tcp_slow_start, tcp_is_cwnd_limited)
+  B1: an event is met when cwnd after == rule.
+Per transaction (CSV): suite, MTU, delay, n ticket segments; late = ticket acknowledgments processed after the first response segment
+was queued (XQ); cwnd, packets_out, max_packets_out after the last event before the first acknowledgment of the response can return;
+the burst from the capture; the median time AK - RX of the ticket's acknowledgments (shift_us). The accounting of the burst was derived
+from these columns on the pilot data.
+The _ack.csv file holds the window events. txs() is also used by the other round-3 scripts and, with with_conn=True, by the analysis of
+the random cells (G24).
 """
 import argparse, collections, csv, glob, os, re, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import analyze_r3 as R, analyze_ticket_race as T
 
 def txs(rundir, with_conn=False):
+    """Window events and transactions of one run directory trace_r3<TAG>_<kind><delay>_m<mtu>.
+
+    kind says what was delayed: d = the client's pure acknowledgments, w = the server's write of the response (sleeping), s = the write
+    (spinning). delay is in microseconds or "off". Returns (event rows, transaction rows). In a transaction row: t_q (internal) is the
+    time the first response segment was queued; ak_minus_tq_us lists the processing times of the ticket's acknowledgments relative to
+    t_q; late counts those after t_q; pw_us is t_q minus the arrival of the last request segment, i.e. when the response was written.
+    with_conn=True adds the connection number and times from the capture.
+    """
     m = re.search(r"_([dws])(off|[0-9.]+)_m(\d+)$", rundir.rstrip("/")); kind, delay, mtu = m.group(1), m.group(2), int(m.group(3)); ev_rows, tx_rows = [], []
     for f in sorted(glob.glob(os.path.join(rundir, "*_srv.pcap"))):
         g = T.TAG.search(os.path.basename(f)).groupdict(); bpf = f[:-len("_srv.pcap")] + ".bpf.txt"

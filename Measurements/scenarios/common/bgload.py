@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""bgload.py - background CPU load for scenarios that test a machine under load (G7).
+"""bgload.py - background CPU load for scenarios that measure a machine under load.
 
   bgload.py --cpus 3 --duty 50 [--seconds 600] [--avoid-test-cpus]
-Starts one busy process per CPU, each pinned to its CPU, working `duty` percent of every 20 ms and sleeping the rest. It stays in the
-foreground until --seconds have passed or it receives SIGTERM/SIGINT; the runner starts it in the background and stops it afterwards.
---avoid-test-cpus keeps off the CPUs that run_testbed.py uses for the client, server and proxy (and their hyper-thread siblings).
+
+Starts one busy process per CPU, each pinned to its CPU, which works `duty` percent of every 20 ms and sleeps for the rest. The program
+stays in the foreground until --seconds have passed or it receives SIGTERM or SIGINT; the scenario runner starts it in the background
+and stops it afterwards. --avoid-test-cpus keeps off the CPUs that run_testbed.py uses for the client, the server and the proxy, and off
+their hyper-thread siblings.
 """
 import argparse, os, signal, sys, time, multiprocessing as mp
 
@@ -12,6 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def test_cpus():
+    """CPUs used by the testbed (client, server, proxy) and their hyper-thread siblings."""
     sys.path.insert(0, os.path.join(HERE, "..", "..", "testbed"))
     try:
         import run_testbed
@@ -28,6 +31,7 @@ def test_cpus():
 
 
 def burn(cpu, duty):
+    """Load process: on CPU `cpu`, busy-wait for `duty` percent of each 20 ms period."""
     os.sched_setaffinity(0, {cpu})
     period = 0.020
     on = period * duty / 100.0
@@ -41,6 +45,7 @@ def burn(cpu, duty):
 
 
 def main():
+    """Choose the CPUs (from the highest numbers down), start the load processes and stop them on request or after --seconds."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--cpus", type=int, required=True, help="number of CPUs to load")
     ap.add_argument("--duty", type=float, default=50, help="percent of each 20 ms that a process is busy")

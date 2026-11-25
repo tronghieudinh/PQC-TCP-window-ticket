@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""selftest_clock_repeat.py - checks analyze_clock_repeat.py on SYNTHETIC events built from real captures (checks the matching and the arithmetic, not the kernel).
+"""selftest_clock_repeat.py - checks analyze_clock_repeat.py on SYNTHETIC kernel events built from real captures (it checks the matching and
+the arithmetic, not the kernel).
 
-    python3 selftest_clock_repeat.py DIR_WITH_srv_pcap_FILES [N_FILES]  -> writes results/selftest_clock/ and prints what analyze_clock_repeat.py must find
-Construction: the offset capture - bpftrace is 1234.567 s; a client segment gets RX at its capture stamp minus the offset; a server segment is stamped by the capture at XS, and was queued
-XQ = XS - (RTT/2 + 170 us) earlier (so the capture's own correction by RTT/2 is 170 us too small); the write that sent the response returns 100 us after the first response segment was queued.
-Expected: K1 deviations ~0, K2 ~0, K3 median = RTT/2 + 170 us, K4 100 %, K6 clock-safe share lower than or equal to the capture's.
+    python3 selftest_clock_repeat.py DIR_WITH_srv_pcap_FILES [N_FILES]   -> writes results/selftest_clock/
+Construction: the capture clock minus the kernel-trace clock is OFF = 1234.567 s; a client segment gets its RX event at its capture time
+minus OFF; a server segment is stamped by the capture at XS (leaving the queueing discipline) and was queued earlier, XQ = XS - (RTT/2 +
+EXTRA), so the capture's own correction by RTT/2 is EXTRA = 170 us too small; the write of the response returns 100 us after the first
+response segment was queued.
+Expected results of analyze_clock_repeat.py: checks K1 deviations about 0, K2 about 0, K3 median = RTT/2 + 170 us, K4 100 %, K6 the
+share with clock-safe times at most the share with the capture's times.
 """
 import glob, os, sys, shutil, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

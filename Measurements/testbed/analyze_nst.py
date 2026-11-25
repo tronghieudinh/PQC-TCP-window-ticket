@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""analyze_nst.py - stage D of WP5: compares the measured resumed latency with the pre-registered predictions of H_joined and H_early (see nst_predict.py)."""
+"""analyze_nst.py - ticket position (stage D): compares the measured resumed latency with the predictions, fixed before the measurement
+(nst_predict.py), of two hypotheses: "joined" (the ticket is sent together with the response) and "early" (it is written separately when
+the client's Finished arrives).
+
+    python3 analyze_nst.py      (needs results/resume_summary_nst_tls.csv, made by analyze_resume.py)
+A cell is wrong when the prediction is off by more than 50 ms (half the RTT).
+"""
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import csv, os, statistics as st
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -7,6 +13,7 @@ RES = os.path.join(HERE, "results")
 
 
 def main():
+    """Errors of both hypotheses, verdict on the cells where they differ, and the list of those cells."""
     pred = {(r["suite"], int(r["req"]), int(r["resp"])): r for r in csv.DictReader(open(os.path.join(RES, "nst_predictions.csv")))}
     summ = os.path.join(RES, "resume_summary_nst_tls.csv")
     if not os.path.exists(summ):

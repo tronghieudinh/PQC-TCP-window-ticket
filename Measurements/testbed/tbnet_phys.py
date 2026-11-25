@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-"""tbnet_phys.py - a testbed on a REAL link between two machines (scenario G13-lite of L1), with the same interface as tbnet.Testbed.
+"""tbnet_phys.py - the testbed on a real link between two machines, with the same interface as tbnet.Testbed.
 
-The machine that runs run_slack.py / run_testbed.py is the CLIENT host; the SERVER host is reached through SSH (key-based). Both hosts need the repository at some path
-(`repo=`), the probes built (`setup_host.sh`: tls_probe, tcp_flight), the same certificates generated under `work/` (they are copied with rsync before each run), and
-`sudo -n` for tc, ip, ethtool and sysctl (or an SSH login as root). The link is a physical cable or switch between one NIC of each host; the RTT is made with tc netem on the
-EGRESS of both NICs (delay RTT/2 each way), as the namespace testbed does on the veth pair. Test addresses fd99:13::1 (client) and fd99:13::2 (server) are added to the two NICs
-for the run and removed at the end; TCP timestamps are turned off and restored; the offload features of the NICs are left as they are (spec offload=keep) or turned off (offload=off).
+The machine that runs run_slack.py or run_testbed.py is the client host; the server host is reached over SSH with a key. Both hosts need
+the repository at a known path (repo=), the probes built (setup_host.sh), the same test certificates (copied with rsync before a run) and
+`sudo -n` for tc, ip, ethtool and sysctl, or an SSH login as root. One network card of each host is connected by a cable or a switch. The
+round-trip time is emulated with netem on the outgoing side of both cards (RTT/2 each way), as on the veth pair of the namespace testbed.
+The test addresses fd99:13::1 (client) and fd99:13::2 (server) are added to the two cards for the run and removed afterwards. TCP
+timestamps are switched off and restored. Offload features of the cards stay as they are (offload=keep) or are switched off.
 
-Spec, in the environment variable PQC_PHYS (comma separated key=value):
+Specification, in the environment variable PQC_PHYS (comma-separated key=value):
     server=USER@HOST      required: SSH destination of the server host
-    ifc=IFACE             required: NIC of the client host
-    ifs=IFACE             required: NIC of the server host
+    ifc=IFACE             required: network interface of the client host
+    ifs=IFACE             required: network interface of the server host
     repo=PATH             repository root on the server host (default: the same path as here)
-    cpu_s=N               CPU on the server host for the server probe (default: the one chosen for the local machine)
-    certs_local=DIR       the directory of the test certificates here (PQC_CERTS) when it lies outside the repository, and
-    certs_remote=DIR      where the same files are put on the server host (copied with rsync at the start; test keys only, a lab machine)
-    offload=keep|off      NIC offloads (default keep: the real default)
-    sudo=sudo -n|none     how to get root on the SERVER host (default 'sudo -n'; 'none' when the SSH user is root); the client host side runs as root already (scenario scripts use sudo)
-    openssl=PREFIX        OpenSSL prefix of the measurement build on the server host (default: the same as here)
-    ssh=OPTIONS           extra ssh options (default: -o BatchMode=yes -o ConnectTimeout=10)
+    cpu_s=N               CPU of the server probe on the server host (default: the one chosen for the local machine)
+    certs_local=DIR       local directory of the test certificates (PQC_CERTS) if it lies outside the repository, and
+    certs_remote=DIR      where the same files go on the server host (copied at the start; test keys only, on a laboratory machine)
+    offload=keep|off      offloads of the network cards (default keep, the real default)
+    sudo=sudo -n|none     how to obtain root on the server host (default "sudo -n"; "none" if the SSH user is root)
+    openssl=PREFIX        OpenSSL installation of the measurement build on the server host (default: the same as here)
+    ssh=OPTIONS           further ssh options (default: -o BatchMode=yes -o ConnectTimeout=10)
 """
 import os
 import re
@@ -38,6 +39,7 @@ REPO_LOCAL = os.path.abspath(os.path.join(HERE, "..", ".."))
 
 
 def parse_spec(spec: str) -> dict:
+    """Parse PQC_PHYS into a dictionary, check the required keys and fill in the defaults."""
     d = {}
     for part in [p for p in spec.split(",") if p]:
         k, _, v = part.partition("=")
@@ -53,9 +55,11 @@ def parse_spec(spec: str) -> dict:
 
 
 class PhysTestbed(Testbed):
+    """Testbed on two hosts; the "namespaces" PHYS_C and PHYS_S stand for the local host and the server host."""
     physical = True
 
     def __init__(self, spec: str, dry_run: bool = False, verbose: bool = False, timestamps: bool = False):
+        """spec: content of PQC_PHYS (see the module docstring); the other arguments as in tbnet.Testbed."""
         self.topology = "direct"
         self.dry = dry_run
         self.timestamps = timestamps
@@ -66,13 +70,16 @@ class PhysTestbed(Testbed):
 
     # ------------------------------------------------------------------ execution on the two hosts
     def _ssh(self, remote: str) -> list:
+        """ssh command that runs the shell command `remote` on the server host."""
         return ["ssh"] + shlex.split(self.spec["ssh"]) + [self.spec["server"], remote]
 
     def _priv_s(self) -> list:
+        """Prefix that gives root rights on the server host (empty if the SSH user is root)."""
         s = self.spec["sudo"]
         return [] if s == "none" else shlex.split(s)
 
     def run(self, cmd, ns=None, check=True, capture=False):
+        """As Testbed.run; a command for the server host is wrapped in ssh with root rights."""
         if isinstance(cmd, str):
             cmd = shlex.split(cmd)
         if ns == PHYS_S:
@@ -84,14 +91,16 @@ class PhysTestbed(Testbed):
         return subprocess.run(cmd, check=check, capture_output=capture, text=True, stdin=subprocess.DEVNULL)
 
     def _out(self, cmd, ns) -> str:
+        """Standard output of a command on one of the two hosts (failures give an empty or partial string)."""
         return self.run(cmd, ns=ns, check=False, capture=True).stdout or ""
 
     # ------------------------------------------------------------------ used by run_slack.py and run_testbed.py
     def exec_prefix(self, who: str) -> list:
+        """Marker for commands of the server (resolved by map_cmd); client commands run locally without prefix."""
         return [SENTINEL] if who == "s" else []
 
     def map_cmd(self, cmd: list) -> list:
-        """Turn a command built with exec_prefix('s') into one SSH call; paths under the local repository are rewritten to the repository of the server host."""
+        """Turn a command built with exec_prefix('s') into one ssh call, with local paths rewritten to those of the server host."""
         if SENTINEL not in cmd:
             return cmd
         i = cmd.index(SENTINEL)
@@ -99,20 +108,25 @@ class PhysTestbed(Testbed):
         if self.spec.get("cpu_s") and "taskset" in head:
             head[head.index("-c") + 1] = self.spec["cpu_s"]
         remote = [self.rpath(x) if isinstance(x, str) else x for x in head + tail]
-        # the probes have no rpath: the OpenSSL they run against is chosen by LD_LIBRARY_PATH, which a non-interactive ssh login does not carry
-        # the shell writes its PID to a file and then execs (env, taskset and the probe keep that PID), so that stop_server() can end exactly this process
+        # The probes carry no library path: LD_LIBRARY_PATH selects their OpenSSL, and a non-interactive ssh login does not set it.
+        # The shell writes its process ID to a file and then replaces itself (env, taskset and the probe keep that ID), so that
+        # stop_server() can end exactly this process.
         wrapped = ["sh", "-c", 'echo $$ > ' + PIDFILE + '; exec "$@"', "sh", "env", "LD_LIBRARY_PATH=" + self.remote_openssl_lib()] + remote
         return self._ssh(shlex.join(wrapped))
 
     def stop_server(self):
-        """End the server process left on the server host by the last map_cmd (closing the local ssh does not end it, so it would keep the port). Safe to call when none runs."""
+        """End the server process that the last map_cmd left on the server host: closing the local ssh does not end it, and it would keep
+        the port. Safe to call when no server is running.
+        """
         if self.dry:
             return
         subprocess.run(self._ssh(f"[ -r {PIDFILE} ] && kill -TERM $(cat {PIDFILE}) 2>/dev/null; sleep 0.3; [ -r {PIDFILE} ] && kill -KILL $(cat {PIDFILE}) 2>/dev/null; rm -f {PIDFILE}; true"),
                        check=False, capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
 
     def remote_openssl_lib(self) -> str:
-        """lib directory of the measurement OpenSSL on the server host: spec key openssl=PREFIX, else the prefix used here (PQC_OPENSSL, default ~/opt/openssl-3.5 of the invoking user; the two hosts use the same layout)."""
+        """Library directory of the measurement OpenSSL on the server host: from the key openssl=, otherwise the installation used here
+        (PQC_OPENSSL, default ~/opt/openssl-3.5 of the invoking user; both hosts use the same layout).
+        """
         prefix = self.spec.get("openssl") or os.environ.get("PQC_OPENSSL")
         if not prefix:
             home = os.path.expanduser("~" + os.environ["SUDO_USER"]) if os.environ.get("SUDO_USER") else os.path.expanduser("~")
@@ -120,6 +134,7 @@ class PhysTestbed(Testbed):
         return os.path.join(prefix, "lib")
 
     def rpath(self, p):
+        """Translate a local path (repository or certificate directory) into the path on the server host."""
         cl, cr = self.spec.get("certs_local"), self.spec.get("certs_remote")
         if cl and cr and isinstance(p, str) and p.startswith(cl):
             return cr + p[len(cl):]
@@ -128,7 +143,7 @@ class PhysTestbed(Testbed):
         return p
 
     def sync(self, work: str):
-        """Copy the generated certificate chains to the server host (same relative place in the repository)."""
+        """Copy the generated certificate chains to the same relative place on the server host."""
         if self.dry:
             return
         dest = self.rpath(os.path.abspath(work))
@@ -137,20 +152,25 @@ class PhysTestbed(Testbed):
 
     @property
     def client_target(self) -> str:
+        """Address of the server host on the test link."""
         return IP_S
 
     @property
     def server_bind(self) -> str:
+        """Address the probe server listens on."""
         return IP_S
 
     # ------------------------------------------------------------------ build / tear down
     def _hosts(self):
+        """(host, interface, own test address, peer test address) of the client and of the server."""
         return ((PHYS_C, self.spec["ifc"], IP_C, IP_S), (PHYS_S, self.spec["ifs"], IP_S, IP_C))
 
     def _sysctl_get(self, ns, key):
+        """Current value of a kernel parameter on one host."""
         return self._out(["sysctl", "-n", key], ns).strip()
 
     def up(self):
+        """Prepare both hosts: certificates, kernel parameters (old values are remembered), test addresses and offloads."""
         cl, cr = self.spec.get("certs_local"), self.spec.get("certs_remote")
         if cl and cr and not self.dry:
             self._out(["mkdir", "-p", cr], PHYS_S)
@@ -168,6 +188,7 @@ class PhysTestbed(Testbed):
                 self.run(["ethtool", "-K", ifc, "tso", "off", "gso", "off", "gro", "off", "lro", "off"], ns=ns, check=False, capture=True)
 
     def down(self):
+        """Remove qdiscs, routes and test addresses and restore the kernel parameters and offloads."""
         for ns, ifc, addr, peer in self._hosts():
             self.run(["tc", "qdisc", "del", "dev", ifc, "root"], ns=ns, check=False, capture=True)
             self.run(["ip", "-6", "route", "del", f"{peer}/128", "dev", ifc], ns=ns, check=False, capture=True)
@@ -185,6 +206,7 @@ class PhysTestbed(Testbed):
     # ------------------------------------------------------------------ per-configuration shaping
     def shape(self, rtt_ms: float, rate_mbps: float, loss_pct: float, mtu: int, icw: int, cc: str = "reno",
               initrwnd: int = 100, quickack: bool = True, qdisc: str = ""):
+        """Apply one network configuration to both interfaces; parameters as in Testbed.shape (no qdisc option, random loss only)."""
         shaped = rtt_ms > 0 or rate_mbps > 0 or loss_pct > 0
         for ns, ifc, _addr, peer in self._hosts():
             self.run(["ip", "link", "set", "dev", ifc, "mtu", str(mtu)], ns=ns)
@@ -206,6 +228,7 @@ class PhysTestbed(Testbed):
             self.run(["ip", "tcp_metrics", "flush"], ns=ns, check=False, capture=True)
 
     def netem_counters(self) -> dict:
+        """Packets sent and dropped by netem in each direction, as in Testbed.netem_counters."""
         out = {}
         for tag, ns, ifc in (("c2s", PHYS_C, self.spec["ifc"]), ("s2c", PHYS_S, self.spec["ifs"])):
             t = self._out(["tc", "-s", "qdisc", "show", "dev", ifc], ns)
@@ -214,6 +237,7 @@ class PhysTestbed(Testbed):
         return out
 
     def smoke_test(self) -> bool:
+        """Ping the server host over the test link."""
         r = self.run(["ping", "-6", "-c", "2", "-W", "3", IP_S], check=False, capture=True)
         return r.returncode == 0
 

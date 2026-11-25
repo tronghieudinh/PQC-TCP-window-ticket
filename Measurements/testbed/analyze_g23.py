@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
-"""analyze_g23.py - reads a run of scenario G23 (GnuTLS 3.8.14) for ONE machine and reports what the data say about the principles of results/g23_gnutls_predictions.md.
+"""analyze_g23.py - GnuTLS server (scenario G23, GnuTLS 3.8.14): reads one run of one machine and reports what the data say about the
+explanations stated in results/g23_gnutls_predictions.md.
+
     python3 analyze_g23.py --run DIR [--run2 DIR2] [--machine NAME] [--out results/g23_<machine>_analysis.txt]
-DIR is the `data` directory of the run: g23_c.csv (C), g23_d.csv (D), g23_t0.csv ... g23_t4.csv (T: 0 to 4 tickets), g23_r.csv (R, random cells), g23_o.csv (O, OpenSSL control).
-Measured excess of a cell = median t_total_ms of the resumed transactions on the shaped link minus the median on the unshaped base of the same suite and sizes (the CPU time of the library cancels).
-A cell is 'wrong' when the prediction is off by more than half an RTT; a cell with fewer than 20 valid transactions is MISSING. The purpose is to find the principle that explains the observations,
-not to pass or fail: every count is printed with the band expected from the references of L1 (the count a library that behaves like OpenSSL or Go would give with probability 95 %); a count above
-its band is a SIGNAL to diagnose (the diagnosis lines list the cells and the signed errors), not a verdict. What is reported:
-  C  stage C: cells where rule (1) is wrong (band 0-2); the rule loosened by two segments and textbook slow start on their discriminating cells (expected wrong on nearly all)
-  D  stage D: `early` wrong on the cells where it differs from `joined` (band 0-3) and on all cells (band 0-15); signed errors of the wrong cells against the suite, the ticket segments and k
-  dir  cells where the model is too FAST by more than half an RTT over C, D and R (band 0-1; in L1 never in 1 280 cell-runs)
-  T  the ticket data from 0 to 4 tickets (ticket segments 0 to 18): for every cell which of the two explanations the latency follows (`inflight`: the model of L1; `acked`: the window is rule (1)
-     applied to the ticket flight), the extra round trip of the measurement against both predictions, and the response size k at which the extra round trip appears for each ticket count
-  R  40 random cells: `early` wrong (band 0-3)
-  O  the OpenSSL control of the same session: the model of L1 wrong (band 0-2); if above its band the session is suspect and the other numbers of this run must be read with care
-  data  cells with fewer than 20 valid transactions; bytes written and read by the client against the calibrated flights (16 B)
-With --run2 (a second run on the same machine, declared beforehand as a repeat) the cells whose measured excess differs between the runs by more than half an RTT are reported (noise floor).
+DIR is the `data` directory of the run: g23_c.csv (C, client window), g23_d.csv (D, ticket position), g23_t0.csv .. g23_t4.csv (T,
+0 to 4 tickets), g23_r.csv (R, random cells), g23_o.csv (O, OpenSSL control). Excess latency of a cell: median total time of the resumed transactions on the shaped link minus the median on the unshaped link, for the same suite and sizes. (The CPU time of the library cancels.)
+A cell is wrong when the prediction is off by more than half an RTT; a cell with fewer than 20 valid transactions is missing.
+The aim is to find the explanation that fits the observations, not to pass or fail: every count is printed with the band expected from
+the earlier results (the count a library behaving like OpenSSL or Go would give with probability 95 %). A count above its band is a
+signal to diagnose (the diagnosis lines list the cells and the signed errors), not a verdict. Reported:
+  C    cells where the window rule is wrong (band 0-2); the rule loosened by two segments and textbook slow start on the cells where they
+       differ from it (expected wrong on nearly all)
+  D    the early-ticket model on the cells where it differs from the joined-ticket model (band 0-3) and on all cells (band 0-15), with
+       the signed errors
+  dir  cells of C, D and R where the model is too fast by more than half an RTT (band 0-1)
+  T    0 to 4 tickets (0 to 18 ticket segments): which explanation each cell follows (`inflight`: the paper's model; `acked`: the window
+       is the window rule applied to the ticket flight), the extra round trip against both, and the response size at which it appears
+  R    40 random cells: early-ticket model wrong (band 0-3)
+  O    the OpenSSL control of the same session: the paper's model wrong (band 0-2); above the band, the session is suspect
+  data cells with fewer than 20 valid transactions; bytes written and read by the client against the calibrated flights (16 bytes)
+With --run2 (a repeat on the same machine, announced beforehand) the cells whose measured excess differs between the runs by more than
+half an RTT are counted (the noise level).
 """
 import argparse, csv, json, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -47,6 +53,7 @@ def excess(path):
 
 
 def expected_bytes(cal, su, req, resp, tickets=2):
+    """Bytes the client should write and read in one resumed transaction with the given number of tickets, from the calibration."""
     c = cal["suites"][su]
     tk = c["resumed_ticket_bytes"] if tickets == 2 else (0 if tickets == 0 else c[f"tickets{tickets}_resumed_ticket_bytes"])
     flight = c["resumed_server_flight_writes"] if tickets == 2 else c[f"tickets{tickets}_resumed_server_flight_writes"]
@@ -55,11 +62,12 @@ def expected_bytes(cal, su, req, resp, tickets=2):
     return w, r
 
 
-BANDS = dict(c0=2, early_dis=3, early_all=15, fast=1, early_r=3, o_wrong=2)      # from the references of L1 (results/g23_gnutls_predictions.md, table of thresholds)
-TK = [0, 1, 2, 3, 4]
+BANDS = dict(c0=2, early_dis=3, early_all=15, fast=1, early_r=3, o_wrong=2)      # from the references of the paper (results/g23_gnutls_predictions.md, table of thresholds)
+TK = [0, 1, 2, 3, 4]      # numbers of tickets of stage T
 
 
 def evaluate(d, cal):
+    """All counts, bands inputs, diagnosis list, per-cell results of stage T and data checks for one run directory."""
     M = {n: excess(os.path.join(d, f"g23_{n}.csv")) for n in ["c", "d", "r", "o"] + [f"t{t}" for t in TK]}
     P = {n: rd(os.path.join(RES, f"g23_predictions_{n}.csv")) for n in ("c", "d", "t", "r", "o")}
     P["d"] = [p for p in P["d"] if p["in_design"] == "1"]
@@ -122,6 +130,7 @@ def step_k(items, col):
 
 
 def main():
+    """Evaluate one run (and a repeat, if given) and write the report."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", required=True, help="DIR (the data directory of the run) with the g23_*.csv files")
     ap.add_argument("--run2", default="", help="DIR of a repeat on the same machine (noise floor, reported only)")

@@ -1,8 +1,8 @@
 /*
- * tls_load_open.c - OPEN-loop TLS 1.3 load generator (Poisson arrivals), paper 2, WP6 (latency under load).
+ * tls_load_open.c - OPEN-loop TLS 1.3 load generator (Poisson arrivals), for latency under load.
  *
- * tls_load.c is closed-loop: it measures capacity but its latency is the latency of a saturated server. A bank sizes for a budget at a
- * fraction of capacity, so this program starts connections at a fixed mean rate (exponential gaps), whatever the server does, and reports the
+ * tls_load.c is closed-loop: it measures capacity but its latency is the latency of a saturated server. Services are sized for a latency
+ * budget at a fraction of capacity, so this program starts connections at a fixed mean rate (exponential gaps), whatever the server does, and reports the
  * latency distribution of the transactions (connect() start -> last response byte, as in tls_load) in ONE CSV line:
  *   rate_target,time_s,started,ok,err,dropped,rate_ok,p50_ms,p90_ms,p99_ms,p999_ms,max_ms,first_error
  * `dropped` counts arrivals not started because --max-conc connections were already open (a sign of overload, reported separately).
@@ -41,6 +41,7 @@ typedef struct {
     unsigned seed;
 } Opt;
 
+/* Options, TLS context and server address. */
 static Opt O;
 static SSL_CTX *CTX;
 static struct addrinfo *AI;
@@ -49,17 +50,20 @@ static SSL_SESSION *SESS;                       /* one ticket, shared by all res
 static SSL_SESSION *POOL[POOLMAX];              /* --pool: single-use tickets, one per resumed connection (a client of its own each) */
 static int NPOOL;
 static pthread_mutex_t SESS_MU = PTHREAD_MUTEX_INITIALIZER;
+/* Start of measurement and end of the run (ms), latency histogram and counters shared by all connection threads. */
 static double T_MEASURE, T_END;
 static unsigned long HIST[NBIN], STARTED, OK, ERR, DROPPED, ACTIVE;
 static double MAXMS;
 static char FIRST_ERR[48];
 
+/* Monotonic time in milliseconds. */
 static double now_ms(void) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
 
+/* Store a received session ticket: in the pool (--pool) or as the single shared ticket. */
 static int new_session_cb(SSL *ssl, SSL_SESSION *sess) {
     (void)ssl;
     pthread_mutex_lock(&SESS_MU);
@@ -73,6 +77,7 @@ static int new_session_cb(SSL *ssl, SSL_SESSION *sess) {
     return 1;
 }
 
+/* Read exactly n bytes of application data; -1 on error or end of connection. */
 static int read_exact(SSL *ssl, unsigned char *buf, int n) {
     int got = 0;
     while (got < n) {
@@ -83,6 +88,7 @@ static int read_exact(SSL *ssl, unsigned char *buf, int n) {
     return got;
 }
 
+/* One transaction on a new connection; returns NULL on success or a short error tag and sets *reused if resumed. */
 static const char *transact(unsigned char *req, unsigned char *resp, SSL_SESSION *sess, int *reused) {
     const char *err = NULL;
     int one = 1;
@@ -110,6 +116,7 @@ static const char *transact(unsigned char *req, unsigned char *resp, SSL_SESSION
     return err;
 }
 
+/* Thread of one arrival: take a ticket if resuming, run one transaction and record it if it started after the warm-up. */
 static void *one_connection(void *arg) {
     (void)arg;
     unsigned char *req = calloc(O.req, 1), *resp = malloc(O.resp);
@@ -145,6 +152,7 @@ static void *one_connection(void *arg) {
     return NULL;
 }
 
+/* Latency (ms) below which the fraction p of the successful transactions lies, from the histogram. */
 static double pct(double p) {
     unsigned long acc = 0;
     for (int b = 0; b < NBIN && OK; b++) {
@@ -154,6 +162,7 @@ static double pct(double p) {
     return -1;
 }
 
+/* Parse the options, obtain tickets, start connections at exponentially distributed intervals and print one CSV line. */
 int main(int argc, char **argv) {
     O.addr = "127.0.0.1"; O.port = "4433"; O.req = 302; O.resp = 222; O.rate = 500; O.time_s = 10; O.warmup_s = 2; O.max_conc = 2048; O.seed = 1;
     static struct option lo[] = {{"addr", 1, 0, 'a'}, {"port", 1, 0, 'p'}, {"cert", 1, 0, 'c'}, {"key", 1, 0, 'k'}, {"ca", 1, 0, 'A'}, {"groups", 1, 0, 'g'},

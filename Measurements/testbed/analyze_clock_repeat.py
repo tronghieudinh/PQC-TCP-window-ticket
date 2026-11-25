@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
-"""analyze_clock_repeat.py - criteria K1-K7 of results/wp6_pred_clock.md (approved 21 Nov 2026) on the clock-safe repeat of the ticket traces.
+"""analyze_clock_repeat.py - analysis of the repeated ticket traces with all events on one clock, against criteria K1-K7 fixed before the
+measurement (results/wp6_pred_clock.md).
 
-    python3 analyze_clock_repeat.py --softirq results/trace_clock_softirq --race results/trace_clock_race [--out results/wp6_clock_repeat_analysis.txt]
+    python3 analyze_clock_repeat.py --softirq results/trace_clock_softirq --race results/trace_clock_race
+                                    [--out results/wp6_clock_repeat_analysis.txt] [--k7csv FILE]
 
-Input per file: <tag>_srv.pcap (tcpdump on the server's link), <tag>.bpf.txt (ticket_xmit.bt or ticket_softirq.bt + XQ/XS: all events on one clock, nsecs) and <tag>.clock.json (clock_sync.py).
-Lines: XQ/XS ns cpu sport dport seq len | RX ns cpu sport dport seq ack len | SEND ns tid dport wseq_before wseq_after | ENQ ns cpu sport ack (R1).
-Packets are matched to events by (client port, seq, ack, length) for the client's segments and (client port, seq, length) for the server's. Keys that occur more than once in a file are left out.
-K1 offset capture - RX, spread inside a file; K2 capture stamp of a server segment minus offset against XS; K3 XS - XQ (reported); K4 first response segment queued before the write returns;
-K5 late acknowledgments (R1) arrive after the first response segment was queued; K6 share of transactions with a ticket segment acknowledged before the write, t_w = XQ of the first response segment (R2);
-K7 the 0.049 ms rule on client packets only, recomputed (R2).  Every section is skipped, and said so, when its input is missing.
+Input per run: <tag>_srv.pcap (capture on the server link), <tag>.bpf.txt (ticket_xmit.bt, or ticket_softirq.bt with the XQ and XS
+lines: all events on one clock, ns) and <tag>.clock.json (clock_sync.py). Trace lines: XQ/XS ns cpu sport dport seq len (queued, sent);
+RX ns cpu sport dport seq ack len (arrival); SEND ns tid dport write_seq_before write_seq_after; ENQ ns cpu sport ack. Packets are
+matched to events by (client port, sequence, acknowledgment, length) for the client's segments and (client port, sequence, length) for
+the server's; keys that occur more than once in a file are left out.
+  K1  offset between capture and RX events and its spread inside a file
+  K2  capture time stamp of a server segment minus offset, compared with XS
+  K3  XS - XQ, the delay added by the emulated link (reported only)
+  K4  the first response segment is queued before the write returns
+  K5  late acknowledgments (softirq traces) arrive after the first response segment was queued
+  K6  share of transactions with a ticket segment acknowledged before the write; time of the write = XQ of the first response segment
+  K7  the threshold rule (burst above ten iff the last ticket ACK comes more than 0.049 ms after the last request segment),
+      recomputed with arrival times of client segments only
+A section whose input is missing is skipped, and the output says so.
 """
 import argparse, collections, glob, json, os, statistics as st, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -17,11 +27,14 @@ from pcap_summary import read_pcap
 PORT = 4433
 OUT = []
 def say(s=""):
+    """Print a line and keep it for --out."""
     print(s); OUT.append(s)
 def q(v, p):
+    """The p-quantile of the values (nearest rank)."""
     v = sorted(v); return v[min(len(v) - 1, int(p * len(v)))] if v else float("nan")
 
 def parse_bpf(path):
+    """Read the trace lines of one run, grouped by their first word, as tuples of integers (times in ns)."""
     ev = collections.defaultdict(list)
     for line in open(path, errors="ignore"):
         f = line.split()
@@ -37,9 +50,11 @@ def parse_bpf(path):
     return ev
 
 def uniq(pairs):
+    """Dictionary of the (key, value) pairs whose key occurs exactly once."""
     pairs = list(pairs); c = collections.Counter(k for k, _ in pairs); return {k: v for k, v in pairs if c[k] == 1}
 
 def conns(pcap):
+    """Packets of the capture grouped by client port, in order of first appearance."""
     d = collections.OrderedDict()
     for p in read_pcap(pcap):
         cp = p[2] if p[1] == PORT else (p[1] if p[2] == PORT else None)
@@ -47,6 +62,7 @@ def conns(pcap):
     return d
 
 def load(dirpath):
+    """The runs of a directory that have both a capture and a trace, with file-name parameters, trace events and clock check."""
     files = []
     for f in sorted(glob.glob(os.path.join(dirpath, "*_srv.pcap"))):
         m = T.TAG.search(os.path.basename(f)); bpf = f[:-len("_srv.pcap")] + ".bpf.txt"; ck = f[:-len("_srv.pcap")] + ".clock.json"
@@ -55,7 +71,9 @@ def load(dirpath):
     return files
 
 def offsets(fl):
-    """capture time of a client segment minus RX time of the same segment, per file: returns (median offset, list of deviations in us)."""
+    """Capture time minus RX time of the same client segment, for one run: (median offset in seconds, list of deviations from it in
+    microseconds); (None, []) if no segment matches.
+    """
     rx = uniq(((e[1], e[3], e[4], e[5]), e[0]) for e in fl["ev"].get("RX", []) if e[2] == PORT)
     cap = uniq(((p[1], p[3], p[4], p[6]), p[0]) for p in read_pcap(fl["pcap"]) if p[2] == PORT)
     offs = [cap[k] - rx[k] / 1e9 for k in cap if k in rx]
@@ -63,6 +81,7 @@ def offsets(fl):
     med = st.median(offs); return med, [(o - med) * 1e6 for o in offs]
 
 def main():
+    """Evaluate K1 to K7 for the given directories and write the report."""
     ap = argparse.ArgumentParser(); ap.add_argument("--softirq", default=""); ap.add_argument("--race", default=""); ap.add_argument("--out", default=""); ap.add_argument("--k7csv", default="")
     a = ap.parse_args()
     sets = {n: load(d) for n, d in (("R1 softirq", a.softirq), ("R2 race", a.race)) if d}

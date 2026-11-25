@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""analyze_g9.py - evaluates the criteria G1-G4 of results/g9_ticket_versions_predictions.md on one or more OpenSSL releases measured with scenario G9.
-    python3 analyze_g9.py                                   # the archived runs: results/g9/3.5, 4.1.0, 3.6.5 (X250, 19 Nov 2026), baseline 3.5
-    python3 analyze_g9.py --run 3.5=DIR --run 4.1.0=DIR [--run 3.6.5=DIR] [--out results/g9_analysis.txt] [--cross-out results/g9_crossversion.txt]
-DIR holds slack_tls.csv (stage C) and nst_tls.csv (stage D) of one run. The first --run is the baseline (3.5 on the SAME machine).
-Also writes the cross-release comparison (md5sum of the raw files, differences of the resumed latency of the 80 stage-D cells against the baseline).
-The predictions are those of results/slack_predictions.csv and results/nst_predictions.csv, unchanged. A cell is 'wrong' when the prediction is off by more than 50 ms (half the RTT).
-Criteria (as approved; thresholds are not adjusted here):
-  G1  stage C: the validated rule (slack 0) is wrong on at most 1 of 28 cells
-  G2  stage C: the rule loosened by two segments is wrong on at least 3 of 28 cells
+"""analyze_g9.py - other OpenSSL releases (scenario G9): evaluates criteria G1-G4 fixed before the measurement
+(results/g9_ticket_versions_predictions.md) for one or more releases.
+
+    python3 analyze_g9.py                                   # the archived runs results/g9/3.5, 4.1.0, 3.6.5 (X250); baseline 3.5
+    python3 analyze_g9.py --run 3.5=DIR --run 4.1.0=DIR [--run 3.6.5=DIR] [--out results/g9_analysis.txt]
+                          [--cross-out results/g9_crossversion.txt]
+DIR holds slack_tls.csv (stage C) and nst_tls.csv (stage D) of one run. The first --run is the baseline (3.5 on the same machine). Also
+writes a comparison between releases (md5 sums of the raw files; differences of the resumed latency of the 80 stage-D cells against the
+baseline). The predictions are those of results/slack_predictions.csv and results/nst_predictions.csv, unchanged. A cell is wrong when
+the prediction is off by more than 50 ms (half the RTT).
+  G1  stage C: the window rule (no loosening, "slack 0") wrong on at most 1 of the 28 cells
+  G2  stage C: the rule loosened by two segments wrong on at least 3 of the 28 cells
   G3  stage D, the 10 cells where the two ticket models differ: early ticket wrong on at most 1, joined ticket wrong on at least 9
   G4  stage D, all 80 cells: early ticket wrong on at most 6
-Baseline condition: the first run must meet G1-G4, otherwise the machine does not reproduce the earlier result and the other runs are INCONCLUSIVE.
+Baseline condition: the first run must meet G1-G4, otherwise this machine does not reproduce the earlier result and the other runs are
+inconclusive.
 """
 import argparse, csv, os, statistics as st, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -19,6 +23,7 @@ rd = lambda p: list(csv.DictReader(open(p)))
 
 
 def summary(raw, tmp):
+    """Run analyze_resume.py on a raw CSV file and return the rows of its summary."""
     out = os.path.join(tmp, os.path.basename(raw) + ".summary.csv")
     r = subprocess.run([sys.executable, os.path.join(HERE, "analyze_resume.py"), "--out", out, raw], capture_output=True, text=True)
     if r.returncode: raise SystemExit(f"analyze_resume failed on {raw}: {r.stderr[-300:] or r.stdout[-300:]}")
@@ -26,6 +31,7 @@ def summary(raw, tmp):
 
 
 def evaluate(d, tmp):
+    """Counts of wrong cells, mean absolute errors and the outcome of G1-G4 for one run directory."""
     c_meas = {(r["suite"], int(r["req"])): float(r["resumed_excess"]) for r in summary(os.path.join(d, "slack_tls.csv"), tmp)}
     c_pred = rd(os.path.join(RES, "slack_predictions.csv"))
     e0 = [float(p["model_slack0_ms"]) - c_meas[(p["suite"], int(p["req"]))] for p in c_pred if (p["suite"], int(p["req"])) in c_meas]
@@ -62,6 +68,7 @@ def cross(runs, tmp):
 
 
 def main():
+    """Evaluate every release, check the baseline condition and write both reports."""
     ap = argparse.ArgumentParser(); ap.add_argument("--run", action="append", help="VERSION=DIR"); ap.add_argument("--out", default=os.path.join(RES, "g9_analysis.txt"))
     ap.add_argument("--cross-out", default=os.path.join(RES, "g9_crossversion.txt"))
     a = ap.parse_args(); lines = []; res = []

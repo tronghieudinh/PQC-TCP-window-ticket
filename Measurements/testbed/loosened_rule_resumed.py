@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""loosened_rule_resumed.py - mean error of the model over the 144 resumed configurations for the window rule loosened by two segments (L1, Section 4, 'Larger window').
-The loosened rule (cwnd_slack = 2) was chosen after seeing the data, so the figure is post hoc; the pre-registered test of it is the 28-cell client-window test (row 2 of the table of tests).
-    python3 loosened_rule_resumed.py [--write]     (writes results/loosened_rule_resumed.txt)
+"""loosened_rule_resumed.py - mean error of the model over the 144 resumed configurations when the window rule is loosened by two segments,
+with the joined and with the early ticket.
+
+The loosened rule (cwnd_slack = 2) was chosen after seeing the data, so these figures are post hoc; the pre-registered test of it is the
+28-cell client-window test.
+    python3 loosened_rule_resumed.py [--write]     (--write: results/loosened_rule_resumed.txt)
+Columns: window rule, ticket model, mean absolute error (ms), configurations wrong by more than half a round-trip time.
 """
 import csv, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))

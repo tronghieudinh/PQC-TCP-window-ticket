@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""analyze_g14_cells.py - lists the cells of G14 where a model is off by more than 50 ms (the 'wrong' cells counted by analyze_g14.py). Descriptive; no criterion is changed.
+"""analyze_g14_cells.py - lists the cells of scenario G14 in which a model is off by more than 50 ms (the cells counted as wrong by
+analyze_g14.py). Descriptive; no criterion is changed.
+
     python3 analyze_g14_cells.py --arm bbr|delack --run DIR
 """
 import argparse, os, sys
@@ -11,6 +13,7 @@ d = os.path.expanduser(a.run)
 mc, md = G.excess(os.path.join(d, "slack_tls.csv")), G.excess(os.path.join(d, "nst_tls.csv"))
 pc = G.rd(os.path.join(G.RES, f"g14_predictions_{a.arm}_c.csv"))
 pd_ = [r for r in G.rd(os.path.join(G.RES, f"g14_predictions_{a.arm}_d.csv")) if r["in_design"] == "1"]
+# cols, dcols: prediction columns compared in stage C and stage D for this arm
 cols = ["model_bbr_ms", "model_rule1_ms"] if a.arm == "bbr" else ["model_rule1_ms"]
 dcols = ["model_early_ms", "model_reno_early_ms"] if a.arm == "bbr" else ["model_early_ms", "model_joined_ms"]
 print("stage C (cell; measured excess; " + ", ".join(cols) + "; error of first)")

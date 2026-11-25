@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""
-netem_calibrate.py - the RTT that the testbed REALLY delivers, recorded with every measurement run.
+"""netem_calibrate.py - measure the round-trip time that the emulated link really delivers; recorded with every measurement run.
 
-shaper_probe.py (2026-11-15) showed that the netem delay of the testbed overshoots the configured value by a machine-dependent amount: a nominal 30 ms
-round trip measured 30.7 ms on the X250 (two runs, +0.66 to +0.79 ms) and 31.1-31.3 ms on the GX10 (+1.07 to +1.31 ms). A transaction has 3-4 round trips, so the
-excess latency of a configuration is off by that many times the overshoot, which is about the size of the differences between machines that replication
-criteria R2 and R5 could not explain. This tool measures the overshoot with plain `ping` through the same veth pair, shaped with the same tbnet.py code, so that every
-data set carries its own number and runs on different machines or at different times can be corrected or compared.
+The delay configured in netem is exceeded by an amount that depends on the machine: a nominal 30 ms round trip measured 30.7 ms on the
+Lenovo X250 and 31.1 to 31.3 ms on the Arm machine (GX10). A transaction takes three to four round trips, so this excess adds up to about
+the size of the latency differences between machines. The tool measures it with `ping` over the same veth pair, shaped by the same code
+(tbnet.py), so that every data set carries its own value and runs on different machines or days can be compared.
 
-  sudo python3 netem_calibrate.py --out FILE.json          # RTT 5 and 30 ms, 30 pings each, about 15 s; refuses if the namespaces pqcc/pqcs exist
-  python3 netem_calibrate.py --dry-run                     # plan only (no root)
-  python3 netem_calibrate.py --selftest                    # parser test (no root)
-Output (JSON): base_rtt0_ms (unshaped ping, the stack and veth cost), and for every nominal RTT: median_ms, p10_ms, p90_ms, n, over_ms = median - base - nominal.
-`over_ms` is the quantity to subtract per round trip. Never fatal for a measurement: callers ignore a non-zero exit status.
+    sudo python3 netem_calibrate.py --out FILE.json     # RTT 5 and 30 ms, 30 pings each, about 15 s; refuses if the test namespaces exist
+    python3 netem_calibrate.py --dry-run                # print the plan (no root)
+    python3 netem_calibrate.py --selftest               # test the parser of the ping output (no root)
+
+Output (JSON): base_rtt0_ms is the unshaped ping (cost of the stack and the veth pair); for every nominal RTT median_ms, p10_ms, p90_ms,
+n and over_ms = median - base - nominal, the excess of one round trip. A failure does not stop a measurement run.
 """
 from __future__ import annotations
 
@@ -33,21 +32,24 @@ TIME_RE = re.compile(r"time[=<]([0-9.]+)\s*ms")
 
 
 def parse_ping(text: str) -> list:
-    """RTT samples (ms) of a ping run: every 'time=X ms' line (the first reply is dropped by the caller: neighbour discovery)."""
+    """RTT samples in ms from the output of `ping` (every 'time=X ms' field)."""
     return [float(m.group(1)) for m in TIME_RE.finditer(text)]
 
 
 def pct(v, p):
+    """Percentile p (0 to 100) of the values, taken as the nearest sample."""
     v = sorted(v)
     return v[min(len(v) - 1, int(round(p / 100 * (len(v) - 1))))]
 
 
 def summarize(samples: list) -> dict:
+    """Count, median, 10th and 90th percentile of the samples, without the first reply, which includes neighbour discovery."""
     s = samples[1:] if len(samples) > 3 else samples          # first reply includes neighbour discovery
     return {"n": len(s), "median_ms": round(st.median(s), 3), "p10_ms": round(pct(s, 10), 3), "p90_ms": round(pct(s, 90), 3)} if s else {"n": 0}
 
 
 def selftest() -> int:
+    """Check the parser and the summary on a fixed example."""
     t = "PING fd99:1::2 ...\n64 bytes from fd99:1::2: icmp_seq=1 ttl=64 time=31.9 ms\n64 bytes from fd99:1::2: icmp_seq=2 ttl=64 time=30.71 ms\n" \
         "64 bytes from fd99:1::2: icmp_seq=3 ttl=64 time=30.69 ms\n64 bytes from fd99:1::2: icmp_seq=4 ttl=64 time=30.72 ms\n--- stats ---\n"
     x = parse_ping(t)
@@ -60,6 +62,7 @@ def selftest() -> int:
 
 
 def main() -> int:
+    """Build the namespaces, ping unshaped and at each nominal RTT, tear down and write the result."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--out", default="")
     ap.add_argument("--rtts", default="5,30", help="nominal RTTs in ms, comma separated")
@@ -88,6 +91,7 @@ def main() -> int:
         tb.up()
 
         def ping():
+            """Ping the peer from the client namespace and summarise the samples."""
             r = subprocess.run(["ip", "netns", "exec", NS_C, "ping", "-6", "-c", str(a.count + 1), "-i", "0.2", "-W", "2", A_P1], capture_output=True, text=True)
             return summarize(parse_ping(r.stdout))
         tb.shape(0, 0, 0, 1500, 10)                              # unshaped: veth and stack only

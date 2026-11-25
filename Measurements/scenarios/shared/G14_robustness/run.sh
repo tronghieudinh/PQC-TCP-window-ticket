@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G14: the stage-C and stage-D ticket tests of L1 under (arm bbr) BBR and (arm delack) Linux delayed acknowledgments. See README.md.
+# Scenario G14, robustness: the ticket tests of the paper (stage C client window, stage D ticket position) under BBR congestion control
+# (--arm bbr) and under Linux delayed acknowledgments (--arm delack). See README.md.
 #   ./run.sh --arm bbr|delack [--limit N (only the first N calls: smoke test)] [scenario_lib options: --n N --label L --yes --dry-run --preflight-only --cpus ...]
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
 TB=$(cd "$HERE/../../../testbed" && pwd)
@@ -13,6 +14,7 @@ D="$SC_RUNDIR/data"; mkdir -p "$D"
 RT=(python3 "$SC_TESTBED/run_testbed.py" --profile core --resume --depths 2 --rtts 100 --rates 100 --mtus 1500 --icws 10 --n "$N")
 if [ "$ARM" = bbr ]; then RT+=(--cc bbr); sc_exec sc_sudo modprobe tcp_bbr; else RT+=(--delack); fi
 sc_tune_on
+# PLAN: one line per testbed call, "output-file request response suite,suite,...", from the cells of this arm in results/g14_cells.json.
 PLAN=$(python3 - "$TB/results/g14_cells.json" "$ARM" <<'PY'
 import json, sys
 cells = json.load(open(sys.argv[1]))[sys.argv[2]]

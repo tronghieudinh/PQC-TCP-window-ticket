@@ -1,30 +1,36 @@
 #!/usr/bin/env bash
-# All L1 replication steps on the i9, one after the other, unattended (design and criteria: results/i9_replication_design.md). Run inside tmux, as root through sudo from the normal user:
-# the password is typed ONCE (the whole run is one root process); sudoers is not changed.
+# run_i9_all.sh - run all replication steps on a second x86 machine (Core i9) one after the other, unattended (design and criteria:
+# results/i9_replication_design.md). Run it inside tmux, as root through sudo from a normal user: the password is typed once, the whole run
+# is one root process, and the sudo configuration is not changed.
 #
 #   sudo bash run_i9_all.sh run                 # smoke test of every step first (about 30 min), then the main runs (about 9 h)
-#   sudo bash run_i9_all.sh run --with-load     # also G17 (puts load on EVERY CPU of this shared machine; about 2 h more)
+#   sudo bash run_i9_all.sh run --with-load     # also G17 (puts load on every CPU of the machine; about 2 h more)
 #   sudo bash run_i9_all.sh run --only g24,g9   # some steps only
-#   bash run_i9_all.sh plan                     # list steps and commands, run nothing (no root needed)
+#   bash run_i9_all.sh plan                     # list the steps and their commands, run nothing (no root needed)
 #   bash run_i9_all.sh status                   # results so far
 #
-# Running it again skips the steps already completed and retries the others. After each step the data are packed into ~/i9_queue/<step>_<ok|FAILED>_<time>.tar.gz (+ .sha256);
-# the analysis machine fetches them with pull_i9_results.sh. preflight_*.json (they list other users and processes) and keys stay on this machine.
+# Steps: g24, g9, g19, g12, g14delack, r3d, clock, g14bbr, g16, g11 (and g17); CODE_GUIDE.md explains the codes. Running the script again
+# skips the completed steps and retries the others. After each step the data are packed into ~/i9_queue/<step>_<ok|FAILED>_<time>.tar.gz
+# with a .sha256 file, to be copied to the analysis machine. The preflight_*.json files (they list other users and processes) and the keys
+# stay on this machine.
 set -uo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; REPO=$(realpath "$HERE/../..")
+# MODE: run, plan or status. ALL: steps in the order in which they run. ONLY: the list given with --only.
 MODE=${1:-}; shift || true
 case "$MODE" in run|plan|status) ;; *) echo "usage: sudo bash run_i9_all.sh run [--with-load] [--only a,b] | bash run_i9_all.sh plan|status"; exit 1;; esac
 ALL="g24 g9 g19 g12 g14delack r3d clock g14bbr g16 g11"; ONLY=""; ARGS=("$@")
 while [ $# -gt 0 ]; do case "$1" in --with-load) ALL="$ALL g17";; --only) ONLY=${2:?--only needs a list}; shift;; *) echo "unknown option $1"; exit 1;; esac; shift; done
 if [ -n "$ONLY" ]; then for s in ${ONLY//,/ }; do case " $ALL g17 " in *" $s "*) ;; *) echo "unknown step $s"; exit 1;; esac; done; ALL=${ONLY//,/ }; fi
+# RUNS: directory of the measurement data. QUEUE: directory of the packed results and of the status table.
 U=${SUDO_USER:-$(id -un)}; UH=$(getent passwd "$U" | cut -d: -f6)
 RUNS=$(realpath -m "${I9_OUT:-$UH/pqc_analysis_data/i9_runs}"); QUEUE=$(realpath -m "${I9_QUEUE:-$UH/i9_queue}")
 if [ "$MODE" = status ]; then cat "$QUEUE/status.tsv" 2>/dev/null || echo "no status yet ($QUEUE/status.tsv)"; [ -e "$QUEUE/ALL_DONE" ] && echo "ALL_DONE"; exit 0; fi
+# SCEN: scenario runners. CPUS: CPUs of the server (S) and the client (C). R3S: write delays (us) of step r3d.
 SCEN=$HERE/../scenarios/shared; CPUS="S=6,C=7"; R3S="off 0 200 300 400 500 600 800 1600"
 
 scen_dir() { case "$1" in g9) echo G9_ticket_versions;; g19) echo G19_random_design;; g12) echo G12_ticket_new_cells;; g14delack|g14bbr) echo G14_robustness;;
   g16) echo G16_loss_window;; g11) echo G11_cc_pacing;; g17) echo G17_background_load;; *) return 1;; esac; }
-# limits in minutes (a hung step must not stop the night); generous, the usual time is much shorter
+# time limit of a step in minutes, so that a step that hangs does not block the later ones; usual times are much shorter
 limit() { case "$1:$2" in *:smoke) echo 30;; g24:*) echo 45;; g12:*) echo 240;; g9:*) echo 180;; g17:*) echo 240;; g19:*|g14*:*|g16:*) echo 150;; r3d:*) echo 90;; *) echo 60;; esac; }
 # the command of a step; phase is smoke or main
 cmd() { local s=$1 ph=$2 d a=()
@@ -48,6 +54,7 @@ if [ "$MODE" = plan ]; then
 [ "$(id -u)" = 0 ] && [ -n "${SUDO_USER:-}" ] || { echo "run with sudo from your normal user"; exit 1; }
 if [ -z "${WD_INHIBITED:-}" ] && command -v systemd-inhibit >/dev/null; then exec env WD_INHIBITED=1 systemd-inhibit --what=sleep:idle:handle-lid-switch --who=i9all --why="L1 replication runs" bash "$HERE/run_i9_all.sh" "$MODE" "${ARGS[@]}"; fi
 export WD_INHIBITED=1 HOME=$UH
+# The OpenSSL installation and certificates; git (run as root) is told to trust the user's repository.
 export PQC_OPENSSL=${PQC_OPENSSL:-$UH/opt/openssl-3.5}
 export LD_LIBRARY_PATH="$PQC_OPENSSL/lib:$PQC_OPENSSL/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export PQC_CERTS=${PQC_CERTS:-$UH/meas_copy/certs}
@@ -65,11 +72,13 @@ for t in tc ip bpftrace tcpdump python3 make gcc flock timeout; do command -v $t
 [ -f results/i9_replication_design.md ] || { log "ERROR: the registration file is missing (update the checkout)"; exit 1; }
 runuser -u "$U" -- make -s -C "$HERE" PQC_OPENSSL="$PQC_OPENSSL" >>"$LOG" 2>&1 || { log "ERROR: make failed (see $LOG)"; exit 1; }
 [ -x tcp_flight ] || { log "ERROR: tcp_flight is not built"; exit 1; }
+# Refuse to start with less than 10 GB free; record the machine, the software versions and the commit.
 FREE=$(df -BG --output=avail "$RUNS" | tail -1 | tr -dc 0-9); [ "$FREE" -ge 10 ] || { log "ERROR: only ${FREE} GB free at $RUNS (need 10)"; exit 1; }
 COMMIT=$(git -C "$REPO" rev-parse --short HEAD); DIRTY=$(git -C "$REPO" status --porcelain --untracked-files=no -- Measurements | grep -v '\.pem$' | head -3)
 { echo "date $(date -u '+%FT%TZ')"; echo "kernel $(uname -r)"; "$PQC_OPENSSL/bin/openssl" version; bpftrace --version; grep -m1 'model name' /proc/cpuinfo; echo "commit $COMMIT"; echo "tracked changes: ${DIRTY:-none}"; } > "$QUEUE/machine.txt"
 log "start: steps [$ALL], commit $COMMIT, kernel $(uname -r), $("$PQC_OPENSSL/bin/openssl" version)"
 
+# State of the host before the run: time synchronization and loaded kernel modules.
 NTP0=$(timedatectl show -p NTP --value 2>/dev/null || echo yes)
 MODS0=""; for m in ifb tcp_bbr sch_fq; do [ -d /sys/module/$m ] && MODS0="$MODS0 $m"; done
 restore_host() {    # safety net after every step: the runners restore by themselves, this covers a step that was killed
@@ -77,14 +86,19 @@ restore_host() {    # safety net after every step: the runners restore by themse
   [ "$NTP0" = yes ] && timedatectl set-ntp true
   pkill -f "$HERE/(tls_probe|tcp_flight) " 2>/dev/null; true
 }
+# At the end: restore the host, unload the modules loaded during the run and return all files to the user.
 finish() { restore_host; for m in ifb tcp_bbr sch_fq; do case " $MODS0 " in *" $m "*) ;; *) [ -d /sys/module/$m ] && modprobe -r $m 2>/dev/null && log "module $m unloaded";; esac; done
   chown -R "$U" "$RUNS" "$QUEUE"; find "$HERE" -maxdepth 2 -user root -exec chown -h "$U" {} + ; log "host restored (governor $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor), NTP $(timedatectl show -p NTP --value))"; }
 trap finish EXIT
+# CHILD: process of the current step, stopped by stop() on an interrupt.
 CHILD=""
 stop() { log "interrupted: stopping the current step"; [ -n "$CHILD" ] && kill -TERM "$CHILD" 2>/dev/null && wait "$CHILD" 2>/dev/null; exit 130; }
 trap stop INT TERM HUP
+# Wait (up to 60 minutes) until the 1-minute load average is at most I9_MAXLOAD (default 2.0).
 wait_idle() { local l i; for i in $(seq 1 60); do l=$(cut -d' ' -f1 /proc/loadavg); awk -v l="$l" -v m="${I9_MAXLOAD:-2.0}" 'BEGIN{exit !(l<=m)}' && { log "load $l"; return 0; }; [ $i = 1 ] && log "load $l > ${I9_MAXLOAD:-2.0}: waiting"; sleep 60; done; log "load still $l after 60 minutes: running anyway"; }
+# Append one line (time, step, phase, result, duration, commit) to the status table.
 note() { printf '%s\t%s\t%s\t%s\t%ss\t%s\n' "$(date '+%F %T')" "$1" "$2" "$3" "$4" "$COMMIT" >> "$QUEUE/status.tsv"; }
+# Run one step in one phase (smoke or main) under its time limit, restore the host and record the result.
 step_run() { # step phase
   local s=$1 ph=$2 c rc t0 out=$RUNS/state/$1.$2.log; c=$(cmd "$s" "$ph"); t0=$(date +%s)
   log "$s $ph: $c"
@@ -95,6 +109,7 @@ step_run() { # step phase
   [ $rc = 0 ] || tail -5 "$out" | tee -a "$LOG"
   return $rc
 }
+# Pack the data and logs of a step (without preflight files and keys) with a checksum.
 pack() { # step result
   local s=$1 r=$2 d p=() T
   case "$s" in g24) p=(g24 g24_smoke);; r3d) p=(r3d smoke/r3d);; clock) p=(clock smoke/clock);; *) d=$(scen_dir "$s"); d=${d%%_*}; p=("scen/scenarios/$d" "smoke/scenarios/$d");; esac
@@ -112,6 +127,7 @@ OLD=$UH/pqc_analysis_data/g24_$(hostname -s)
 if [[ " $ALL " == *" g24 "* ]] && [ ! -e "$RUNS/state/g24.ok" ] && grep -q "packed:" "$OLD/g24_run.log" 2>/dev/null; then
   log "g24: a finished run exists in $OLD; it is used and G24 is not run again"; rm -rf "${RUNS:?}/g24"; cp -a "$OLD" "$RUNS/g24" && { touch "$RUNS/state/g24.ok"; note g24 main "ok(earlier run)" 0; pack g24 ok; }
 fi
+# Smoke test every remaining step, then run the main phase of those that passed.
 TODO=""; for s in $ALL; do [ -e "$RUNS/state/$s.ok" ] && log "$s: already completed, skipped" || TODO="$TODO $s"; done
 GOOD=""
 log "== smoke tests:$TODO"

@@ -48,8 +48,10 @@ import (
 	"unsafe"
 )
 
+// t0 is the origin of all time stamps of the process.
 var t0 = time.Now()
 
+// nowMs returns the milliseconds since t0 (monotonic clock).
 func nowMs() float64 { return float64(time.Since(t0).Nanoseconds()) / 1e6 }
 
 // ---------------------------------------------------------------- trace and byte counting
@@ -60,6 +62,8 @@ var (
 	connSeq   atomic.Int64
 )
 
+// countConn wraps the TCP connection of one transaction: it counts the bytes written (w) and read (r) and, if a trace file is
+// open, appends one line per call: role (C or S), connection number, W or R, bytes, time in ms.
 type countConn struct {
 	net.Conn
 	role string
@@ -91,11 +95,14 @@ func (c *countConn) Read(b []byte) (int, error) {
 
 // ---------------------------------------------------------------- TCP_INFO (offsets of the Linux uapi struct tcp_info, as in tls_probe.c)
 
+// tcpInfo holds the fields of the kernel's struct tcp_info that the CSV reports: send MSS, congestion window (segments),
+// total retransmissions, smoothed RTT (us), data segments in and out; ok is false if the socket option could not be read.
 type tcpInfo struct {
 	mss, cwnd, retrans, rtt, dsi, dso uint32
 	ok                                bool
 }
 
+// getTCPInfo reads TCP_INFO of the connection.
 func getTCPInfo(tc *net.TCPConn) tcpInfo {
 	var ti tcpInfo
 	sc, err := tc.SyscallConn()
@@ -119,6 +126,7 @@ func getTCPInfo(tc *net.TCPConn) tcpInfo {
 
 // ---------------------------------------------------------------- keys and certificates
 
+// oidMLDSA maps the object identifiers of ML-DSA-44, -65 and -87 to Go's parameter sets.
 var oidMLDSA = map[string]func() mldsa.Parameters{
 	"2.16.840.1.101.3.4.3.17": mldsa.MLDSA44,
 	"2.16.840.1.101.3.4.3.18": mldsa.MLDSA65,
@@ -169,6 +177,7 @@ func loadKey(path string) (crypto.Signer, error) {
 	return mldsa.NewPrivateKey(mk(), seed)
 }
 
+// loadChain loads the certificate chain (leaf first) and its private key and checks that they match.
 func loadChain(certPath, keyPath string) (tls.Certificate, error) {
 	var c tls.Certificate
 	data, err := os.ReadFile(certPath)
@@ -204,6 +213,7 @@ func loadChain(certPath, keyPath string) (tls.Certificate, error) {
 	return c, nil
 }
 
+// loadPool loads the trust anchors from a PEM file.
 func loadPool(path string) (*x509.CertPool, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -216,6 +226,7 @@ func loadPool(path string) (*x509.CertPool, error) {
 	return p, nil
 }
 
+// curveOf maps the value of --groups to the key-exchange group of crypto/tls.
 func curveOf(groups string) ([]tls.CurveID, error) {
 	switch strings.ToLower(groups) {
 	case "x25519":
@@ -230,6 +241,8 @@ func curveOf(groups string) ([]tls.CurveID, error) {
 
 // ---------------------------------------------------------------- options
 
+// opt holds the command-line options (same names as tls_probe): req and resp are the request and response sizes in bytes,
+// n the measured transactions, warmup the discarded ones before them, gapMs the pause between transactions.
 type opt struct {
 	addr, port, cert, key, ca, groups, serverName string
 	mtls, resume, reuseport, noResumedTicket        bool
@@ -240,6 +253,7 @@ type opt struct {
 var ticketKey = [32]byte{0x5a, 0x11, 0x42, 0x07, 0x9c, 0x3e, 0xd0, 0x77, 0x18, 0xa5, 0x6b, 0x2f, 0xee, 0x01, 0x93, 0x4d,
 	0x60, 0xb8, 0x25, 0xc1, 0x7a, 0x0d, 0xf4, 0x39, 0x8e, 0x52, 0xab, 0x14, 0xc7, 0x6e, 0x30, 0x9f} // fixed (TEST ONLY), as in tls_probe.c
 
+// baseConfig is the TLS configuration common to both roles: TLS 1.3 only, one key-exchange group, full-size records.
 func baseConfig(o *opt) (*tls.Config, error) {
 	cv, err := curveOf(o.groups)
 	if err != nil {
@@ -254,6 +268,8 @@ func baseConfig(o *opt) (*tls.Config, error) {
 
 // ---------------------------------------------------------------- server
 
+// runServer accepts connections one at a time and, on each, performs the handshake, reads --req bytes, writes --resp bytes and
+// closes. It prints READY when listening and the MSS and initial window of the first connection (SRVINFO).
 func runServer(o *opt) error {
 	if o.noResumedTicket {
 		return errors.New("--no-resumed-ticket is not available with crypto/tls (no ticket on resumption needs a patched library)")
@@ -319,6 +335,7 @@ func runServer(o *opt) error {
 
 // ---------------------------------------------------------------- client
 
+// sessCache keeps one session ticket; allow controls whether the next connection may present it.
 type sessCache struct {
 	s     *tls.ClientSessionState
 	allow bool
@@ -332,6 +349,8 @@ func (c *sessCache) Get(string) (*tls.ClientSessionState, bool) {
 }
 func (c *sessCache) Put(_ string, s *tls.ClientSessionState) { c.s = s }
 
+// result of one transaction: t0 start, t1 TCP connected, t2 handshake done, t3 response complete (ms; 0 if not reached);
+// ti and te TCP_INFO after connecting and at the end; bw and br bytes written and read; reused: the session was resumed.
 type result struct {
 	t0, t1, t2, t3 float64
 	ti, te         tcpInfo
@@ -340,6 +359,7 @@ type result struct {
 	err            string
 }
 
+// transact runs one transaction on a new TCP connection and records its times, byte counts and TCP state.
 func transact(o *opt, cfg *tls.Config, req, resp []byte) result {
 	var r result
 	r.t0 = nowMs()
@@ -381,6 +401,9 @@ func transact(o *opt, cfg *tls.Config, req, resp []byte) result {
 	return r
 }
 
+// runClient runs warmup + n transactions and prints one CSV row per measured one; times are relative to the start of the
+// transaction (-1 if not reached). With --resume each is preceded by a full handshake that obtains the ticket (prime_ms).
+// It stops after PQC_PROBE_MAX_CONSEC_ERR consecutive errors (default 3; 0 = never).
 func runClient(o *opt) error {
 	cfg, err := baseConfig(o)
 	if err != nil {
@@ -468,6 +491,7 @@ func runClient(o *opt) error {
 	return nil
 }
 
+// b2i converts a bool to 0 or 1 for the CSV.
 func b2i(b bool) int {
 	if b {
 		return 1

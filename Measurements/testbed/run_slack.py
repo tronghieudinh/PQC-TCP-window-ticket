@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-"""
-run_slack.py - Paper 2, WP5: direct measurement of how the Linux kernel grows the congestion window after a first flight, to confirm or
-refute the "slack" hypothesis of the transport model (Net.cwnd_slack; the rule cwnd < 2 x segments-in-flight is met exactly at the
-boundary by a 5-segment ClientHello, and the resumed ML-DSA-44 flow behaves as if the window had grown).
+"""run_slack.py - measure how Linux grows the congestion window of a new connection after its first flight (plain TCP, no TLS).
 
-Uses tcp_flight (plain TCP, no TLS) in the netns testbed of tbnet.py. One factor is changed at a time from the base configuration
-(RTT 100 ms, 100 Mbit/s, MTU 1500, initcwnd 10, Reno, quickack on, no TCP timestamps, no offload), so that a dependence of the rule on
-the stack shows. Resumable: configurations already in the output file are skipped.
+This is the direct test of the window rule. The client writes n1 full-sized segments; once they are acknowledged, the window is read from
+TCP_INFO; then, after a small write that stands in for a TLS Finished, a second flight of n2 segments is sent and timed. The traffic
+program is tcp_flight (tcp_flight.c), run in the namespaces of tbnet.py. One factor at a time is changed from the base configuration
+(RTT 100 ms, 100 Mbit/s, MTU 1500, initial window 10, Reno, immediate ACKs, no TCP timestamps, no offload), so that any dependence of the
+rule on the network stack shows. The "slack" in the file name is the model's term for the extra window that a first flight leaves behind.
 
-  stage A  (cwnd rule)   n1 = 1..16, 20, 24, 31, 40 segments, tiny second flight: the window the kernel actually has after n1 segments
-  stage B  (timing)      n1 = 1..12, n2 = 9..16 (3..12 for icw4, 17..24 for icw20; Finished write of 80 bytes first, like TLS)
-  --trace                also record the kernel tcp_probe tracepoint (snd_cwnd at every incoming ACK) for stage A of the base configuration
+  stage A  (window)   n1 = 1..16, 20, 24, 31, 40 segments and a minimal second flight: the window the kernel has after n1 segments
+  stage B  (timing)   n1 = 1..12 and several n2 around the expected window: whether the second flight needs an extra round trip
+  --trace             also record the kernel tracepoint tcp:tcp_probe (snd_cwnd at every incoming ACK) during stage A
 
-  sudo ./host_tune.sh on; sudo python3 run_slack.py --stage A,B ; sudo ./host_tune.sh off
+    sudo ./host_tune.sh on; sudo python3 run_slack.py --stage A,B; sudo ./host_tune.sh off
+
+Configurations that are already in the output file are skipped, so an interrupted run can be repeated. Output: the CSV of --out (one row
+per connection, columns COLS) and <out>_env.json (kernel and TCP settings). Main columns: cwnd0 initial window, cwnd_pre2 window just
+before the second flight, ssthresh and unacked_pre2 at the same moment, t_b1_ms and t_b2_ms time of each flight, retrans retransmissions.
 """
 import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
 import argparse, csv, os, subprocess, sys, time
@@ -26,14 +29,15 @@ CONFIGS = {
     "base": {},
     "rtt30": dict(rtt=30.0), "rtt5": dict(rtt=5.0), "rate10": dict(rate=10.0), "rate1000": dict(rate=1000.0),
     "mtu1280": dict(mtu=1280), "mtu9000": dict(mtu=9000),
-    # J1 (results/j_mtu9000_predictions.md): MTU 9000 at 1 Gbit/s (the rate of the pre-registered model) and the two RTTs of the prediction
+    # jumbo frames at 1 Gbit/s and the two RTTs of the registered prediction (results/j_mtu9000_predictions.md)
     "j1_rtt30": dict(mtu=9000, rtt=30.0, rate=1000.0), "j1_rtt100": dict(mtu=9000, rtt=100.0, rate=1000.0),
     "icw4": dict(icw=4), "icw20": dict(icw=20),
     "delack": dict(quickack=0), "cubic": dict(cc="cubic"), "ts": dict(ts=1), "offload": dict(offload=1),
 }
-# G11 (not in the default list: name them with --configs): BBR and fq pacing, plain TCP. Predictions: results/g11_cc_pacing_predictions.md
+# Extra configurations, run only when named with --configs.
+# BBR and fq pacing (predictions: results/g11_cc_pacing_predictions.md)
 CONFIGS_EXTRA = {"bbr": dict(cc="bbr"), "reno_fq": dict(qdisc="fq"), "cubic_fq": dict(cc="cubic", qdisc="fq"),
-                 # G16: independent packet loss per direction (netem), plain TCP stage A. Predictions: results/g16_loss_predictions.md
+                 # independent packet loss in each direction, stage A (predictions: results/g16_loss_predictions.md)
                  "loss01": dict(loss=0.1), "loss05": dict(loss=0.5), "loss1": dict(loss=1.0)}
 ALL_CONFIGS = {**CONFIGS, **CONFIGS_EXTRA}
 N1_A = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,24,31,40"
@@ -49,7 +53,8 @@ TRACE = "/sys/kernel/tracing"
 
 
 def set_offload(tb, on):
-    if getattr(tb, "physical", False):          # real NICs (G13-lite): offloads stay as set by the spec of tbnet_phys
+    """Switch segmentation and receive offloads (TSO, GSO, GRO) on both ends of the test link."""
+    if getattr(tb, "physical", False):          # two-machine testbed with real network cards: offloads stay as its specification sets them
         return
     for ns, ifc in ((tbnet.NS_C, "vc0"), (tbnet.NS_S, "vs0")):
         tb.run(["ethtool", "-K", ifc, "tso", "on" if on else "off", "gso", "on" if on else "off", "gro", "on" if on else "off"],
@@ -57,6 +62,17 @@ def set_offload(tb, on):
 
 
 def run_flight(tb, cfg, stage, n1, n2, reps, split, w, trace_file=None):
+    """Run one configuration: start the tcp_flight server, run the client for every n1 (and n2), and append its rows to the CSV.
+
+    tb          shaped testbed
+    cfg         configuration dictionary (see BASE) with its name
+    stage       "A" or "B"
+    n1, n2      comma-separated lists of flight sizes in segments
+    reps        connections per size
+    split       send the small Finished-like write before the second flight
+    w           csv.DictWriter of the output file
+    trace_file  if given, record tcp:tcp_probe into this file during the run
+    """
     if getattr(tb, "physical", False):
         tb.stop_server()                                       # a server left by an earlier run would hold the port
     srv = subprocess.Popen(tb.map_cmd(tb.exec_prefix("s") + [tb.rpath(os.path.join(HERE, "tcp_flight")), "server", "--bind", tb.server_bind, "--port", "4500"]),
@@ -83,15 +99,16 @@ def run_flight(tb, cfg, stage, n1, n2, reps, split, w, trace_file=None):
 
 
 def main():
+    """Parse the options, record the environment, and run the requested stages and configurations."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", default="A,B")
-    ap.add_argument("--n1-a", default=N1_A, help="comma list of burst-1 sizes (segments) for stage A (default: the list of the original runs; J1 uses 1..20)")
+    ap.add_argument("--n1-a", default=N1_A, help="comma list of burst-1 sizes (segments) for stage A (default: the list used for most results)")
     ap.add_argument("--configs", default=",".join(CONFIGS))
     ap.add_argument("--reps-a", type=int, default=20)
     ap.add_argument("--reps-b", type=int, default=15)
     ap.add_argument("--out", default=os.path.join(HERE, "results", "slack_tcp.csv"))
     ap.add_argument("--trace", action="store_true", help="tcp_probe tracepoint for stage A of the configurations in --trace-configs (needs tracefs)")
-    ap.add_argument("--trace-configs", default="base", help="comma list of configurations to trace with --trace (WP6 B5: mtu9000)")
+    ap.add_argument("--trace-configs", default="base", help="comma list of configurations to trace with --trace (e.g. mtu9000)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     if os.geteuid() != 0 and not a.dry_run:
@@ -99,7 +116,7 @@ def main():
     if not os.path.exists(os.path.join(HERE, "tcp_flight")):
         sys.exit("tcp_flight not built: gcc -O2 -o tcp_flight tcp_flight.c (setup_host.sh does it)")
     stages = a.stage.split(",")
-    if not a.dry_run:                                   # the kernel and the settings the rule depends on (WP6 B6: repeat on another kernel)
+    if not a.dry_run:                                   # record the kernel and the TCP settings that the window rule depends on
         import json, platform
         def sysctl(k):
             try:
@@ -112,7 +129,7 @@ def main():
         os.makedirs(os.path.dirname(a.out), exist_ok=True)
         json.dump(env, open(os.path.splitext(a.out)[0] + "_env.json", "w"), indent=2)
     names = a.configs.split(",")
-    if not a.dry_run:                                   # G11: the kernel modules of the extra configurations (no-op for the others)
+    if not a.dry_run:                                   # load the kernel modules needed for BBR or fq
         for n_ in names:
             for mod_ in (("tcp_bbr",) if {**BASE, **ALL_CONFIGS[n_]}.get("cc") == "bbr" else ()) + (("sch_fq",) if ALL_CONFIGS[n_].get("qdisc") == "fq" else ()):
                 subprocess.run(["modprobe", mod_], check=False)

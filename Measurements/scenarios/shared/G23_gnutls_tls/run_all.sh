@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# G23 in one call, on a measuring machine (X250 and GX10; then a declared repeat on the X250): build the probe, check its write pattern against the calibration, preflight, measure, analyse.
+# Scenario G23 (GnuTLS server) in one call, on a measurement machine: build the probe, check its write pattern against the calibration, preflight, measure, analyse.
 # Run inside tmux (about 2.5 hours with n = 30; asks for sudo once):
 #   G23_MACHINE=X250 ./run_all.sh             # everything (X250 | GX10 | Optiplex)
 #   G23_MACHINE=X250 ./run_all.sh --smoke     # 3 calls, n = 3: checks that the chain works (a few minutes); its data are not the measurement
 #   ./run_all.sh --dry-run                    # build, calibration check and preflight only
 # Options: --certs DIR | --n N (default 30) | --label TEXT | --cpus S=a,b,C=c,d (pin server and client to idle cores) | --repeat (the declared repeat on the same machine: label run2, not blocked by the state file)
-# The GnuTLS stack must exist (tools/build_gnutls_stack.sh; prefix GNUTLS_PREFIX, default ~/build_tls3/prefix). On the GX10 run the measurement with: sudo env PQC_CERTS=... is done by the library (sc_sudo).
+# The GnuTLS library must exist (tools/build_gnutls_stack.sh; prefix GNUTLS_PREFIX, default ~/build_tls3/prefix). PQC_CERTS is passed to the root commands by the scenario library (sc_sudo).
 set -uo pipefail
 if [ -z "${G23_TEE:-}" ]; then
   mkdir -p "$HOME/pqc_measurements"; export G23_TEE=1 G23_LOG="$HOME/pqc_measurements/G23_all_$(hostname -s)_$(date +%Y%m%d-%H%M%S).log"

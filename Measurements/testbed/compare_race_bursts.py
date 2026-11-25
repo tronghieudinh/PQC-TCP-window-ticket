@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""compare_race_bursts.py - burst (segments sent before the first response ACK) per cell of the race design in several runs: the first run (results/ticket_race.csv) and trace directories.
+"""compare_race_bursts.py - do repeated runs of the ticket race design give the same bursts as the first run? The burst of a resumed
+transaction is the number of response segments the server sends before the first acknowledgment of the response can arrive.
 
     python3 compare_race_bursts.py results/clock_x250/trace_clock_race [results/clock_x250/trace_clock_ctrl1 ...]
-Prints, per run and suite, the share of resumed transactions with a burst above ten, and per cell the most common bursts: the question is whether a run reproduces the first one (ECDSA-P256 always ten) or not.
+The first run is read from results/ticket_race.csv, the other runs from their directories of server-side captures. Prints, per run and
+suite, the share of resumed transactions with a burst above ten (the initial window), and per cell (suite, RTT, rate, MTU) the most
+common bursts. A run reproduces the first one if, among other things, ECDSA-P256 always sends ten.
 """
 import sys, os, csv, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -10,6 +13,7 @@ import analyze_ticket_race as T
 from pcap_summary import read_pcap
 HERE = os.path.dirname(os.path.abspath(__file__))
 def trace_dir(d):
+    """{(suite, RTT, rate, MTU): bursts} of the resumed connections (every second one) in the captures of a directory."""
     out = collections.defaultdict(list)
     import glob
     for f in sorted(glob.glob(os.path.join(d, "*_srv.pcap"))):

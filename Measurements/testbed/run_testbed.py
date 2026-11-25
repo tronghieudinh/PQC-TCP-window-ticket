@@ -1,26 +1,31 @@
 #!/usr/bin/env python3
-"""
-run_testbed.py - sweep real OpenSSL 3.5 TLS 1.3 transactions over an emulated network.
+"""run_testbed.py - measure real OpenSSL 3.5 TLS 1.3 transactions over an emulated network.
 
-For every configuration (suite x chain depth x mutual-TLS x RTT x rate x MTU x loss x initial window) it
-shapes a veth link with tc netem (tbnet.py), starts tls_probe server/client pinned to separate cores,
-and records the timing of every transaction. Unshaped "base" runs measure the cost of computation and of
-the local stack; analyze_testbed.py subtracts them and compares the remainder with the model.
+A configuration is a combination of suite (certificate algorithm and key-exchange group), certificate chain depth, server-only or mutual
+authentication, message sizes, RTT, link rate, MTU, loss and initial window. For each one the script shapes a veth link with tc netem
+(tbnet.py), starts a tls_probe server and client pinned to separate CPU cores, and records the timing and TCP counters of every
+transaction, one CSV row each. Unshaped "base" runs measure the time spent in computation and in the local stack; the analysis scripts
+subtract it and compare the remainder with the latency model (Simulation/pqc_sim.py).
 
-    sudo python3 run_testbed.py --profile smoke                 # ~2 minutes, checks the whole chain
+    sudo python3 run_testbed.py --profile smoke                 # about 2 minutes, checks the whole chain
     sudo python3 run_testbed.py --profile core --n 30           # a few hours
-    sudo python3 run_testbed.py --profile full  --n 30          # overnight
-    sudo python3 run_testbed.py --profile loss  --n 200         # loss tails (slow)
-    sudo python3 run_testbed.py --profile proxy --topology proxy-tcp      # real middlebox (HAProxy)
-    sudo python3 run_testbed.py --topology loopback --profile smoke       # no root: pipeline self-test only
+    sudo python3 run_testbed.py --profile full --n 30           # overnight
+    sudo python3 run_testbed.py --profile loss --n 200          # tail latency under loss (slow)
+    sudo python3 run_testbed.py --profile proxy --topology proxy-tcp      # with a real middlebox (HAProxy)
+    sudo python3 run_testbed.py --topology loopback --profile smoke       # no shaping: self-test of the pipeline only
 
-The run is resumable: finished configurations (>= n rows) are skipped when the output file exists.
+--resume measures resumed connections (a first full handshake obtains the session ticket). --configs-from runs exactly the configurations
+listed in a CSV file. An interrupted run continues where it stopped: configurations that already have n successful rows are skipped.
+
+Output: the CSV of --out (columns COLS), env.json (machine, kernel, tool versions) and <out>.netem.csv (netem packet counters).
+Times in the CSV are in milliseconds: t_tcp_ms TCP handshake, t_hs_ms until the TLS handshake is complete, t_total_ms until the
+response has arrived. snd_mss, snd_cwnd0, retrans and rtt_us are the client's TCP_INFO values.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
-import csvhdr  # noqa: F401  (skips the "#" header lines of pqcm data files)
+import csvhdr  # noqa: F401  (lets csv readers skip the "#" comment lines at the top of some data files)
 import csv
 import itertools
 import json
@@ -64,14 +69,18 @@ COLS = ["cfg_id", "topology", "suite", "cert_alg", "group", "depth", "mtls", "re
 
 
 def cfg_id(c):
+    """Identifier of a configuration, used to recognise finished configurations when a run is resumed."""
     cid = "|".join(str(c[k]) for k in ("topology", "suite", "depth", "mtls", "req", "resp", "rtt_ms", "rate_mbps",
                                       "loss_pct", "mtu", "icw", "cc"))
     return cid + ("|client=" + c["client_alg"] if c.get("client_alg") else "")       # unchanged for every earlier run
 
 
 def detect_cpus():
-    """CPUs for client, server, proxy. Default: auto (_detect_cpus_auto). Override with PQC_CLIENT_CPU / PQC_SERVER_CPU / PQC_PROXY_CPU
-    (one logical CPU each; set by pqcm.sh --cpus). Without these variables the behavior is unchanged (all earlier data)."""
+    """Logical CPUs for the client, the server and the proxy.
+
+    Chosen automatically (_detect_cpus_auto) unless PQC_CLIENT_CPU, PQC_SERVER_CPU or PQC_PROXY_CPU give one logical CPU number each
+    (the scenario runners set them from --cpus).
+    """
     c, s, p = _detect_cpus_auto()
     ec, es, ep = (os.environ.get(k, "") for k in ("PQC_CLIENT_CPU", "PQC_SERVER_CPU", "PQC_PROXY_CPU"))
     for name, v in (("PQC_CLIENT_CPU", ec), ("PQC_SERVER_CPU", es), ("PQC_PROXY_CPU", ep)):
@@ -100,11 +109,13 @@ def _detect_cpus_auto():
 
 
 def need(binary):
+    """Stop with a message if a required program is not on the PATH."""
     if shutil.which(binary) is None:
         sys.exit(f"missing tool: {binary} (run setup_host.sh)")
 
 
 def read_text(cmd):
+    """Standard output of a command, or an empty string if it fails (used to record the environment)."""
     try:
         env = dict(os.environ)
         if cmd and os.sep in cmd[0] and os.path.basename(os.path.dirname(cmd[0])) == "bin":    # a self-built OpenSSL has no rpath
@@ -115,6 +126,7 @@ def read_text(cmd):
 
 
 def write_env(path, args, cpus, openssl):
+    """Write env.json: time, platform, CPU and clock settings, library and tool versions, command-line options."""
     gov = read_text(["cat", "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"])
     turbo = read_text(["cat", "/sys/devices/system/cpu/intel_pstate/no_turbo"])
     env = dict(utc=datetime.now(timezone.utc).isoformat(), platform=platform.platform(), machine=platform.machine(),
@@ -165,6 +177,9 @@ backend b
 
 
 def start_proxy(tb, work, inspect, cpu):
+    """Start HAProxy as a TCP proxy in the proxy namespace, pinned to `cpu`; with `inspect`, it waits for the ClientHello before it
+    connects to the server.
+    """
     cfg = os.path.join(work, "haproxy.cfg")
     ins = ("    tcp-request inspect-delay 5s\n    tcp-request content accept if { req.ssl_hello_type 1 }\n"
            if inspect else "")
@@ -180,10 +195,19 @@ def start_proxy(tb, work, inspect, cpu):
 
 
 def run_config(c, tb, probe, cpus, work, loopback):
+    """Measure one configuration: start the probe server, run the probe client for warmup + n transactions, stop the server.
+
+    c         configuration (dictionary, see build_configs)
+    tb        Testbed that has already been shaped, or None in loopback mode
+    cpus      (client CPU, server CPU, proxy CPU)
+    loopback  measure over the loopback interface without namespaces (self-test)
+
+    Returns (CSV rows of the client, the server's "SRVINFO" line, stderr of both programs).
+    """
     alg, group = ALL_SUITES[c["suite"]]
     ch = ensure_chain(alg, c["depth"], work)
     ca_srv = ch["ca"]                      # the server's trust anchor for the CLIENT certificate
-    if c.get("client_alg"):                # WP6: the client certificate comes from another algorithm's tree (mixed chains; a transition scenario)
+    if c.get("client_alg"):                # mixed chains: the client certificate comes from the tree of another signature algorithm
         chc = ensure_chain(c["client_alg"], c["depth"], work)
         ca_srv = os.path.join(work, f"ca_{alg}_{c['client_alg']}_d{c['depth']}.pem")
         with open(ca_srv, "w") as fh:
@@ -198,14 +222,14 @@ def run_config(c, tb, probe, cpus, work, loopback):
     mtls = ["--mtls"] if c["mtls"] else []
     srv_cmd = ["taskset", "-c", str(cpu_s)] + pre_s + [probe, "server", "--addr", s_addr, "--port", port,
               "--cert", ch["server"][0], "--key", ch["server"][1], "--ca", ca_srv, "--groups", group,
-              "--req", str(c["req"]), "--resp", str(c["resp"])] + mtls + (["--resume"] if c["resume"] else []) + os.environ.get("PQC_PROBE_SERVER_ARGS", "").split()   # extra server options of a probe (G23: --tickets-resumed N)
+              "--req", str(c["req"]), "--resp", str(c["resp"])] + mtls + (["--resume"] if c["resume"] else []) + os.environ.get("PQC_PROBE_SERVER_ARGS", "").split()   # extra options for the probe server, e.g. --tickets-resumed N
     gap = 2 * c["rtt_ms"] + 5
     cli_cmd = ["taskset", "-c", str(cpu_c)] + pre_c + [probe, "client", "--addr", c_addr, "--port", port,
               "--ca", ch["ca"], "--groups", group, "--req", str(c["req"]), "--resp", str(c["resp"]),
               "--n", str(c["n"]), "--warmup", str(c["warmup"]), "--gap-ms", f"{gap:g}"] + (["--resume"] if c["resume"] else [])
     if c["mtls"]:
         cli_cmd += ["--cert", ch["client"][0], "--key", ch["client"][1]]
-    if tb is not None and getattr(tb, "physical", False):          # G13-lite: the server runs on the other host (SSH), the certificates are copied there
+    if tb is not None and getattr(tb, "physical", False):          # two-machine testbed: the server runs on the other host (over SSH), after the certificates are copied there
         tb.sync(work)
         tb.stop_server()                       # a server left by an earlier run would hold the port
         srv_cmd = tb.map_cmd(srv_cmd)
@@ -244,7 +268,7 @@ def run_config(c, tb, probe, cpus, work, loopback):
 
 
 def configs_from_csv(a, path):
-    """The configurations of a table (one row per shaped configuration, e.g. paper1/Latex/data/testbed_configurations.csv): the same suite, depth,
+    """The configurations of a table (CSV with one row per shaped configuration, for example testbed_configurations.csv): the same suite, depth,
     mutual-TLS mode, request and response sizes, RTT, rate, MTU, loss and initial window; one unshaped base run for every group of suite, depth, mode and sizes."""
     base, shaped, seen = [], [], set()
     n = a.n or 30
@@ -262,6 +286,9 @@ def configs_from_csv(a, path):
 
 
 def build_configs(a, p):
+    """List of configurations to run, from --configs-from or from the profile and its command-line overrides: one unshaped base run
+    per suite, depth and authentication mode, followed by the shaped configurations in an order shuffled with --seed.
+    """
     if a.configs_from:
         return configs_from_csv(a, a.configs_from)
     suites = a.suites.split(",") if a.suites else p["suites"]
@@ -287,10 +314,12 @@ def build_configs(a, p):
 
 
 def estimate_s(c):
+    """Rough duration of one configuration in seconds, for the time estimate printed before a run."""
     return (c["n"] + c["warmup"]) * (8 * c["rtt_ms"] + 20 + 2 * c["rtt_ms"] + 5) * (2 if c["resume"] else 1) / 1000 + 1.5
 
 
 def main():
+    """Parse the options, prepare the network, measure every unfinished configuration and append the rows to the output file."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--profile", choices=list(PROFILES), default="smoke")
     ap.add_argument("--topology", choices=["direct", "proxy-tcp", "proxy-inspect", "loopback"], default="direct")
@@ -335,7 +364,7 @@ def main():
     sudo_uid = int(os.environ.get("SUDO_UID", os.getuid()))
     home = os.path.expanduser("~" + os.environ["SUDO_USER"]) if os.environ.get("SUDO_USER") else os.path.expanduser("~")
     prefix = os.environ.get("PQC_OPENSSL", os.path.join(home, "opt", "openssl-3.5"))
-    probe = os.environ.get("PQC_PROBE") or os.path.join(HERE, "tls_probe")   # PQC_PROBE: another implementation with the same command line and CSV (tls_probe_go, scenario G10)
+    probe = os.environ.get("PQC_PROBE") or os.path.join(HERE, "tls_probe")   # PQC_PROBE: another TLS implementation with the same command line and CSV output (Go, GnuTLS)
     if not os.path.exists(probe) and not a.dry_run:
         sys.exit("tls_probe not built (run setup_host.sh)")
     openssl = os.path.join(prefix, "bin", "openssl")
@@ -368,7 +397,7 @@ def main():
         if topo == "proxy":
             proxy = start_proxy(tb, work, a.topology == "proxy-inspect", cpus[2])
     load = None
-    if tb and os.environ.get("PQC_LOAD") and not a.dry_run:        # G17: background load (cross traffic, CPU loops) during the whole call; see bgload.py
+    if tb and os.environ.get("PQC_LOAD") and not a.dry_run:        # optional background load (cross traffic, busy CPU loops) during the whole run; see bgload.py
         import bgload
         load = bgload.start(tb, os.environ["PQC_LOAD"])
     if loopback:

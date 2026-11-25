@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""r3c_report.py - the numbers of the paper on round 3c (the write of the response delayed) from the derived CSV files of the pilot (GX10) and of the test (X250) and the thresholds fixed from the pilot:
-`key value` lines for make_assets_short.py.   python3 r3c_report.py --out results/r3c_report.txt"""
+"""r3c_report.py - the numbers the paper reports for round 3c (the write of the response delayed), from the derived CSV files of the pilot
+(GX10) and of the test (X250) and the thresholds fixed on the pilot, as `key value` lines for make_assets_short.py.
+
+    python3 r3c_report.py --out results/r3c_report.txt
+Keys: Rc<Pilot|Test> + TxN/TxOk transactions and those matching the burst accounting; EvN/EvOk window events and those matching the
+rule; CellsN/CellsIn cells (series x delay) and those whose measured late share is within the binomial band of the prediction;
+MeanErr/NullErr mean absolute error of the prediction and of "no dependence on D" (points); LateZero/LateMax late share of ML-DSA-87
+without and with the largest delay; DevMax largest deviation of the write shift from D (us); DMax the largest D.
+"""
 import argparse, csv, json, math, os, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); RES = os.path.join(HERE, "results")
 import r3c as C
 
 def machine(tag, tx, ack, T):
+    """The keys of one machine's runs, prefixed Rc<tag>."""
     X = C.load(os.path.join(RES, tx)); E = [e for e in csv.DictReader(open(os.path.join(RES, ack))) if e.get("kind", "w") == "w"]
     D = C.dlist(X); L = {}
     L[f"Rc{tag}TxN"] = len(X); L[f"Rc{tag}EvN"] = len(E); L[f"Rc{tag}EvOk"] = sum(int(e["met"]) for e in E)

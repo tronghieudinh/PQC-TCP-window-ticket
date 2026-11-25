@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario G19: held-out test of the model of L1 on 100 cells drawn at random (resumed TLS 1.3). See README.md.
+# Scenario G19, random cells: test of the model of the paper on 100 configurations drawn at random (resumed TLS 1.3,
+# results/g19_cells.csv), which were not used to build it. See README.md.
 #   ./run.sh [scenario_lib options: --n N (default 30) --label L --yes --dry-run --preflight-only --cpus ...]
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); . "$HERE/../../common/scenario_lib.sh"
 TB=$(cd "$HERE/../../../testbed" && pwd)

@@ -4,6 +4,8 @@ Repeatable paper (ACM SIGCOMM Computer Communication Review); its appendix says 
 
 The paper measures how Linux grows the TCP congestion window after a short flight (plain TCP, 13 configurations, four kernels, three CPUs), refutes with predictions fixed in advance a larger-window explanation of a model error, and shows with an intervention that the TLS session ticket, a write of its own, enlarges the server's window through acknowledgments that the kernel processes while the sender is window-limited. It is a companion of the study archived in `pqc-financial-transport` (Zenodo concept DOI 10.5281/zenodo.23839449), whose per-segment transport model it uses (`Simulation/pqc_sim.py`).
 
+[`CODE_GUIDE.md`](CODE_GUIDE.md): what every code file does (input, output) and what the scenario names (G9 to G24), stages, rounds and criteria letters mean.
+
 ## Requirements
 [`REQUIREMENTS.md`](REQUIREMENTS.md): the packages and kernel features needed to rebuild the numbers and the PDF, to rerun the analyses of the raw traces, and to repeat measurements.
 
