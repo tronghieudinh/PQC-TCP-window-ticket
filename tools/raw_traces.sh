@@ -18,7 +18,7 @@ pack)
   for d in $USED $EXPLORATORY; do [ -d "$T/$d" ] && list="$list $d" || echo "missing: $d"; done
   ( cd "$T" && find $list -type f | sort | xargs sha256sum > /tmp/raw_traces_sha256.txt )
   ( cd "$T" && tar -cf - $list ) | xz -9 -T0 > "$OUT"
-  cp /tmp/raw_traces_sha256.txt "$OUT.sha256-of-files.txt"; sha256sum "$OUT" > "$OUT.sha256"
+  cp /tmp/raw_traces_sha256.txt "$OUT.sha256-of-files.txt"; ( cd "$(dirname "$OUT")" && sha256sum "$(basename "$OUT")" ) > "$OUT.sha256"   # file name only, so "sha256sum -c" checks the downloaded copy
   ls -l "$OUT"; echo "files: $(wc -l < /tmp/raw_traces_sha256.txt)"; cat "$OUT.sha256"
   echo "Exploratory (not used for a number of the paper): $EXPLORATORY";;
 verify)
