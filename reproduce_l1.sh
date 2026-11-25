@@ -156,6 +156,12 @@ $PY Measurements/testbed/analyze_g19_arm.py --run "$(last "$I/G19/*/data")/g19.c
 cmp -s "$tmp/i19.txt" $R/g19_i9_analysis.txt && cmp -s "$tmp/i19c.txt" $R/g19_i9_cells.txt && echo "G19 i9 analysis OK" || { echo "G19 i9 analysis DIFF"; exit 1; }
 $PY Measurements/testbed/analyze_g12.py --run "$(last "$I/G12/*/data")" --out "$tmp/i12.txt" >/dev/null
 cmp -s <(tail -n +2 "$tmp/i12.txt") <(tail -n +2 $R/g12_i9_analysis.txt) && echo "G12 i9 analysis OK" || { echo "G12 i9 analysis DIFF"; exit 1; }
+$PY Measurements/testbed/analyze_g11.py --run "$(last "$I/G11/*/data")/slack_tcp.csv" --out "$tmp/i11.txt" >/dev/null
+cmp -s "$tmp/i11.txt" $R/g11_i9_analysis.txt && echo "G11 i9 analysis OK" || { echo "G11 i9 analysis DIFF"; exit 1; }
+$PY Measurements/testbed/analyze_g16.py --run "$(last "$I/G16/*/data")/slack_tcp.csv" --out "$tmp/i16.txt" >/dev/null
+cmp -s "$tmp/i16.txt" $R/g16_i9_analysis.txt && echo "G16 i9 analysis OK" || { echo "G16 i9 analysis DIFF"; exit 1; }
+$PY Measurements/testbed/analyze_g16_cells.py --run "$(last "$I/G16/*/data")/slack_tcp.csv" > "$tmp/i16c.txt"
+cmp -s "$tmp/i16c.txt" $R/g16_i9_cells.txt && echo "G16 i9 cells OK" || { echo "G16 i9 cells DIFF"; exit 1; }
 for arm in delack bbr; do
   $PY Measurements/testbed/analyze_g14.py --arm $arm --run "$(last "$I/G14/*-$arm/data")" --out "$tmp/i14_$arm.txt" >/dev/null
   cmp -s "$tmp/i14_$arm.txt" $R/g14_i9_analysis_$arm.txt && echo "G14 $arm i9 analysis OK" || { echo "G14 $arm i9 analysis DIFF"; exit 1; }

@@ -10,5 +10,9 @@ Runner `run_i9_all.sh`, commit b69b8d4, Linux 7.0.0-43, OpenSSL 3.5.4. All smoke
 | g14delack | D1-D5 met | | `g14_i9_analysis_delack.txt` |
 | r3d | C1-C4 met | weak test on this machine: the late share is already at most 9 % without any delay, so C2 only checks that it does not rise, and C3's error (2.6 points) is close to that of "no dependence on D" (3.6); one cell of 32 outside the band | `r3d_i9_test.txt` |
 | clock | K1, K2, K4, K5 met | K5 rests on 5 late acknowledgments. K7: 171 of 180 right with the threshold of the first run, but only 10 of the 180 have a burst above ten, so always answering "ten or less" is right in 170 | `wp6_clock_repeat_i9_analysis.txt` |
+| g16 | L1-L3 met | L1 only just: 24 of 30 cells within 6 points (24 needed; the X250 run had 23). L2: 5 698 of 5 703 connections without a retransmission. All 6 cells off by more than 6 points are above the prediction | `g16_i9_analysis.txt`, `g16_i9_cells.txt` |
+| g11 | Q1-Q5 met | median windows equal to those of the X250 at all 20 sizes of every configuration (cubic with fq: 48 against 50 at n = 40 on both) | `g11_i9_analysis.txt` |
+
+All steps of the runner have run and all completed (`ALL_DONE`, 26 Nov 04:21); g17 was not requested. The i9 was checked afterwards: governor powersave, turbo on, NTP on, no testbed kernel module or namespace left.
 
 The preflight warning "prediction file ... is not in any upstream branch" in the run records is false: the checkout was a detached HEAD, which has no upstream branch; the commits are in `origin/main`.

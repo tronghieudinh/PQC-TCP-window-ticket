@@ -1,0 +1,7 @@
+G16 (plain TCP under loss, stage A)
+  L1 MET: 24 of 30 cells within 6 points of (1-p)^n (at least 24 of 30)
+  L2 MET: 5698 of 5703 connections without retransmission have the window of rule (1) (99.9 %; at least 95 %)
+  L3 MET: 30 cells, 0 with fewer than 150 valid connections
+  loss01  share exact (measured/predicted) by n: 1:100/100 5:100/100 10:100/99 16:100/98 24:99/98 40:98/96
+  loss05  share exact (measured/predicted) by n: 1:100/100 5:99/98 10:98/95 16:93/92 24:96/89 40:93/82
+  loss1   share exact (measured/predicted) by n: 1:100/99 5:97/95 10:96/90 16:92/85 24:88/79 40:79/67
