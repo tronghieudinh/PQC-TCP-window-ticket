@@ -21,3 +21,5 @@ Measurements/testbed/tls_load_open
 Measurements/testbed/tcp_flight
 Measurements/testbed/bench_pqc
 Measurements/testbed/tls_client_time
+# certificate chains concatenated by the runners
+Measurements/testbed/work/
