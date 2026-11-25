@@ -1,7 +1,7 @@
 {
  "id": "G19b",
  "title": "The ECDSA-P256 cell of G19 that the early-ticket model got wrong, measured again (n = 200), and six cells that test the ticket-size explanation",
- "serves": "L1 (the one discriminating cell of G19 where the early-ticket model was wrong)",
+ "serves": "the one discriminating cell of G19 where the early-ticket model was wrong",
  "device_classes": [
   "mint-x86"
  ],
@@ -17,6 +17,6 @@
   "results/g19b_cells.json",
   "results/phase2_predictions.md"
  ],
- "status": "prepared 20 Nov 2026; criteria U1-U4 of results/phase2_predictions.md APPROVED 2026-11-20 (commit and push them before measuring)",
+ "status": "criteria U1-U4 in results/phase2_predictions.md, fixed on 2026-11-20, before the measurement",
  "notes": "Six calls (n = 100, and n = 200 for the cell of G19), about 15 minutes. Analyse with testbed/analyze_g19b.py --run DIR/data/g19b.csv."
 }

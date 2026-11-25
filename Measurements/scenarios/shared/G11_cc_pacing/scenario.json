@@ -1,7 +1,7 @@
 {
  "id": "G11",
  "title": "Plain-TCP window after a short flight under BBR and under fq pacing (Reno, Cubic): stage A, n1 = 1..40 segments",
- "serves": "L1 (limitation: other controllers and pacing not tested), Paper 1",
+ "serves": "limitation of the paper: other congestion controllers and pacing not tested",
  "device_classes": [
   "mint-x86",
   "gx10"
@@ -19,6 +19,6 @@
  "stages": [
   "custom: run_slack.py stage A, configs base, bbr, reno_fq, cubic_fq (the last three are in CONFIGS_EXTRA, not in the default list)"
  ],
- "status": "written 2026-11-19; criteria Q1-Q5 in results/g11_cc_pacing_predictions.md APPROVED 2026-11-19 (commit and push them before measuring); any machine; needs the kernel modules tcp_bbr and sch_fq",
+ "status": "criteria Q1-Q5 in results/g11_cc_pacing_predictions.md, fixed on 2026-11-19, before the measurement; any machine; needs the kernel modules tcp_bbr and sch_fq",
  "notes": "BBR here is the in-tree BBRv1 of the running kernel. fq is attached as the child of netem on both interfaces (tbnet.shape(qdisc='fq')); the other scenarios do not use it."
 }

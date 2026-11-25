@@ -4,7 +4,7 @@ In G10 the model was wrong on all 20 ML-DSA-87 cells of Go (a round trip too slo
 
 ```bash
 cd Measurements/scenarios/shared/G18_go_pipelined
-export PQC_CERTS=~/meas_copy/certs
+export PQC_CERTS=$HOME/pqc_certs_local/certs     # directory with the test certificates (Measurements/certs.sh)
 ./run.sh --dry-run
 ./run.sh      # inside tmux, asks for sudo
 ```

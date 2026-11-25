@@ -1,7 +1,7 @@
 {
  "id": "G16",
  "title": "The window rule (1) on plain TCP under independent packet loss (0.1, 0.5, 1 %)",
- "serves": "L1 (limitation: no loss; 'loss would end the slow start that rule (1) describes')",
+ "serves": "limitation of the paper: no loss (loss would end the slow start that rule (1) describes)",
  "device_classes": ["mint-x86", "gx10"],
  "needs_root": true,
  "needs": ["netns", "tc"],
@@ -9,6 +9,6 @@
  "est_minutes": 60,
  "predictions": ["results/g16_loss_predictions.csv", "results/g16_loss_predictions.md"],
  "stages": ["A (plain TCP): run_slack.py --stage A --configs loss01,loss05,loss1 --n1-a 1,3,5,6,8,10,12,16,24,40 --reps-a 200"],
- "status": "prepared 19 Nov 2026; criteria L1-L3 of results/g16_loss_predictions.md APPROVED 2026-11-19 (commit and push them before measuring)",
+ "status": "criteria L1-L3 in results/g16_loss_predictions.md, fixed on 2026-11-19, before the measurement",
  "notes": "Exploratory with pre-registered criteria. 6 000 connections; about 60 minutes. Analyse with testbed/analyze_g16.py."
 }

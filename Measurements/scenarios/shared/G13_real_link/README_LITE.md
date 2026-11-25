@@ -1,6 +1,6 @@
 # G13-lite: a real link between two machines
 
-Serves the paper (objection: "the link is emulated"). It runs the plain-TCP window rule (stage A, RTT 100 and 30 ms) and the ticket tests of L1 (28 client-window cells and 32 ticket-timing cells of G14, n = 30) on a physical link, with the RTT made by `tc netem` on the egress of both NICs. Predictions and criteria: `testbed/results/phase2_predictions.md` (F1, F2) and `testbed/results/g14_robustness_predictions.md` (D1-D5, unchanged).
+Addresses an objection to the paper ("the link is emulated"). It runs the plain-TCP window rule (stage A, RTT 100 and 30 ms) and the ticket tests of the paper (28 client-window cells and 32 ticket-timing cells of G14, n = 30) on a physical link, with the RTT made by `tc netem` on the egress of both NICs. Predictions and criteria: `testbed/results/phase2_predictions.md` (F1, F2) and `testbed/results/g14_robustness_predictions.md` (D1-D5, unchanged).
 
 ## What you need
 - Two Linux machines joined by a cable (or one switch that nothing else uses during the run), one NIC on each. Any pair: X250 and i9, two i9, Arm and i9.
@@ -17,7 +17,6 @@ export PQC_CERTS=/path/to/certs PHYS_CERTS_REMOTE=/path/for/certs/on/server     
 bash preflight_phys.sh                  # must end with "preflight passed"
 ./run_lite.sh --dry-run                 # lists the commands; look at the ssh lines
 ./run_lite.sh                           # about 110 minutes
-python3 ../../../testbed/push_data.py   # on the client host
 ```
 Record which pair was used (the run directory keeps `phys_spec.txt` and `env.json`). The offload features of the NICs are left as they are (`PHYS_OFFLOAD=keep`); `PHYS_OFFLOAD=off` turns TSO/GSO/GRO/LRO off for the run and puts them back.
 

@@ -1,7 +1,7 @@
 {
  "id": "G23",
  "title": "What governs the server's window after a session ticket? GnuTLS 3.8.14 (with leancrypto): the ticket data varied from 0 to 4 tickets without changing the suite (stage T), client window (C), ticket position (D), 40 random cells (R), and an OpenSSL control in the same session (O)",
- "serves": "L1 (limitation: only OpenSSL and Go), Paper 1 (limits)",
+ "serves": "limitation of the paper: only OpenSSL and Go",
  "device_classes": [
   "mint-x86",
   "gx10"
@@ -27,6 +27,6 @@
  "stages": [
   "custom: run_testbed.py --profile core --resume with PQC_PROBE=tls_probe_gnutls; cells of results/g23_cells.json grouped by (request, response); T five times with PQC_PROBE_SERVER_ARGS='--tickets-resumed 0..4'; R from results/g23_random_cells.csv; O with the OpenSSL probe"
  ],
- "status": "prepared 22 Nov 2026; design and expected bands in results/g23_gnutls_predictions.md APPROVED 2026-11-22 and pushed before measuring; X250 and GX10, then a declared repeat on the X250",
+ "status": "design and expected bands in results/g23_gnutls_predictions.md, fixed on 2026-11-22, before the measurement; X250 and GX10, then a declared repeat on the X250",
  "notes": "Needs GnuTLS 3.8.14 built with leancrypto (tools/build_gnutls_stack.sh; prefix in GNUTLS_PREFIX, default ~/build_tls3/prefix) and testbed/build_gnutls_probe.sh. run_all.sh checks the write pattern of the probe on THIS machine against results/gnutls_calibration.json (tolerance 16 B). Analyse with testbed/analyze_g23.py (reports bands and the T-stage reading, not pass or fail) --run DIR/data --machine NAME [--run2 DIR2/data]."
 }

@@ -1,7 +1,7 @@
 {
  "id": "G12",
- "title": "Ticket-timing test of L1 (OpenSSL 3.5) on new cells: RTT 30 and 200 ms, request sizes 5000, 9000, 14000 B, n = 40",
- "serves": "L1 (limitation: the ticket hypothesis rests on few discriminating cells at one RTT), Paper 1 (limits)",
+ "title": "Ticket-timing test of the paper (OpenSSL 3.5) on new cells: RTT 30 and 200 ms, request sizes 5000, 9000, 14000 B, n = 40",
+ "serves": "limitation of the paper: the ticket hypothesis rests on few discriminating cells at one RTT",
  "device_classes": [
   "mint-x86",
   "gx10"
@@ -21,6 +21,6 @@
  "stages": [
   "custom: run_testbed.py --profile core --resume, the 76 cells of results/g12_cells.json grouped by (RTT, request, response)"
  ],
- "status": "written 2026-11-19; criteria K1-K4 in results/g12_predictions.md APPROVED 2026-11-19 (commit and push them before measuring); any machine, one at a time (X250 busy with G10 until it ends)",
- "notes": "OpenSSL 3.5 as in L1 (PQC_OPENSSL default ~/opt/openssl-3.5). The model is not changed; analyse with testbed/analyze_g12.py."
+ "status": "criteria K1-K4 in results/g12_predictions.md, fixed on 2026-11-19, before the measurement; any machine, one at a time",
+ "notes": "OpenSSL 3.5 as in the paper (PQC_OPENSSL default ~/opt/openssl-3.5). The model is not changed; analyse with testbed/analyze_g12.py."
 }

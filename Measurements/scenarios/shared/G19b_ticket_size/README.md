@@ -4,6 +4,6 @@ In G19 the early-ticket model was wrong on one of the seven discriminating cells
 
 ```bash
 cd Measurements/scenarios/shared/G19b_ticket_size
-export PQC_CERTS=~/meas_copy/certs
+export PQC_CERTS=$HOME/pqc_certs_local/certs     # directory with the test certificates (Measurements/certs.sh)
 ./run.sh      # about 15 minutes
 ```

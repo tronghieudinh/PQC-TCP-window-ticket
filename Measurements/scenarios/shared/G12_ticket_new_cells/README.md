@@ -1,6 +1,6 @@
-# G12: the ticket-timing test of L1 on new cells
+# G12: the ticket-timing test of the paper on new cells
 
-Serves: L1 (limitation: the ticket hypothesis rests on 10 discriminating cells at one RTT), Paper 1. About 100 minutes (76 cells, n = 40). Any machine with netns, `tc`, root and OpenSSL 3.5 (`~/opt/openssl-3.5`).
+Addresses a limitation of the paper (the ticket hypothesis rests on 10 discriminating cells at one RTT). About 100 minutes (76 cells, n = 40). Any machine with netns, `tc`, root and OpenSSL 3.5 (`~/opt/openssl-3.5`).
 
 Question: does the early-ticket model (the ticket is its own write when the client's Finished arrives) keep predicting where it differs from the joined-ticket model by a round trip, on RTTs (30 and 200 ms) and request sizes (5 000, 9 000, 14 000 B) on which it was not found? 32 discriminating cells (16 per RTT; the earlier test had 10 at 100 ms) and 44 controls. Predictions (model unchanged) and criteria K1-K4: `testbed/results/g12_predictions.md`.
 

@@ -1,7 +1,7 @@
 {
  "id": "G18",
  "title": "The pipelined (partial-flight) variant of the model on Go's crypto/tls: new cells at RTT 30, 50 and 200 ms (ML-DSA-87) and ML-DSA-65 controls",
- "serves": "L1 (the post hoc variant of G10 had not been tested on cells that were not used to find it)",
+ "serves": "the post hoc variant of G10 had not been tested on cells that were not used to find it",
  "device_classes": [
   "mint-x86"
  ],
@@ -19,6 +19,6 @@
   "results/phase2_predictions.md",
   "results/go_calibration.json"
  ],
- "status": "prepared 20 Nov 2026; criteria P1-P4 of results/phase2_predictions.md APPROVED 2026-11-20 (commit and push them before measuring)",
+ "status": "criteria P1-P4 in results/phase2_predictions.md, fixed on 2026-11-20, before the measurement",
  "notes": "22 calls, n = 30 per cell, about 40 to 60 minutes on the X250. Analyse with testbed/analyze_g18.py --run DIR/data/g18.csv."
 }
