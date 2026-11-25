@@ -23,7 +23,7 @@ The PDF of the paper and of the supplement is built only if `latexmk` is found (
 sudo apt-get install -y latexmk texlive-latex-extra texlive-publishers texlive-fonts-recommended texlive-fonts-extra texlive-pictures cm-super
 ```
 
-`texlive-publishers` provides `acmart` and `texlive-fonts-extra` the Libertine, Inconsolata and newtx fonts it uses; the latter package is large.
+`texlive-publishers` provides `acmart` and `texlive-fonts-extra` the Libertine, Inconsolata and newtx fonts it uses; the latter package is large. These packages were enough to build both PDFs on a Linux Mint 22.3 machine that before had only the base TeX Live packages, without `latexmk` and the publisher and extra font packages (26 November 2026).
 
 ## Level 2: analyses from the raw traces
 
