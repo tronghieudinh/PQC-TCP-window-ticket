@@ -1,0 +1,6 @@
+OpenSSL 3.5: stage C 28 cells (validated rule wrong 0, MAE 1.18 ms; loosened by 2 wrong 4); stage D 80 cells, 10 discriminating (early wrong 0, joined wrong 10); early wrong on 2 of 80, MAE 4.2 ms
+   G1 MET  G2 MET  G3 MET  G4 MET
+baseline (3.5) reproduces the earlier result: YES
+
+Run record (26 Nov 2026): 02:05-03:20, commit b557bf9 or its parent b69b8d4 as recorded in the run record, 0 failed commands, same device fingerprint after.
+Load (system records, 10-minute averages 02:00-03:20): total CPU about 97 % idle; CPUs 0 and 1 over 96 % idle; 1-minute load 0.34-0.82. Seconds-level load was not recorded.

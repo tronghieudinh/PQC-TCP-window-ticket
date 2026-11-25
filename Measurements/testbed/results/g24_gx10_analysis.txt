@@ -1,0 +1,21 @@
+G24, machine GX10: 530 resumed transactions in 9 cells, repetitions ['a', 'b'], 2630 window events
+  note: ~/pqc_analysis_data/g24_gx10/trace_g24a_c16_doff_m1280: 27 of 30 transactions matched
+  note: ~/pqc_analysis_data/g24_gx10/trace_g24b_c16_doff_m1280: 28 of 30 transactions matched
+  note: ~/pqc_analysis_data/g24_gx10/trace_g24b_c32_doff_m1500: 25 of 30 transactions matched
+cell grp suite        n fast tkt resp | cwnd fast / slow (median) | request ms fast / slow | excess ms fast / slow (model)
+  10 U   ML-DSA-44   60   20   4   14 |   14 / 10   |    80 / 81    |   322 / 404   (400)
+  15 K   ECDSA-P256  60    0   1   13 |    - / 10   |     - / 30    |     - / 153   (150)
+  16 K   ML-DSA-44   55    0   4   15 |    - / 10   |     - / 100   |     - / 503   (500)
+  20 K   ECDSA-P256  60    0   1   12 |    - / 10   |     - / 101   |     - / 504   (501)
+  32 U   ML-DSA-44   55   29   4   12 |   14 / 10   |   200 / 201   |   804 / 1004  (1001)
+  37 K   ECDSA-P256  60    0   1   12 |    - / 10   |     - / 35    |     - / 164   (159)
+  65 K   ML-DSA-44   60    0   4   13 |    - / 10   |     - / 29    |     - / 122   (116)
+  66 U   ML-DSA-65   60   23   5   12 |   15 / 10   |    81 / 81    |   324 / 405   (401)
+  72 U   ML-DSA-87   60   60   7   13 |   17 / -    |   201 / -     |   804 / -     (1001)
+Q1 the window rule per event: 2630 of 2630 (100.000 %), threshold 99.914 %  -> MET
+Q2 burst = min(cwnd, response segments): 530 of 530 (100.00 %), threshold 99.6 %  -> MET
+Q3a fast <=> cwnd >= response segments, all cells: 527 of 530 (99.43 %), threshold 95 %  -> MET
+Q3b group U, fast transactions with cwnd >= response segments: 129 of 132 (97.73 %), threshold 90 %  -> MET
+    group U: 132 fast, 103 slow; slow transactions with cwnd < response segments: 103 of 103
+Q4 the saving is not on the request side: cells with both classes [10, 32, 66]; cells where the request of the fast ones took at least half an RTT less: []  -> MET
+Q5 no fast transaction where 10 + ticket segments < response segments (cells [10, 15, 16, 20, 32, 37]): 3 of 239 fast, at most 1 %  -> NOT MET

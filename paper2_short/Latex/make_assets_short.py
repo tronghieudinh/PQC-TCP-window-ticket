@@ -274,7 +274,7 @@ if os.path.exists(_bu):
             _k = {"first run": "First", "trace_clock_race": "Ur", "trace_clock_ctrl1": "Uc", "trace_clock_race2": "Ut", "trace_clock_ctrl1_t": "Pc", "trace_clock_race_t": "Pr"}[_m.group(1)]
             num("Bu" + _k + "EcUp", _m.group(2)); num("Bu" + _k + "EcN", _m.group(3))
 def _g19_cells_table():
-    runs = [("g19_gx10_cells.txt", "arm", "GX10"), ("g19_x250_run2_cells.txt", "arm", "X250 run 2"), ("g19_optiplex_cells.txt", "arm", "Optiplex")]
+    runs = [("g19_gx10_cells.txt", "arm", "GX10"), ("g19_x250_run2_cells.txt", "arm", "X250 run 2"), ("g19_optiplex_cells.txt", "arm", "OptiPlex"), ("g19_i9_cells.txt", "arm", "i9")]
     rx = _re.compile(r"^\s*(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)")
     data = {}
     for fn, _, name in runs:
@@ -287,7 +287,7 @@ def _g19_cells_table():
                 d["runs"][name] = float(m.group(8)); d["runs"].setdefault("X250 run 1", float(m.group(9)))
     def wrong(d, v): return abs(d["model"] - v) > 0.5 * d["rtt"]
     bad = sorted(c for c, d in data.items() if any(wrong(d, v) for v in d["runs"].values()))
-    order = ["X250 run 1", "X250 run 2", "GX10", "Optiplex"]
+    order = ["X250 run 1", "X250 run 2", "GX10", "OptiPlex", "i9"]
     rows = []
     for c in bad:
         d = data[c]; cells = []
@@ -297,20 +297,20 @@ def _g19_cells_table():
         rows.append(f"{c} & {d['suite']} & {d['rtt']} & {d['req']:,} / {d['resp']:,} & {d['model']:.0f} & " .replace(",", "\\,") + " & ".join(cells) + "\\\\")
     open(os.path.join(HERE_TEX, "g19_cells_table.tex"), "w").write("\\newcommand{\\GnineCellRows}{" + "\n".join(rows) + "}\n")
     nw = {n: sum(wrong(d, d["runs"][n]) for d in data.values() if n in d["runs"]) for n in order}
-    for n, k in zip(order, ["XOne", "XTwo", "Gx", "Op"]): num("GnineCellsWrong" + k, nw[n])
+    for n, k in zip(order, ["XOne", "XTwo", "Gx", "Op", "Nine"]): num("GnineCellsWrong" + k, nw[n])
     num("GnineCellsEvery", sum(all(wrong(d, d["runs"][n]) for n in order if n in d["runs"]) for d in data.values()))
     num("GnineCellsUnion", len(bad))
     if True:                                                                      # supplement figure: error of the model in round trips against the segments of the response, one mark per cell and run
         fig, ax = plt.subplots(figsize=(3.4, 2.2))
-        mk = {"X250 run 1": "o", "X250 run 2": "s", "GX10": "^", "Optiplex": "D"}
+        mk = {"X250 run 1": "o", "X250 run 2": "s", "GX10": "^", "OptiPlex": "D", "i9": "v"}
         seg = lambda d: -(-d["resp"] // (d["mtu"] - S.IP_TCP_HDR))
         for n in order:
             xs = [seg(d) for d in data.values() if n in d["runs"] and not wrong(d, d["runs"][n])]
             ys = [(d["runs"][n] - d["model"]) / d["rtt"] for d in data.values() if n in d["runs"] and not wrong(d, d["runs"][n])]
-            ax.plot(xs, ys, mk[n], color=GREY, ms=2.2, mew=0, alpha=0.55)
+            ax.plot(xs, ys, mk[n], mfc="none", mec=GREY, ms=2.6, mew=0.4, ls="none")
         for n in order:
             pts = [(seg(d), (d["runs"][n] - d["model"]) / d["rtt"]) for d in data.values() if n in d["runs"] and wrong(d, d["runs"][n])]
-            ax.plot([x for x, _ in pts], [y for _, y in pts], mk[n], color=ACC, ms=3.4, mew=0, label=n)
+            ax.plot([x for x, _ in pts], [y for _, y in pts], mk[n], mfc="black", mec="black", ms=3.4, mew=0, ls="none", label=n)
         ax.axhline(0, color=INK, lw=0.5); ax.axhline(-0.5, color=INK, lw=0.5, ls=":")
         ax.text(0.5, -0.53, "wrong below this line (half an RTT)", fontsize=5.5, va="top")
         for c in bad:
@@ -319,7 +319,7 @@ def _g19_cells_table():
                 ax.annotate(str(c), (seg(d), (d["runs"]["X250 run 1"] - d["model"]) / d["rtt"]), xytext=(3, 2), textcoords="offset points", fontsize=5.5)
         ax.set_xlabel("segments of the response"); ax.set_ylabel("measured minus model (RTT)")
         ax.spines[["top", "right"]].set_visible(False)
-        ax.legend(frameon=False, fontsize=6, loc="lower left", bbox_to_anchor=(0.0, 0.0), ncol=2, handletextpad=0.1, columnspacing=0.8, title="grey: right; colour: wrong", title_fontsize=6)
+        ax.legend(frameon=False, fontsize=6, loc="lower left", bbox_to_anchor=(0.0, 0.0), ncol=2, handletextpad=0.1, columnspacing=0.8, title="open: right; filled: wrong", title_fontsize=6)
         fig.tight_layout(pad=0.4); fig.savefig(os.path.join(HERE, "figures", "fig_cells_map.pdf")); plt.close(fig)
 HERE_TEX = os.path.dirname(os.path.abspath(__file__))
 _g19_cells_table()
@@ -375,11 +375,11 @@ def _g22():
         if a and b and c: num("GttXRunTwoWrong", a.group(1)); num("GttXRunTwoMae", b.group(1)); num("GttXNoise", c.group(1))
 _g22()
 
-# ---- where the model is wrong: by size of the request, over the four runs of the first random draw (g19 cell files), threshold 13 000 B (a request flight that needs another round trip)
+# ---- where the model is wrong: by size of the request, over the five runs of the first random draw (g19 cell files), threshold 13 000 B (a request flight that needs another round trip)
 def _domain():
     rx = _re.compile(r"^\s*(\d+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)")
     big = [0, 0]; rest = [0, 0]
-    for fn, col in (("g19_x250_run2_cells.txt", 9), ("g19_x250_run2_cells.txt", 8), ("g19_gx10_cells.txt", 8), ("g19_optiplex_cells.txt", 8)):
+    for fn, col in (("g19_x250_run2_cells.txt", 9), ("g19_x250_run2_cells.txt", 8), ("g19_gx10_cells.txt", 8), ("g19_optiplex_cells.txt", 8), ("g19_i9_cells.txt", 8)):
         pth = os.path.join(RES, fn)
         if not os.path.exists(pth): return
         for ln in open(pth):
@@ -459,16 +459,16 @@ _details_tables()
 
 # ---- Supplement figure: the last ticket acknowledgment against the last request segment, one row per run (K7)
 def _fig_k7_points():
-    runs = [("wp6_k7_points_x250_fixed.csv", "X250, clock fixed"), ("wp6_k7_points_optiplex_fixed.csv", "Optiplex, clock fixed"),
-            ("wp6_k7_points_x250_isolA.csv", "X250, turbo on"), ("wp6_k7_points_x250_isolB.csv", "X250, turbo off"), ("wp6_k7_points_x250_asleft.csv", "X250, clock as left"), ("wp6_k7_points_gx10_fixed.csv", "GX10 (Arm), clock fixed")]
+    runs = [("wp6_k7_points_x250_fixed.csv", "X250, clock fixed"), ("wp6_k7_points_optiplex_fixed.csv", "OptiPlex, clock fixed"),
+            ("wp6_k7_points_x250_isolA.csv", "X250, turbo on"), ("wp6_k7_points_x250_isolB.csv", "X250, turbo off"), ("wp6_k7_points_x250_asleft.csv", "X250, clock as left"), ("wp6_k7_points_gx10_fixed.csv", "GX10, clock fixed")]
     if not all(os.path.exists(os.path.join(RES, f)) for f, _ in runs): return
     fig, axs = plt.subplots(len(runs), 1, figsize=(3.4, 4.0), sharex=True)
     rng = __import__("random").Random(7)
     for ax, (fn, lab) in zip(axs, runs):
         rows = [r for r in rd(os.path.join(RES, fn)) if r["suite"].startswith("ML-DSA") and r["mtu"] != "9000"]
-        for big, mk, col in ((False, "o", GREY), (True, "o", ACC)):
+        for big, mk, col in ((False, "o", GREY), (True, "x", "black")):
             xs = [float(r["last_ticket_ack_minus_last_request_ms"]) for r in rows if (int(r["burst_segments"]) > 10) == big]
-            ax.plot(xs, [rng.uniform(-0.4, 0.4) for _ in xs], mk, ms=1.8, mew=0, color=col, alpha=0.7, label=("burst above ten" if big else "burst of ten or less"))
+            ax.plot(xs, [rng.uniform(-0.4, 0.4) for _ in xs], mk, ms=(2.6 if big else 2.2), mew=(0.6 if big else 0.4), mfc="none", mec=col, ls="none", label=("burst above ten" if big else "burst of ten or less"))
         ax.axvline(0.049, color=INK, lw=0.6)
         ax.set_xscale("symlog", linthresh=0.1); ax.set_ylim(-0.6, 1.5); ax.set_yticks([])
         ax.text(0.01, 0.97, lab, transform=ax.transAxes, ha="left", va="top", fontsize=6.5)
@@ -883,6 +883,45 @@ def _fmt(v):
     if re.fullmatch(r"\d{4,}", t):
         t = f"{int(t):,}".replace(",", "\\,")
     return t
+# ---- G24 (the server's window in nine random cells, three machines) and the replications of 25-26 Nov 2026
+def _g24():
+    rule = {10: 10, 15: 10, 20: 10, 32: 10, 37: 10, 16: 12, 65: 12, 66: 12, 72: 18}      # rule (1) applied to the ClientHello flight of the cell (g24_design.md, S3)
+    tot = collections.Counter(); per = {}; groups = {}
+    for m, tag in (("gx10", "Gx"), ("x250", "X"), ("i9", "I")):
+        pth = os.path.join(RES, f"g24_{m}_posthoc_points.csv"); ana = os.path.join(RES, f"g24_{m}_analysis.txt")
+        if not (os.path.exists(pth) and os.path.exists(ana)): return
+        X = rd(pth); w = [r for r in X if r["cwnd"] != ""]
+        fit = lambda r: int(r["cwnd"]) >= int(r["resp_segs"])
+        c = collections.Counter(n=len(X), w=len(w), agree=sum(fit(r) == (r["fast"] == "1") for r in w), ufast=sum(r["group"] == "U" and r["fast"] == "1" for r in w),
+                                ufastfit=sum(r["group"] == "U" and r["fast"] == "1" and fit(r) for r in w), uslow=sum(r["group"] == "U" and r["fast"] == "0" for r in w),
+                                uslowsmall=sum(r["group"] == "U" and r["fast"] == "0" and not fit(r) for r in w), larger=sum(int(r["req_first"]) > rule[int(r["cell"])] for r in X),
+                                smaller=sum(int(r["req_first"]) < rule[int(r["cell"])] for r in X))
+        tot.update(c)
+        q = _re.findall(r"^(Q\d[ab]?) .*-> (NOT MET|MET)", open(ana).read(), _re.M)
+        crit = {}
+        for k, v in q: crit.setdefault(k[:2], []).append(v == "MET")            # Q3a and Q3b are one criterion, Q3
+        num(f"Gtf{tag}Met", sum(all(v) for v in crit.values())); num(f"Gtf{tag}K", len(crit))
+        num(f"Gtf{tag}Agree", c["agree"]); num(f"Gtf{tag}W", c["w"]); num(f"Gtf{tag}Larger", c["larger"]); num(f"Gtf{tag}N", c["n"])
+        for r in X:
+            d = per.setdefault(int(r["cell"]), {}).setdefault(tag, [0, 0]); d[0] += r["fast"] == "1"; d[1] += 1
+            groups[int(r["cell"])] = (r["group"], collections.Counter())
+    for k, v in (("N", "n"), ("W", "w"), ("Agree", "agree"), ("UFast", "ufast"), ("UFastFit", "ufastfit"), ("USlow", "uslow"), ("USlowSmall", "uslowsmall"), ("Larger", "larger"), ("Smaller", "smaller")):
+        num("Gtf" + k, tot[v])
+    cells = {int(c["cell"]): c for c in rd(os.path.join(RES, "g24_cells.csv"))}
+    rows = [f"{c} & {'unexplained' if groups[c][0] == 'U' else 'never wrong'} & {cells[c]['suite'].split('|')[0]} & " + " & ".join(f"{per[c][t][0]} of {per[c][t][1]}" for t in ("X", "Gx", "I")) + "\\\\" for c in sorted(per, key=lambda c: (groups[c][0] != "U", c))]
+    open(os.path.join(HERE, "g24_table.tex"), "w").write("\\newcommand{\\GtfRows}{" + "\n".join(rows) + "}\n")
+_g24()
+
+def _repl_nov25():
+    for tag, fn in (("Gx", "g9_gx10_analysis.txt"), ("I", "g9_i9_analysis.txt"), ("X", "g9_analysis.txt")):
+        m = _re.search(r"OpenSSL 3\.5:.*?early wrong on (\d+) of (\d+)", open(os.path.join(RES, fn)).read())
+        if m: num(f"Rone{tag}Early", m.group(1)); num("RoneDN", m.group(2))
+    for nm, fs, rx in (("Rone", ["g9_gx10_analysis.txt", "g9_i9_analysis.txt"], r"\b(G\d) (NOT MET|MET)"), ("InineRand", ["g19_i9_analysis.txt"], r"\b(A\d) (NOT MET|MET)"),
+                       ("InineTkt", ["g12_i9_analysis.txt", "g14_i9_analysis_delack.txt"], r"\b([KD]\d) (NOT MET|MET)"), ("InineBbr", ["g14_i9_analysis_bbr.txt"], r"\b(B\d) (NOT MET|MET)")):
+        r = _count_met(fs, rx)
+        if r: num(nm + "Met", r[0]); num(nm + "K", r[1])
+_repl_nov25()
+
 with open(os.path.join(HERE, "numbers_short.tex"), "w") as fh:
     fh.write("% generated by make_assets_short.py - do not edit\n")
     for k, v in NUMS.items():

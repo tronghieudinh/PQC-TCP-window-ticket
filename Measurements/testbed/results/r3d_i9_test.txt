@@ -1,0 +1,18 @@
+Round 3d test, machine i9: 1710 resumed transactions
+C1 instrument (the write is later by D within 25 us)  -> MET
+   D 200: median deviation -12.1 us (tolerance 25.0), spread 44 (limit 101)  ok
+   D 300: median deviation -17.0 us (tolerance 25.0), spread 42 (limit 130)  ok
+   D 400: median deviation -1.0 us (tolerance 25.0), spread 46 (limit 159)  ok
+   D 500: median deviation +1.6 us (tolerance 25.0), spread 45 (limit 188)  ok
+   D 600: median deviation -7.7 us (tolerance 25.0), spread 44 (limit 217)  ok
+   D 800: median deviation +0.8 us (tolerance 25.0), spread 46 (limit 275)  ok
+   D 1600: median deviation -3.4 us (tolerance 25.0), spread 42 (limit 507)  ok
+C2 the order moves in the predicted direction  -> MET
+   ML-DSA-65 MTU 1280: change -3 points (band 18)  ok
+   ML-DSA-65 MTU 1500: change +0 points (band 17)  ok
+   ML-DSA-87 MTU 1280: change -6 points (band 17)  ok
+   ML-DSA-87 MTU 1500: change -3 points (band 17)  ok
+C3 the late share at each D is predicted from the D = 0 transactions and the measured shifts: 31 of 32 cells in the band (allowed outside: 4), mean absolute error 2.6 points (limit 5.2), null 3.6 (needs at most 0.79 of it)  -> MET
+   OUTSIDE: ML-DSA-87 MTU 1280 D 300: measured 53 %, predicted 6 %
+C4 the rule and the accounting: B1 100.000 % of 10225 events, B2 100.00 % of 1710 transactions  -> MET
+Reading (as registered): C1 to C4 met on this machine: the order is set by the times of the acknowledgments and of the write, moved by an intervention on this machine and predicted from the unperturbed transactions and the measured shifts (CONFIRMED, levels A and B).

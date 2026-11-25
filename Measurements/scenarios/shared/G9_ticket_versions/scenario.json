@@ -1,0 +1,26 @@
+{
+ "id": "G9",
+ "title": "Ticket tests of L1 on another OpenSSL release (3.5.4 baseline, 3.6.5, 4.1.0): stage C (client window) and stage D (ticket joined or written on the Finished)",
+ "serves": "L1 (limitation: one TLS library), Paper 1 (limits)",
+ "device_classes": [
+  "mint-x86",
+  "gx10"
+ ],
+ "needs_root": true,
+ "needs": [
+  "netns",
+  "tc"
+ ],
+ "tune": "optional",
+ "est_minutes": 80,
+ "predictions": [
+  "results/slack_predictions.csv",
+  "results/nst_predictions.csv",
+  "results/g9_ticket_versions_predictions.md"
+ ],
+ "stages": [
+  "custom: run_testbed.py --profile core --resume, the loops of run_slack_tls.sh (stage C) and run_nst_tls.sh (stage D)"
+ ],
+ "status": "runnable; criteria G1-G4 of results/g9_ticket_versions_predictions.md APPROVED 2026-11-18 (commit and push them before measuring); one release per run (--ossl), about 80 minutes each on the X250",
+ "notes": "The model predictions are those of 1 and 2 November 2026 (slack_predictions.csv, nst_predictions.csv; sha256 in the criteria file), unchanged: the model does not depend on the OpenSSL release. Run 3.5.4 on the same machine as the baseline. Analyse with testbed/analyze_g9.py."
+}

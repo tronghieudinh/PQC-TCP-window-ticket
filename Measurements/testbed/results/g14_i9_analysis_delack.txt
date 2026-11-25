@@ -1,0 +1,4 @@
+G14 arm delack: 28 stage-C and 32 stage-D design cells measured (0 missing or with fewer than 30 valid transactions)
+  stage C: rule (1) wrong on 0
+  stage D: 10 discriminating cells: early-ticket model wrong on 0, joined-ticket model wrong on 10; early-ticket model wrong on 0 of 32 design cells
+  D1 MET  D2 MET  D3 MET  D4 MET  D5 MET

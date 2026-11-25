@@ -1,0 +1,34 @@
+G24 post hoc, machine i9: 540 resumed transactions of the capture
+cell grp   n fast | request rounds (fast) | request rounds (slow) | segments of the first request round (fast / slow, median) | response segments
+  10 U    60    6 | {2: 6}             | {2: 54}            | 10 / 10 | {14: 60}
+  15 K    60    0 | {}                 | {2: 60}            | - / 10 | {13: 60}
+  16 K    60    0 | {}                 | {2: 60}            | - / 12 | {15: 60}
+  20 K    60    0 | {}                 | {2: 60}            | - / 10 | {12: 60}
+  32 U    60   27 | {2: 27}            | {2: 33}            | 10 / 10 | {12: 58, 13: 2}
+  37 K    60    0 | {}                 | {2: 60}            | - / 10 | {12: 60}
+  65 K    60    0 | {}                 | {2: 60}            | - / 12 | {13: 60}
+  66 U    60   60 | {2: 60}            | {}                 | 12 / - | {12: 60}
+  72 U    60   60 | {2: 60}            | {}                 | 18 / - | {13: 60}
+transactions whose request took fewer rounds than usual in the cell: 0  (cells {}; of them fast 0)
+fast transactions: 153; with the usual number of request rounds 153, with fewer 0
+window against latency (cwnd >= response segments, close_notify not counted, <=> fast): 540 of 540 transactions with a window reading; no reading for 0
+cell | window of the fast ones (segments: transactions) | window of the slow ones
+  10 | {14: 6} | {10: 53, 12: 1}
+  15 | {} | {10: 56, 11: 4}
+  16 | {} | {10: 52, 12: 2, 13: 2, 14: 4}
+  20 | {} | {10: 60}
+  32 | {12: 13, 13: 2, 14: 12} | {10: 31, 12: 2}
+  37 | {} | {10: 60}
+  65 | {} | {10: 60}
+  66 | {13: 37, 15: 23} | {}
+  72 | {17: 60} | {}
+
+Reading notes (25 Nov 2026; i9-10900K, Linux 7.0.0-43, commit 5e3527d, run 20:05-20:18)
+1. Registered criteria (g24_i9_analysis.txt): Q1 to Q5 all met.
+2. Supplementary criteria of the addendum, computed from every transaction of this analysis:
+   S1 met: "window >= response segments" agrees with "fast" in 540 of 540 transactions.
+   S2 met: group U, 153 of 153 fast transactions have a window >= response segments (the 87 slow ones all have a smaller window).
+   S3 met: the client's first request round equals rule (1) in 540 of 540 transactions (none smaller, none larger).
+3. The registered script counts one disagreement (Q3a 539 of 540); it is absent here, where the close_notify is not counted as a response segment.
+4. Fast transactions of 30 (repetition a, b): cell 10: 5, 1; cell 32: 15, 12; cells 66 and 72: 30, 30.
+5. System load was not recorded during this run.

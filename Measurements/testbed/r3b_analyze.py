@@ -12,7 +12,7 @@ import argparse, collections, csv, glob, os, re, statistics as st, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import analyze_r3 as R, analyze_ticket_race as T
 
-def txs(rundir):
+def txs(rundir, with_conn=False):
     m = re.search(r"_([dws])(off|[0-9.]+)_m(\d+)$", rundir.rstrip("/")); kind, delay, mtu = m.group(1), m.group(2), int(m.group(3)); ev_rows, tx_rows = [], []
     for f in sorted(glob.glob(os.path.join(rundir, "*_srv.pcap"))):
         g = T.TAG.search(os.path.basename(f)).groupdict(); bpf = f[:-len("_srv.pcap")] + ".bpf.txt"
@@ -65,6 +65,7 @@ def txs(rundir):
             tx_rows.append(dict(kind=kind, delay=delay, pw_us=pw, ak_minus_tq_us=";".join(f"{(a_[0] - t_q) / 1000.0:.1f}" for a_, _ in tk), mtu=mtu, suite=g["suite"], n=n, resp_segs=r["resp_segs"], burst=r["burst"], tk_acks=len(tk), late=sum(a[0] > t_q for a, _ in tk),
                                 cwnd_final=lastb[4], po_final=lastb[3], max_po_final=lastb[5], events=tot_ev, events_met=ok_ev,
                                 shift_us=round(st.median(shifts), 1) if shifts else ""))
+            if with_conn: tx_rows[-1].update(conn=i, ticket_segs=r["ticket_segs"], t_fin_ms=r["t_fin"] * 1000, t_req_ms=r["t_req"] * 1000)     # G24
     return ev_rows, tx_rows
 
 def main():

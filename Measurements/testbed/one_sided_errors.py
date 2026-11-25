@@ -93,6 +93,14 @@ def dd(old, scen, mdir):
     return found[-1] if found else os.path.join(DATA, old, "data")
 
 
+def repo(mdir, scen, suffix=""):
+    """data directory of the latest run of a scenario in the data repository (suffix: the end of the run directory name, e.g. -delack)"""
+    for root in (os.path.join(REPO, "data"), os.path.expanduser("~/PQC-data-repo")):      # the copy in the released archive first, else the authors' data repository
+        found = sorted(glob.glob(os.path.join(root, mdir, "scenarios", scen, f"*{suffix}", "data")))
+        if found: return found[-1]
+    return os.path.join(REPO, "data", mdir, "scenarios", scen, "missing")
+
+
 def sets(with_g22=False):
     X = lambda *p: os.path.join(RES, *p)
     S = []
@@ -116,6 +124,15 @@ def sets(with_g22=False):
         S.append((f"background load {lv} (G17)", "X250", lambda lv=lv: pairs_g17(lv)))
     for fn, label, col in (("g19_x250_run2_cells.txt", "X250 run 1 (reference)", 9), ("g19_x250_run2_cells.txt", "X250 run 2", 8), ("g19_gx10_cells.txt", "GX10", 8), ("g19_optiplex_cells.txt", "Optiplex", 8)):
         S.append(("100 random cells (G19)", label, lambda fn=fn, col=col: pairs_g19(fn, col)))
+    # the replications of 25-26 Nov 2026 (results/g9_gx10_design.md, i9_replication_design.md)
+    for mach, md in (("GX10", "gx10"), ("i9", "i9-10900")):
+        S.append(("client window (rule 1), 28 cells", f"{mach} (G9)", lambda md=md: pairs_slack(os.path.join(repo(md, "G9"), "slack_tls.csv"), "slack_predictions.csv", "model_slack0_ms")))
+        S.append(("ticket timing, 80 cells", f"{mach} (G9)", lambda md=md: pairs_nst(os.path.join(repo(md, "G9"), "nst_tls.csv"), "nst_predictions.csv", "model_early_ms")))
+    S.append(("ticket timing on new cells (G12, RTT 30 and 200)", "i9", lambda: pairs_nst(os.path.join(repo("i9-10900", "G12"), "nst_tls.csv"), "g12_predictions.csv", "model_early_ms", design_only=True, with_rtt=True)))
+    S.append(("client window, delayed ACK (G14)", "i9", lambda: pairs_slack(os.path.join(repo("i9-10900", "G14", "-delack"), "slack_tls.csv"), "g14_predictions_delack_c.csv", "model_rule1_ms")))
+    S.append(("ticket timing, delayed ACK (G14)", "i9", lambda: pairs_nst(os.path.join(repo("i9-10900", "G14", "-delack"), "nst_tls.csv"), "g14_predictions_delack_d.csv", "model_early_ms", design_only=True)))
+    S.append(("ticket timing under BBR (G14)", "i9", lambda: pairs_nst(os.path.join(repo("i9-10900", "G14", "-bbr"), "nst_tls.csv"), "g14_predictions_bbr_d.csv", "model_early_ms", design_only=True)))
+    S.append(("100 random cells (G19)", "i9", lambda: pairs_g19("g19_i9_cells.txt", 8)))
     g22 = os.path.expanduser("~/pqc_measurements/scenarios/G22/20261122-040058-gx10/data/g22.csv")
     if with_g22:                                # G22 (round 2) is reported apart; the totals of the paper are those of the tests of L1, all in the archive
         gx = sorted(glob.glob(os.path.expanduser("~/pqc_measurements/scenarios/G22/*gx10*/data/g22.csv")) + glob.glob(os.path.join(REPO, "data", "gx10", "scenarios", "G22", "*", "data", "g22.csv")) + glob.glob(os.path.expanduser("~/PQC-data-repo/gx10/scenarios/G22/*/data/g22.csv")))

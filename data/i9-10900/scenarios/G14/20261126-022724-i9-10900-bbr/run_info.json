@@ -1,0 +1,31 @@
+{
+ "scenario": "G14",
+ "device_fingerprint": "739186b35938",
+ "preflight_before": "warn",
+ "dry_run": false,
+ "n": "",
+ "no_tune": false,
+ "args": "",
+ "started": "2026-11-26T02:27:24+07:00",
+ "finished": "2026-11-26T03:30:15+07:00",
+ "failed_commands": 0,
+ "fingerprint_same_after": true,
+ "state_change": {
+  "load": [
+   [
+    1.01,
+    1.1,
+    1.13
+   ],
+   [
+    1.0,
+    1.02,
+    1.0
+   ]
+  ],
+  "temp_max_c": [
+   65.0,
+   60.0
+  ]
+ }
+}

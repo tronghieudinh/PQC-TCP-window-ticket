@@ -1,0 +1,34 @@
+G24 post hoc, machine X250: 540 resumed transactions of the capture
+  note: rep b cell 72: client port 37072 used by 2 connections
+cell grp   n fast | request rounds (fast) | request rounds (slow) | segments of the first request round (fast / slow, median) | response segments
+  10 U    60   20 | {2: 20}            | {2: 40}            | 10 / 10 | {14: 60}
+  15 K    60    0 | {}                 | {2: 60}            | - / 10 | {13: 60}
+  16 K    60    0 | {}                 | {2: 60}            | - / 12 | {15: 59, 16: 1}
+  20 K    60    0 | {}                 | {2: 60}            | - / 10 | {12: 60}
+  32 U    60   60 | {2: 60}            | {}                 | 10 / - | {12: 60}
+  37 K    60    0 | {}                 | {2: 60}            | - / 10 | {12: 60}
+  65 K    60    0 | {}                 | {2: 60}            | - / 12 | {13: 60}
+  66 U    60   60 | {2: 60}            | {}                 | 12 / - | {12: 60}
+  72 U    60   60 | {1: 1, 2: 59}      | {}                 | 18 / - | {13: 60}
+transactions whose request took fewer rounds than usual in the cell: 1  (cells {72: 1}; of them fast 1)
+fast transactions: 200; with the usual number of request rounds 199, with fewer 1
+window against latency (cwnd >= response segments, close_notify not counted, <=> fast): 538 of 539 transactions with a window reading; no reading for 1
+   disagreement: cell 72 rep a row 1: cwnd 10, response 13, request rounds 1, excess 803.0
+   no window reading: cell 72 rep b row 13: fast 1, request rounds 2, server segments before the request was complete 7
+cell | window of the fast ones (segments: transactions) | window of the slow ones
+  10 | {14: 20} | {10: 38, 13: 2}
+  15 | {} | {10: 53, 11: 7}
+  16 | {} | {10: 42, 13: 4, 14: 14}
+  20 | {} | {10: 59, 11: 1}
+  32 | {12: 1, 14: 59} | {}
+  37 | {} | {10: 60}
+  65 | {} | {10: 60}
+  66 | {15: 60} | {}
+  72 | {10: 1, 17: 58} | {}
+
+Reading notes (post hoc; the registered output is g24_x250_analysis.txt and stays as it is; all five criteria are met there)
+ 1. The registered script matched only 17 of 30 transactions of cell 72, repetition b: a client port used twice shifted the pairing of connections and latencies. The post hoc script splits at the SYN.
+ 2. The two Q2 misses and the two transactions counted against Q5 are one close_notify counted as a response segment (cell 10), one mis-paired connection (cell 72 b) and the transaction of note 3.
+ 3. One fast transaction of cell 72 (repetition a, row 1; group U) saved its round trip on the REQUEST side: the client sent the whole request in one round (19 segments, against 18 as a rule), so the ticket left before
+    the request was complete, the server's window stayed at 10 and the response took two rounds. Its latency equals that of the other fast transactions of the cell, which save the round on the response.
+    The client's window was not traced.

@@ -7,11 +7,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 PY=${PY:-python3}
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-cp paper2_short/Latex/numbers_short.tex "$tmp/numbers_short.tex"; cp paper2_short/Latex/g19_cells_table.tex "$tmp/g19_cells_table.tex"
+cp paper2_short/Latex/numbers_short.tex "$tmp/numbers_short.tex"; for t in g19_cells_table os_table details_tables g24_table; do cp paper2_short/Latex/$t.tex "$tmp/$t.tex"; done
 (cd paper2_short/Latex && $PY make_assets_short.py >/dev/null && PQC_FIG_FLAT=1 $PY make_assets_short.py >/dev/null)      # the figures of the paper are the flat variant (_v3)
 if diff -q "$tmp/numbers_short.tex" paper2_short/Latex/numbers_short.tex >/dev/null; then echo "numbers check OK"
 else echo "numbers DIFF (regenerated against shipped):"; diff "$tmp/numbers_short.tex" paper2_short/Latex/numbers_short.tex || true; exit 1; fi
-cmp -s "$tmp/g19_cells_table.tex" paper2_short/Latex/g19_cells_table.tex && echo "table of the cells wrong across runs OK" || { echo "cells table DIFF"; exit 1; }
+for t in g19_cells_table os_table details_tables g24_table; do cmp -s "$tmp/$t.tex" paper2_short/Latex/$t.tex && echo "table $t OK" || { echo "table $t DIFF"; exit 1; }; done
 # the kernel-logic derivation of rule (1) and the model comparison (Table 1) from the shipped data
 $PY Simulation/window_from_kernel.py | tee "$tmp/kernel.txt"; grep -q "480 of 480" "$tmp/kernel.txt" || { echo "kernel logic check FAILED"; exit 1; }
 cp Measurements/testbed/results/l1_model_comparison.csv "$tmp/cmp.csv"
@@ -76,7 +76,7 @@ if [ -f Measurements/testbed/results/r3d_report.txt ] && [ -f Measurements/testb
   $PY Measurements/testbed/r3d_report.py --out "$tmp/r3d_report.txt" >/dev/null
   cmp -s "$tmp/r3d_report.txt" Measurements/testbed/results/r3d_report.txt && echo "round 3d report OK" || { echo "round 3d report DIFF"; exit 1; }
 fi
-# the direction of the errors of the model over every per-cell test of L1 (supplement, Table 7): rerun from the archived raw files
+# the direction of the errors of the model over every per-cell test of L1 (supplement, table of the direction of the errors): rerun from the archived raw files
 $PY Measurements/testbed/one_sided_errors.py --out "$tmp/one_sided.txt" >/dev/null
 cmp -s "$tmp/one_sided.txt" Measurements/testbed/results/one_sided_errors.txt && echo "direction of the errors OK" || { echo "direction of the errors DIFF"; exit 1; }
 if [ -f Measurements/testbed/results/g20/X250/g20_ecdsa_k12.csv ]; then
@@ -143,8 +143,27 @@ if [ -f "$X1" ] && [ -f "$GX" ] && [ -f "$OP" ]; then
     [ -f "$D/$d/data/nst_tls.csv" ] && { $PY Measurements/testbed/analyze_g14.py --arm delack --run "$D/$d/data" --out "$tmp/g14x.txt" >/dev/null; cmp -s "$tmp/g14x.txt" Measurements/testbed/results/$f && echo "G14 $f OK" || { echo "G14 $f DIFF"; exit 1; }; }
   done
 fi
+# the measurements of 25-26 Nov 2026 on the Arm machine and the i9: analyses rerun from the shipped data files (the analyses of G24, round 3d and the clock repeat on the i9 need the raw traces)
+last() { ls -d $1 2>/dev/null | tail -1 || true; }
+head_ok() { head -n "$(wc -l < "$1")" "$2" | cmp -s - "$1"; }   # the shipped file may carry run notes after the output of the script
+for pair in "gx10/scenarios/G9/*/data:gx10" "i9-10900/scenarios/G9/*/data:i9"; do
+  d=$(last "data/${pair%%:*}"); m=${pair#*:}; [ -n "$d" ] || { echo "G9 $m: data MISSING"; exit 1; }
+  $PY Measurements/testbed/analyze_g9.py --run "3.5=$d" --out "$tmp/g9_$m.txt" --cross-out "$tmp/g9_${m}_cross.txt" >/dev/null
+  head_ok "$tmp/g9_$m.txt" Measurements/testbed/results/g9_${m}_analysis.txt && echo "G9 $m analysis OK" || { echo "G9 $m analysis DIFF"; exit 1; }
+done
+R=Measurements/testbed/results; I=data/i9-10900/scenarios
+$PY Measurements/testbed/analyze_g19_arm.py --run "$(last "$I/G19/*/data")/g19.csv" --out "$tmp/i19.txt" --cells "$tmp/i19c.txt" >/dev/null
+cmp -s "$tmp/i19.txt" $R/g19_i9_analysis.txt && cmp -s "$tmp/i19c.txt" $R/g19_i9_cells.txt && echo "G19 i9 analysis OK" || { echo "G19 i9 analysis DIFF"; exit 1; }
+$PY Measurements/testbed/analyze_g12.py --run "$(last "$I/G12/*/data")" --out "$tmp/i12.txt" >/dev/null
+cmp -s <(tail -n +2 "$tmp/i12.txt") <(tail -n +2 $R/g12_i9_analysis.txt) && echo "G12 i9 analysis OK" || { echo "G12 i9 analysis DIFF"; exit 1; }
+for arm in delack bbr; do
+  $PY Measurements/testbed/analyze_g14.py --arm $arm --run "$(last "$I/G14/*-$arm/data")" --out "$tmp/i14_$arm.txt" >/dev/null
+  cmp -s "$tmp/i14_$arm.txt" $R/g14_i9_analysis_$arm.txt && echo "G14 $arm i9 analysis OK" || { echo "G14 $arm i9 analysis DIFF"; exit 1; }
+done
 if command -v latexmk >/dev/null; then
-  (cd paper2_short/CCR_v3 && for t in main supplement_ack; do latexmk -pdf -interaction=nonstopmode $t.tex >/dev/null 2>&1; latexmk -pdf -interaction=nonstopmode $t.tex >/dev/null 2>&1; done) \
-    && echo "built paper2_short/CCR_v3/main.pdf ($(pdfinfo paper2_short/CCR_v3/main.pdf 2>/dev/null | awk '/Pages/{print $2}') pages) and supplement_ack.pdf ($(pdfinfo paper2_short/CCR_v3/supplement_ack.pdf 2>/dev/null | awk '/Pages/{print $2}') pages)" || echo "PDF build failed (see paper2_short/CCR_v3/main.log)"
-  [ -s paper2_short/CCR_v3/main.pdf ] && (cd paper2_short/CCR_v3 && latexmk -c >/dev/null 2>&1; rm -f main.bbl supplement_ack.bbl main.synctex.gz)   # keep only the PDF: the build files contain the paths of this machine
+  P=paper2_short/CCR_repeatable
+  (cd $P && for t in main supplement_ack; do latexmk -pdf -interaction=nonstopmode $t.tex >/dev/null 2>&1 && latexmk -pdf -interaction=nonstopmode $t.tex >/dev/null 2>&1 || exit 1; done) \
+    && echo "built $P/main.pdf ($(pdfinfo $P/main.pdf 2>/dev/null | awk '/Pages/{print $2}') pages) and supplement_ack.pdf ($(pdfinfo $P/supplement_ack.pdf 2>/dev/null | awk '/Pages/{print $2}') pages)" || { echo "PDF build failed (see $P/main.log)"; exit 1; }
+  (cd $P && latexmk -c >/dev/null 2>&1; rm -f main.bbl supplement_ack.bbl main.synctex.gz)   # keep only the PDF: the build files contain the paths of this machine
 fi
+echo "all checks passed"

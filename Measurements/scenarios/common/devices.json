@@ -1,0 +1,15 @@
+{
+  "note": "Known measurement devices. A host matches a profile when every entry of match_all is found (case-insensitive; a list means any of its words) in the CPU model, DMI product/board, device-tree model or host name, and the architecture agrees. The most specific profile wins. 'class' is what scenario.json lists under device_classes; 'kernels_validated' are kernels already seen on that machine (a new kernel only raises a warning: record it as a new (machine, kernel) pair).",
+  "profiles": [
+    {"label": "gx10", "class": "gx10", "arch": "aarch64", "match_all": [["X925", "GB10", "gx10", "DGX Spark"]],
+     "description": "NVIDIA GX10 (Arm, 10 x Cortex-X925 + 10 x Cortex-A725), shared machine, no root unless granted", "kernels_validated": ["6.14."]},
+    {"label": "x250", "class": "mint-x86", "arch": "x86_64", "match_all": [["5600U", "X250"]],
+     "description": "Lenovo X250, Core i7-5600U (2 cores / 4 threads), Linux Mint, root", "kernels_validated": ["7.0.", "6."]},
+    {"label": "dell7760", "class": "mint-x86", "arch": "x86_64", "match_all": [["11500H", "Precision 7760"]],
+     "description": "Dell Precision 7760, Core i5-11500H, Linux Mint, root", "kernels_validated": ["7.0.", "6."]},
+    {"label": "i9-10900", "class": "mint-x86", "arch": "x86_64", "match_all": [["10900"]],
+     "description": "desktop Core i9-10900K (Comet Lake, 10 cores / 20 threads, not hybrid), Linux Mint, root", "kernels_validated": ["7.0.", "6."]},
+    {"label": "x86-other", "class": "mint-x86", "arch": "x86_64", "match_all": [["Intel", "AMD"]],
+     "description": "another x86-64 machine (not one of the three planned)", "kernels_validated": []}
+  ]
+}

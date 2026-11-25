@@ -1,0 +1,27 @@
+{
+ "scenario": "G9",
+ "device_fingerprint": "739186b35938",
+ "preflight_before": "warn",
+ "dry_run": false,
+ "n": "",
+ "no_tune": false,
+ "args": "",
+ "started": "2026-11-25T21:04:43+07:00",
+ "finished": "2026-11-25T22:19:27+07:00",
+ "failed_commands": 0,
+ "fingerprint_same_after": true,
+ "state_change": {
+  "load": [
+   [
+    0.1,
+    0.22,
+    0.17
+   ],
+   [
+    0.0,
+    0.01,
+    0.21
+   ]
+  ]
+ }
+}

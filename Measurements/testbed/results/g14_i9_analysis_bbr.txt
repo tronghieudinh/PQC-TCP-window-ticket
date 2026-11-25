@@ -1,0 +1,4 @@
+G14 arm bbr: 28 stage-C and 41 stage-D design cells measured (0 missing or with fewer than 30 valid transactions)
+  stage C: model w0 + n wrong on 0; rule (1) wrong on 10 of the 10 cells where it differs from w0 + n
+  stage D: BBR model wrong on 3 of 41; model of L1 wrong on 19 of the 21 cells where it differs from the BBR model
+  B1 MET  B2 MET  B3 MET  B4 MET  B5 MET

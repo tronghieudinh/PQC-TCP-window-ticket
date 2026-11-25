@@ -1,0 +1,42 @@
+G24 post hoc, machine GX10: 540 resumed transactions of the capture
+  note: rep b cell 32: client port 44360 used by 2 connections
+cell grp   n fast | request rounds (fast) | request rounds (slow) | segments of the first request round (fast / slow, median) | response segments
+  10 U    60   20 | {2: 20}            | {2: 40}            | 10 / 10 | {14: 60}
+  15 K    60    0 | {}                 | {2: 60}            | - / 10 | {13: 60}
+  16 K    60    5 | {1: 5}             | {2: 55}            | 16 / 12 | {15: 55, 19: 5}
+  20 K    60    0 | {}                 | {2: 60}            | - / 10 | {12: 60}
+  32 U    60   33 | {2: 33}            | {2: 27}            | 10 / 10 | {12: 60}
+  37 K    60    0 | {}                 | {2: 60}            | - / 10 | {12: 60}
+  65 K    60    0 | {}                 | {2: 60}            | - / 12 | {13: 60}
+  66 U    60   23 | {2: 23}            | {2: 37}            | 12 / 12 | {12: 60}
+  72 U    60   60 | {2: 60}            | {}                 | 18 / - | {13: 60}
+transactions whose request took fewer rounds than usual in the cell: 5  (cells {16: 5}; of them fast 5)
+fast transactions: 141; with the usual number of request rounds 136, with fewer 5
+window against latency (cwnd >= response segments, close_notify not counted, <=> fast): 534 of 534 transactions with a window reading; no reading for 6
+   no window reading: cell 16 rep a row 10: fast 1, request rounds 1, server segments before the request was complete 0
+   no window reading: cell 16 rep a row 11: fast 1, request rounds 1, server segments before the request was complete 0
+   no window reading: cell 16 rep a row 23: fast 1, request rounds 1, server segments before the request was complete 0
+   no window reading: cell 16 rep b row 1: fast 1, request rounds 1, server segments before the request was complete 0
+   no window reading: cell 16 rep b row 23: fast 1, request rounds 1, server segments before the request was complete 0
+   no window reading: cell 32 rep b row 7: fast 0, request rounds 2, server segments before the request was complete 4
+cell | window of the fast ones (segments: transactions) | window of the slow ones
+  10 | {14: 20} | {10: 39, 12: 1}
+  15 | {} | {10: 39, 11: 21}
+  16 | {} | {10: 33, 12: 1, 13: 2, 14: 19}
+  20 | {} | {10: 42, 11: 18}
+  32 | {12: 8, 14: 25} | {10: 25, 11: 1}
+  37 | {} | {10: 60}
+  65 | {} | {10: 60}
+  66 | {13: 8, 15: 15} | {10: 35, 11: 2}
+  72 | {14: 17, 15: 3, 17: 40} | {}
+
+Reading notes (post hoc; the registered output is g24_gx10_analysis.txt and stays as it is: Q5 not met)
+ 1. The three transactions behind "Q5 NOT MET" and the three disagreements of Q3a/Q3b (all in cell 10) had the 24-byte close_notify counted as a 15th response segment by the registered script. Without it they agree.
+ 2. The registered script dropped 10 transactions. Of the five of cell 32, repetition b (a client port used twice), four are recovered here and agree; the one on the reused port has no window reading.
+    Five of cell 16 (group K) are fast by the REQUEST side: the client sent the whole request in one round (16 segments with the Finished = w0 + n for its 6-segment ClientHello, against 12 or 14 otherwise), so the ticket
+    and the response were written together (19 segments). Q4, met as registered, would not be met with these five included. The cells of group U have no such case on this machine.
+    The client's window was not traced; why it reached that size is not known.
+ 3. Load. The GX10 is a shared machine. System records (sar, 10-minute averages): load average about 4 and 12-26 % total CPU between 17:00 and 18:40; during the run (18:49-19:02) the interval 18:50-19:00 shows
+    1.7 % total CPU (1-minute load 0.11 at 19:00); the interval that contains the start shows 8 % (declining load). CPUs 0 and 1, which the probes were pinned to, were over 96 % idle in all intervals.
+    Seconds-level load was not recorded. The share of fast transactions differs between the two repetitions on both machines (cell 10: GX10 18 then 2 of 30, X250 3 then 17), while the agreement
+    between window and latency does not.

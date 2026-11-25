@@ -1,0 +1,8 @@
+OpenSSL 3.5, new cells, run 20261125-231813-i9-10900
+  RTT 30 ms: 38 of 38 cells (0 missing); 16 discriminating: early wrong 0, joined wrong 16; early wrong on 0 of 38
+     K1 MET  K2 MET  K3 MET  K4 MET
+     largest response (segments) within half an RTT of the early model, request 302 B: ECDSA-P256 14, ML-DSA-44 14, ML-DSA-65 14, ML-DSA-87 14
+  RTT 200 ms: 38 of 38 cells (0 missing); 16 discriminating: early wrong 0, joined wrong 16; early wrong on 1 of 38
+     K1 MET  K2 MET  K3 MET  K4 MET
+     largest response (segments) within half an RTT of the early model, request 302 B: ECDSA-P256 14, ML-DSA-44 14, ML-DSA-65 14, ML-DSA-87 14
+     early model wrong (suite, request, k, prediction, measured): ('ML-DSA-65', '19460', '14', '1001.64', 802.9)

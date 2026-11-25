@@ -1,0 +1,19 @@
+G24, machine X250: 527 resumed transactions in 9 cells, repetitions ['a', 'b'], 2606 window events
+  note: ~/pqc_analysis_data/g24_x250/trace_g24b_c72_doff_m1280: 17 of 30 transactions matched
+cell grp suite        n fast tkt resp | cwnd fast / slow (median) | request ms fast / slow | excess ms fast / slow (model)
+  10 U   ML-DSA-44   60   20   4   14 |   14 / 10   |    80 / 80    |   321 / 401   (400)
+  15 K   ECDSA-P256  60    0   1   13 |    - / 10   |     - / 30    |     - / 151   (150)
+  16 K   ML-DSA-44   60    0   4   15 |    - / 10   |     - / 100   |     - / 501   (500)
+  20 K   ECDSA-P256  60    0   1   12 |    - / 10   |     - / 101   |     - / 502   (501)
+  32 U   ML-DSA-44   60   60   4   12 |   14 / -    |   200 / -     |   803 / -     (1001)
+  37 K   ECDSA-P256  60    0   1   12 |    - / 10   |     - / 35    |     - / 162   (159)
+  65 K   ML-DSA-44   60    0   4   13 |    - / 10   |     - / 29    |     - / 121   (116)
+  66 U   ML-DSA-65   60   60   5   12 |   15 / -    |    80 / -     |   323 / -     (401)
+  72 U   ML-DSA-87   47   47   7   13 |   17 / -    |   200 / -     |   803 / -     (1001)
+Q1 the window rule per event: 2606 of 2606 (100.000 %), threshold 99.914 %  -> MET
+Q2 burst = min(cwnd, response segments): 525 of 527 (99.62 %), threshold 99.6 %  -> MET
+Q3a fast <=> cwnd >= response segments, all cells: 524 of 527 (99.43 %), threshold 95 %  -> MET
+Q3b group U, fast transactions with cwnd >= response segments: 184 of 187 (98.40 %), threshold 90 %  -> MET
+    group U: 187 fast, 40 slow; slow transactions with cwnd < response segments: 40 of 40
+Q4 the saving is not on the request side: cells with both classes [10]; cells where the request of the fast ones took at least half an RTT less: []  -> MET
+Q5 no fast transaction where 10 + ticket segments < response segments (cells [10, 15, 16, 20, 37, 72]): 2 of 242 fast, at most 1 %  -> MET

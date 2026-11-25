@@ -1,0 +1,3 @@
+OpenSSL 3.5: stage C 28 cells (validated rule wrong 0, MAE 0.29 ms; loosened by 2 wrong 4); stage D 80 cells, 10 discriminating (early wrong 0, joined wrong 10); early wrong on 0 of 80, MAE 0.4 ms
+   G1 MET  G2 MET  G3 MET  G4 MET
+baseline (3.5) reproduces the earlier result: YES
