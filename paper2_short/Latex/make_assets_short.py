@@ -905,6 +905,7 @@ def _g24():
         for r in X:
             d = per.setdefault(int(r["cell"]), {}).setdefault(tag, [0, 0]); d[0] += r["fast"] == "1"; d[1] += 1
             groups[int(r["cell"])] = (r["group"], collections.Counter())
+    num("GtfWinMax", max(int(r["cwnd"]) for m in ("gx10", "x250", "i9") for r in rd(os.path.join(RES, f"g24_{m}_posthoc_points.csv")) if r["cwnd"] != "" and r["fast"] == "1"))
     for k, v in (("N", "n"), ("W", "w"), ("Agree", "agree"), ("UFast", "ufast"), ("UFastFit", "ufastfit"), ("USlow", "uslow"), ("USlowSmall", "uslowsmall"), ("Larger", "larger"), ("Smaller", "smaller")):
         num("Gtf" + k, tot[v])
     cells = {int(c["cell"]): c for c in rd(os.path.join(RES, "g24_cells.csv"))}
