@@ -1,4 +1,4 @@
-# Code, data and predictions for "How Linux Grows the TCP Window After a Short Flight, and What It Costs Post-Quantum TLS in Round Trips"
+# Code, data and predictions for "Short Flights, Session Tickets, and the Linux TCP Window in Post-Quantum TLS Resumption"
 
 Repeatable paper (ACM SIGCOMM Computer Communication Review); its appendix says how to repeat the key results. Authors: Trong-Hieu Dinh (Banking Academy of Vietnam), <hieudt@hvnh.edu.vn>; Trong-Minh Hoang (Posts and Telecommunications Institute of Technology, corresponding author), <hoangtrongminh@ptit.edu.vn>.
 
