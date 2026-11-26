@@ -341,6 +341,21 @@ HERE_TEX = os.path.dirname(os.path.abspath(__file__))
 _g19_cells_table()
 
 # ---- direction of the errors of the model (one_sided_errors.py -> results/one_sided_errors.txt)
+_ONE_SIDED_LABELS = {      # test name in one_sided_errors.txt -> row label of the supplement's table
+    "client window (rule 1), 28 cells": "client window (rule 1), 28 cells (rows 1, 13, 30)",
+    "ticket timing, 80 cells": "ticket timing, 80 cells (rows 5, 13, 30)",
+    "ticket timing on new cells (G12, RTT 30 and 200)": "ticket timing on new cells, RTT 30 and 200 (rows 16, 29)",
+    "client window, delayed ACK (G14)": "client window, delayed ACK (rows 18, 29)",
+    "ticket timing, delayed ACK (G14)": "ticket timing, delayed ACK (rows 18, 29)",
+    "ticket timing under BBR (G14)": "ticket timing under BBR (rows 17, 29; not in the total)",
+    "client window (rule 1), real link (G13-lite)": "client window (rule 1), physical link (row 25)",
+    "ticket timing, real link (G13-lite)": "ticket timing, physical link (row 25)",
+    "background load L0 (G17)": "background load L0 (row 24)",
+    "background load L1 (G17)": "background load L1 (row 24)",
+    "background load L2 (G17)": "background load L2 (row 24)",
+    "background load L3 (G17)": "background load L3 (row 24)",
+    "100 random cells (G19)": "100 random cells (rows 20, 28)",
+}
 def _one_sided():
     pth = os.path.join(RES, "one_sided_errors.txt")
     if not os.path.exists(pth): return
@@ -356,7 +371,7 @@ def _one_sided():
     rows = []
     for g in _re.findall(r"^GROUP \| (.+?) \| (\d+) \| (\d+) \| (\d+) \| (\d+)$", t, _re.M):
         name, runs, cr, fast, slow = g
-        if "BBR" in name: name += " (not in the total)"
+        name = _ONE_SIDED_LABELS[name]                                            # row numbers of the paper's table of tests
         rows.append(f"{name} & {runs} & {int(cr):,} & {fast} & {slow}\\\\".replace(f"{int(cr):,}", f"{int(cr):,}".replace(",", "\\,")))
     open(os.path.join(HERE_TEX, "os_table.tex"), "w").write("\\newcommand{\\OsRows}{" + "\n".join(rows) + "}\n")
 _one_sided()
@@ -914,6 +929,9 @@ def _g24():
                                 ufastfit=sum(r["group"] == "U" and r["fast"] == "1" and fit(r) for r in w), uslow=sum(r["group"] == "U" and r["fast"] == "0" for r in w),
                                 uslowsmall=sum(r["group"] == "U" and r["fast"] == "0" and not fit(r) for r in w), larger=sum(int(r["req_first"]) > rule[int(r["cell"])] for r in X),
                                 smaller=sum(int(r["req_first"]) < rule[int(r["cell"])] for r in X))
+        usual = {cell: collections.Counter(int(r["req_rounds"]) for r in X if r["cell"] == cell).most_common(1)[0][0] for cell in {r["cell"] for r in X}}
+        c["reqsaved"] = sum(r["fast"] == "1" and int(r["req_rounds"]) < usual[r["cell"]] for r in X)       # fast because the request took fewer rounds
+        num(f"Gtf{tag}ReqSaved", c["reqsaved"])
         tot.update(c)
         q = _re.findall(r"^(Q\d[ab]?) .*-> (NOT MET|MET)", open(ana).read(), _re.M)
         crit = {}
@@ -924,7 +942,7 @@ def _g24():
             d = per.setdefault(int(r["cell"]), {}).setdefault(tag, [0, 0]); d[0] += r["fast"] == "1"; d[1] += 1
             groups[int(r["cell"])] = (r["group"], collections.Counter())
     num("GtfWinMax", max(int(r["cwnd"]) for m in ("gx10", "x250", "i9") for r in rd(os.path.join(RES, f"g24_{m}_posthoc_points.csv")) if r["cwnd"] != "" and r["fast"] == "1"))
-    for k, v in (("N", "n"), ("W", "w"), ("Agree", "agree"), ("UFast", "ufast"), ("UFastFit", "ufastfit"), ("USlow", "uslow"), ("USlowSmall", "uslowsmall"), ("Larger", "larger"), ("Smaller", "smaller")):
+    for k, v in (("N", "n"), ("W", "w"), ("Agree", "agree"), ("UFast", "ufast"), ("UFastFit", "ufastfit"), ("USlow", "uslow"), ("USlowSmall", "uslowsmall"), ("Larger", "larger"), ("Smaller", "smaller"), ("ReqSaved", "reqsaved")):
         num("Gtf" + k, tot[v])
     cells = {int(c["cell"]): c for c in rd(os.path.join(RES, "g24_cells.csv"))}
     rows = [f"{c} & {'unexplained' if groups[c][0] == 'U' else 'never wrong'} & {cells[c]['suite'].split('|')[0]} & " + " & ".join(f"{per[c][t][0]} of {per[c][t][1]}" for t in ("X", "Gx", "I")) + "\\\\" for c in sorted(per, key=lambda c: (groups[c][0] != "U", c))]
