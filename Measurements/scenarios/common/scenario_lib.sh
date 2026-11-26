@@ -141,6 +141,7 @@ sc_tune_on() {
   sc_netem_cal
 }
 sc_tune_off() {
+  [ "${SC_DRY:-0}" = 1 ] && return 0     # a dry run changed nothing, so there is nothing to restore and sudo must not be called
   if [ "${SC_TUNED:-0}" = 1 ]; then sc_sudo "$SC_TESTBED/host_tune.sh" off; SC_TUNED=0; fi
   if [ "${SC_QUIETED:-0}" = 1 ]; then sc_sudo "$SC_TESTBED/host_tune.sh" quiet-off; SC_QUIETED=0; fi
 }
