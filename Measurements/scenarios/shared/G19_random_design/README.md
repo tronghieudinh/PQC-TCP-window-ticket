@@ -7,3 +7,5 @@ cd Measurements/scenarios/shared/G19_random_design
 ./run.sh      # inside tmux, asks for sudo
 ```
 The analysis (`analyze_g19.py`) runs at the end of `run.sh` and writes `g19_analysis.txt` and a per-cell report into the run directory.
+
+Repetitions are compared with the first X250 run by `analyze_g19_arm.py`, written for another machine and also used, with `--mode repeat`, for the second run on the X250. Its report keeps the first wording in both cases: in `testbed/results/g19_x250_run2_analysis.txt`, "second machine" and "Arm run" mean that second run on the X250.

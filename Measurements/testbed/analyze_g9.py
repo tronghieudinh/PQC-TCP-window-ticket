@@ -3,8 +3,9 @@
 (results/g9_ticket_versions_predictions.md) for one or more releases.
 
     python3 analyze_g9.py                                   # the archived runs results/g9/3.5, 4.1.0, 3.6.5 (X250); baseline 3.5
-    python3 analyze_g9.py --run 3.5=DIR --run 4.1.0=DIR [--run 3.6.5=DIR] [--out results/g9_analysis.txt]
-                          [--cross-out results/g9_crossversion.txt]
+    python3 analyze_g9.py --run 3.5=DIR --run 4.1.0=DIR [--run 3.6.5=DIR] [--out FILE] [--cross-out FILE]
+Without --run the reports of the archived runs are rewritten (results/g9_analysis.txt and g9_crossversion.txt). With --run the reports
+are printed, and written only to the files named by --out and --cross-out.
 DIR holds slack_tls.csv (stage C) and nst_tls.csv (stage D) of one run. The first --run is the baseline (3.5 on the same machine). Also
 writes a comparison between releases (md5 sums of the raw files; differences of the resumed latency of the 80 stage-D cells against the
 baseline). The predictions are those of results/slack_predictions.csv and results/nst_predictions.csv, unchanged. A cell is wrong when
@@ -69,9 +70,11 @@ def cross(runs, tmp):
 
 def main():
     """Evaluate every release, check the baseline condition and write both reports."""
-    ap = argparse.ArgumentParser(); ap.add_argument("--run", action="append", help="VERSION=DIR"); ap.add_argument("--out", default=os.path.join(RES, "g9_analysis.txt"))
-    ap.add_argument("--cross-out", default=os.path.join(RES, "g9_crossversion.txt"))
+    ap = argparse.ArgumentParser(); ap.add_argument("--run", action="append", help="VERSION=DIR"); ap.add_argument("--out", help="file for the analysis")
+    ap.add_argument("--cross-out", help="file for the comparison between releases")
     a = ap.parse_args(); lines = []; res = []
+    if not a.run:                                       # only the archived runs rewrite the archived reports
+        a.out = a.out or os.path.join(RES, "g9_analysis.txt"); a.cross_out = a.cross_out or os.path.join(RES, "g9_crossversion.txt")
     runs = [tuple(spec.split("=", 1)) for spec in a.run] if a.run else [(v, os.path.join(RES, "g9", v)) for v in ("3.5", "4.1.0", "3.6.5")]
     runs = [(v, os.path.expanduser(d)) for v, d in runs]
     with tempfile.TemporaryDirectory() as tmp:
@@ -84,9 +87,13 @@ def main():
         lines.append("   " + "  ".join(f"{g} {'MET' if r[g] else 'NOT MET'}" for g in ("G1", "G2", "G3", "G4")) + ("" if r["complete"] else "   [INCOMPLETE: 28 / 80 / 10 cells expected]"))
     base = res[0][1]; ok = all(base[g] for g in ("G1", "G2", "G3", "G4")) and base["complete"]
     lines.append(f"baseline ({res[0][0]}) reproduces the earlier result: {'YES' if ok else 'NO: the other runs are INCONCLUSIVE'}")
-    open(a.out, "w").write("\n".join(lines) + "\n"); print("\n".join(lines))
-    if cross_lines:
-        open(a.cross_out, "w").write("\n".join(cross_lines) + "\n"); print("\n".join(cross_lines))
+    for path, text in ((a.out, lines), (a.cross_out, cross_lines)):
+        if not text:                                    # no comparison for a single run
+            continue
+        if path:
+            with open(path, "w") as handle:
+                handle.write("\n".join(text) + "\n")
+        print("\n".join(text))
 
 
 if __name__ == "__main__":

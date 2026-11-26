@@ -21,4 +21,6 @@ export PQC_CERTS=$HOME/pqc_certs_local/certs     # directory with the test certi
 ```bash
 python3 ../../../testbed/analyze_g9.py --run 3.5.4=DIR_OF_THE_V354_RUN/data --run 4.1.0=DIR_OF_THE_V410_RUN/data   (the run directories are printed at the end of each run.sh)
 ```
+The command prints its reports and leaves the archived ones in `testbed/results/` unchanged; add `--out FILE` (and `--cross-out FILE` for the comparison between releases) to keep them. Without `--run` it rewrites the archived reports from the archived data.
+
 Criteria G1-G4 and the baseline condition: `testbed/results/g9_ticket_versions_predictions.md`.
