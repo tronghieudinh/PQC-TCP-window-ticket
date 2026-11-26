@@ -96,6 +96,7 @@ predictions were made.
 | `reproduce_l1.sh` | all | Regenerate figures, numbers and tables from the committed data, compare them with the shipped copies, rerun analyses and build the PDFs | results/, data/ | check lines; PDFs |
 | `paper2_short/Latex/make_assets_short.py` | all | Compute the figures, every number and the generated table rows of the paper | results/, Simulation/ | figures/\*.pdf, numbers_short.tex, \*_table.tex |
 | `tools/raw_traces.sh` | ticket traces | Re-run the analyses on the archived raw kernel traces, or pack them | directory with trace_\* | SAME/DIFFERENT per output; archive |
+| `tools/filter_kernel_traces.py` | kernel traces | Remove connections and process names that are not the testbed's from trace files before publication, or check for them | trace file, directory or tar archive | filtered copy; list of findings |
 | `tools/build_gnutls_stack.sh` | G23 | Build nettle, leancrypto and GnuTLS 3.8.14 into a private directory | downloaded sources (checksummed) | installation prefix |
 
 ### Model and kernel logic (Simulation)
