@@ -17,7 +17,10 @@ subtract it and compare the remainder with the latency model (Simulation/pqc_sim
 --resume measures resumed connections (a first full handshake obtains the session ticket). --configs-from runs exactly the configurations
 listed in a CSV file. An interrupted run continues where it stopped: configurations that already have n successful rows are skipped.
 
-Output: the CSV of --out (columns COLS), env.json (machine, kernel, tool versions) and <out>.netem.csv (netem packet counters).
+Output: the CSV of --out (columns COLS), env.json (machine, kernel, tool versions) and <out>.netem.csv. The sidecar has one row per
+shaped configuration with the packets netem sent and dropped in each direction DURING THAT CONFIGURATION (the difference of the
+kernel's running totals before and after it; empty fields if they could not be read). Sidecar files written by earlier versions of this
+script hold the running totals themselves: in them the counts of a row include all earlier shaped configurations of the same run.
 Times in the CSV are in milliseconds: t_tcp_ms TCP handshake, t_hs_ms until the TLS handshake is complete, t_total_ms until the
 response has arrived. snd_mss, snd_cwnd0, retrans and rtt_us are the client's TCP_INFO values.
 """
@@ -415,9 +418,13 @@ def main():
             try:
                 if tb:
                     tb.shape(c["rtt_ms"], c["rate_mbps"], c["loss_pct"], c["mtu"], c["icw"], c["cc"], quickack=bool(c["quickack"]))
+                count = bool(tb and not a.dry_run and c["net_id"] == "shaped")
+                # The netem counters are running totals: shape() uses `tc qdisc replace`, which does not reset them. Read them here, before
+                # the transactions, and again afterwards; the sidecar file gets the difference, that is, this configuration only.
+                before = tb.netem_counters() if count else None
                 rows, info, errs = run_config(c, tb, probe, cpus, work, loopback)
-                if tb and not a.dry_run and c["net_id"] == "shaped":
-                    ctr = tb.netem_counters()
+                if count:
+                    ctr = tbnet.counter_difference(before, tb.netem_counters())
                     nfile = a.out[:-4] + ".netem.csv" if a.out.endswith(".csv") else a.out + ".netem.csv"
                     new_n = not os.path.exists(nfile)
                     with open(nfile, "a", newline="") as nf:

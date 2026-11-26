@@ -228,7 +228,11 @@ class PhysTestbed(Testbed):
             self.run(["ip", "tcp_metrics", "flush"], ns=ns, check=False, capture=True)
 
     def netem_counters(self) -> dict:
-        """Packets sent and dropped by netem in each direction, as in Testbed.netem_counters."""
+        """Packets sent and dropped by netem in each direction, as in Testbed.netem_counters.
+
+        Like there, these are running totals since the qdisc was created (`tc qdisc replace` keeps them): subtract two readings with
+        tbnet.counter_difference to obtain the counts of one configuration.
+        """
         out = {}
         for tag, ns, ifc in (("c2s", PHYS_C, self.spec["ifc"]), ("s2c", PHYS_S, self.spec["ifs"])):
             t = self._out(["tc", "-s", "qdisc", "show", "dev", ifc], ns)

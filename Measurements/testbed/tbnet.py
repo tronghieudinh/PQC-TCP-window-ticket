@@ -39,6 +39,23 @@ else:
 PROBE_PORT = "4433"
 
 
+def counter_difference(before: dict, after: dict) -> dict:
+    """Packets (sent, dropped) of each direction between two readings of netem_counters().
+
+    Why a difference is needed: the counters of a queueing discipline are NOT reset when `tc qdisc replace` changes its
+    parameters, so after the second shaped configuration of a run a single reading also counts all earlier ones. The counts of
+    one configuration are the reading after it minus the reading before it (both taken after shape()).
+
+    A direction gets (None, None) if a reading failed or a counter went backwards (the qdisc was recreated in between).
+    """
+    out = {}
+    for tag, end in after.items():
+        start = before.get(tag, (None, None))
+        diff = None if None in tuple(start) + tuple(end) else tuple(e - b for b, e in zip(start, end))
+        out[tag] = diff if diff and min(diff) >= 0 else (None, None)
+    return out
+
+
 class Testbed:
     """The namespaces and links of one topology; commands are run with `ip netns exec`."""
     def __init__(self, topology: str = "direct", dry_run: bool = False, verbose: bool = False, timestamps: bool = False):
@@ -70,9 +87,12 @@ class Testbed:
     def netem_counters(self) -> dict:
         """Packets sent and dropped by the netem qdisc of each direction, as {"c2s": (sent, dropped), "s2c": (sent, dropped)}.
 
-        Read from `tc -s qdisc show`. shape() replaces the qdisc, so the counters start at zero for every configuration. netem does not count
-        a dropped packet as sent, so offered = sent + dropped and the realised loss of a direction is dropped / offered. This measures loss
-        more directly than the retransmission counter of the client, which also counts spurious retransmissions and repeated SYNs.
+        Read from `tc -s qdisc show`. WARNING: the values are running totals since the qdisc was created, not the counts of the current
+        configuration: `tc qdisc replace` in shape() changes the parameters and KEEPS the statistics (only deleting the qdisc, as for an
+        unshaped configuration, starts them again). Take one reading before and one after a configuration and subtract them
+        (counter_difference). netem does not count a dropped packet as
+        sent, so offered = sent + dropped and the realised loss of a direction is dropped / offered. This measures loss more directly than
+        the retransmission counter of the client, which also counts spurious retransmissions and repeated SYNs.
         """
         import re
         pairs = (("c2s", NS_C, "vc0"), ("s2c", NS_S if self.topology == "direct" else NS_P, "vs0" if self.topology == "direct" else "vp0"))
