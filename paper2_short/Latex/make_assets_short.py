@@ -341,20 +341,20 @@ HERE_TEX = os.path.dirname(os.path.abspath(__file__))
 _g19_cells_table()
 
 # ---- direction of the errors of the model (one_sided_errors.py -> results/one_sided_errors.txt)
-_ONE_SIDED_LABELS = {      # test name in one_sided_errors.txt -> row label of the supplement's table
-    "client window (rule 1), 28 cells": "client window (rule 1), 28 cells (rows 1, 13, 30)",
-    "ticket timing, 80 cells": "ticket timing, 80 cells (rows 5, 13, 30)",
-    "ticket timing on new cells (G12, RTT 30 and 200)": "ticket timing on new cells, RTT 30 and 200 (rows 16, 29)",
-    "client window, delayed ACK (G14)": "client window, delayed ACK (rows 18, 29)",
-    "ticket timing, delayed ACK (G14)": "ticket timing, delayed ACK (rows 18, 29)",
-    "ticket timing under BBR (G14)": "ticket timing under BBR (rows 17, 29; not in the total)",
-    "client window (rule 1), real link (G13-lite)": "client window (rule 1), physical link (row 25)",
-    "ticket timing, real link (G13-lite)": "ticket timing, physical link (row 25)",
-    "background load L0 (G17)": "background load L0 (row 24)",
-    "background load L1 (G17)": "background load L1 (row 24)",
-    "background load L2 (G17)": "background load L2 (row 24)",
-    "background load L3 (G17)": "background load L3 (row 24)",
-    "100 random cells (G19)": "100 random cells (rows 20, 28)",
+_ONE_SIDED_LABELS = {      # test name in one_sided_errors.txt -> label in the supplement's table; the numbers are the test numbers of the paper's table of tests
+    "client window (rule 1), 28 cells": "client window (rule 1), 28 design points (Tests 1, 13, 30)",
+    "ticket timing, 80 cells": "ticket timing, 80 design points (Tests 5, 13, 30)",
+    "ticket timing on new cells (G12, RTT 30 and 200)": "ticket timing on new design points, RTT 30 and 200 (Tests 16, 29)",
+    "client window, delayed ACK (G14)": "client window, delayed ACK (Tests 18, 29)",
+    "ticket timing, delayed ACK (G14)": "ticket timing, delayed ACK (Tests 18, 29)",
+    "ticket timing under BBR (G14)": "ticket timing under BBR (Tests 17, 29; not in the total)",
+    "client window (rule 1), real link (G13-lite)": "client window (rule 1), physical link (Test 25)",
+    "ticket timing, real link (G13-lite)": "ticket timing, physical link (Test 25)",
+    "background load L0 (G17)": "background load L0 (Test 24)",
+    "background load L1 (G17)": "background load L1 (Test 24)",
+    "background load L2 (G17)": "background load L2 (Test 24)",
+    "background load L3 (G17)": "background load L3 (Test 24)",
+    "100 random cells (G19)": "100 random design points (Tests 20, 28)",
 }
 def _one_sided():
     pth = os.path.join(RES, "one_sided_errors.txt")
@@ -371,7 +371,7 @@ def _one_sided():
     rows = []
     for g in _re.findall(r"^GROUP \| (.+?) \| (\d+) \| (\d+) \| (\d+) \| (\d+)$", t, _re.M):
         name, runs, cr, fast, slow = g
-        name = _ONE_SIDED_LABELS[name]                                            # row numbers of the paper's table of tests
+        name = _ONE_SIDED_LABELS[name]                                            # labels with the test numbers of the paper's table of tests
         rows.append(f"{name} & {runs} & {int(cr):,} & {fast} & {slow}\\\\".replace(f"{int(cr):,}", f"{int(cr):,}".replace(",", "\\,")))
     open(os.path.join(HERE_TEX, "os_table.tex"), "w").write("\\newcommand{\\OsRows}{" + "\n".join(rows) + "}\n")
 _one_sided()
