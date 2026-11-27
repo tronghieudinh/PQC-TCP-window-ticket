@@ -308,7 +308,7 @@ The archive (Availability) holds the code, the registered predictions, the deriv
 Result & Run, then analyze & What should hold\\
 \midrule
 Window rule~(1), plain TCP (Section~\ref{sec:window}) & \texttt{.../G11\_cc\_\allowbreak pacing/\allowbreak run.sh} (about 10 minutes), which also runs \texttt{analyze\_g11.py} & With Reno and no pacing, rule (1) at 18 or more of 20 flight sizes; under BBR, $w_0+n$\\
-Client window and ticket timing (Tests 1--5) & \texttt{.../G9\_ticket\_\allowbreak versions/\allowbreak run.sh} (about 75 minutes); \texttt{analyze\_g9.py --run 3.5=RUN/data} (\texttt{RUN}: the directory the script prints) & Criteria G1--G4 of the script (Tests 1--4)\\
+Client window and ticket timing (Tests 1--5) & \texttt{.../G9\_ticket\_\allowbreak versions/\allowbreak run.sh} (about 75 minutes); \texttt{analyze\_g9.py -{}-run 3.5=RUN/data} (\texttt{RUN}: the directory the script prints) & Criteria G1--G4 of the script (Tests 1--4)\\
 Random design points (Test 20) & \texttt{.../G19\_random\_\allowbreak design/\allowbreak run.sh} (about an hour), which also runs \texttt{analyze\_g19.py} & Most design points predicted correctly; each mispredicted design point is an overestimate by one RTT; the number of mispredicted design points varies\\
 Server window (Test 31) & \texttt{sudo env PQC\_CERTS=\allowbreak\$PWD/../certs bash run\_g24.sh run} (about 15 minutes); \texttt{analyze\_g24.py}, \texttt{analyze\_g24\_posthoc.py} & A shortened transaction has a window at least as large as the response; the share of shortened transactions varies\\
 \bottomrule
