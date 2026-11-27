@@ -17,6 +17,7 @@
 \title{Supplement to ``Short Flights, Session Tickets, and the Linux TCP Window in Post-Quantum TLS Resumption''}
 \author{Trong-Hieu Dinh \and Trong-Minh Hoang}
 \date{}
+\newcommand{\floatnote}[1]{\par\vspace{1pt}{\footnotesize\raggedright #1\par}} % note under a table or figure, apart from its title
 \begin{document}
 \maketitle
 This supplement follows the order of the paper. First come the test populations, setups, and registered criteria; then the data behind the window rule (Section~4 of the paper) and the comparison of five models (Section~5). For the server window (Section~5) we give the evidence on how the kernel processes the ticket's acknowledgments (ACKs): the kernel's window test, a repeat with every event timed on one clock, and four rounds of interventions on the order of ACKs and the server's write; then the window in the random configurations and the direction of the errors. The robustness tests (Section~6) follow, first on other machines, then with other releases, libraries, controllers, load, and configurations. We close with smaller errors, what remains open, and the script behind each number (Table~\ref{tab:repro}). Machines are named as in Section~3 of the paper: X250 (Lenovo ThinkPad X250, Intel i7-5600U), OptiPlex (Dell OptiPlex 7460, Intel i7-8700), i9 (a workstation with an Intel i9-10900K), and GX10 (ASUS Ascent GX10, Arm Cortex-X925 and A725); all but the GX10 are x86-64, and the GX10 and the i9 are shared laboratory machines. The script \texttt{make\_assets\_short.py} generates most numbers from the archive; the rest are copied from the analysis outputs and design files named in the text. For the ticket ACK tests (Tests 6 to 12 and 27 of Table~2 of the paper), Table~\ref{tab:pop} gives the populations and kinds of evidence, Table~\ref{tab:setup} the setups, and Table~\ref{tab:crit} the registered criteria and outcomes. Criteria of the other registered tests are in Table~\ref{tab:crit2}. Not all evidence weighs the same, so we keep three kinds apart: a \emph{registered} test (its criterion was committed before the run, and a failure is reported as such), an \emph{intervention} (we change something on purpose), and a \emph{post hoc} reading (made after seeing the data, which can suggest but not confirm).
@@ -154,7 +155,7 @@ Configuration (one factor changed from the base) & $w_0$ & Sizes & Connections &
 The \AblFixedN\ resumed configurations of the model comparison form three full grids, all with mutual authentication, 100\,Mbit/s, an initial window of 10, and Reno, with 30 or 40 transactions per configuration (\texttt{results/resume*.csv}). (i)~108 with a 302\,B request and a 222\,B response: RSA-2048 with ECDHE-P256, ECDSA-P256 with X25519 and with X25519MLKEM768, ML-DSA-44 and -65 with ML-KEM-768, and ML-DSA-87 with ML-KEM-1024; chains of depth 1 and 3; RTT 5, 30, and 100\,ms; MTU 1\,280, 1\,500, and 9\,000. (ii)~24 with 10\,900 and 3\,600\,B: ECDSA-P256 with X25519, and ML-DSA-44 and -65 with ML-KEM-768; depth 1 and 3; RTT 30 and 100\,ms; MTU 1\,500 and 9\,000. (iii)~12 with 14\,500 and 12\,100\,B: the suites, RTTs, and MTUs of (ii), at depth 2. Table~\ref{tab:ablation} gives, for five models, the mean absolute error (MAE, in ms) and the number of configurations wrong by a round trip. The first row is the paper's IW model, in which every flight starts with $w_0$ segments; it uses the write pattern of OpenSSL with a coalesced ticket. The other rows start from textbook slow start and add one element each; on the resumed configurations, textbook slow start and the row with Linux validation use ideal segmentation, whereas all three client-window rows use the write pattern of OpenSSL. On the resumed configurations, adding the validation test and then the write pattern changes neither figure; only writing the ticket separately does. The validation test matters in the client-window test.
 
 \begin{table}[h]
-\caption{What each part of the model adds. The predictions of the first two models for the client-window configurations were computed after the measurements.}
+\caption{What each part of the model adds}
 \label{tab:ablation}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrr@{}}
@@ -169,6 +170,7 @@ Textbook slow-start model & \AblSlowMae & \AblSlowOff & \AblCSlowMae & \AblCSlow
 + ticket written separately (separate-ticket model) & \AblEarlyMae & \AblEarlyOff & --- & ---\\
 \bottomrule
 \end{tabular}
+\floatnote{The predictions of the first two models for the client-window configurations were computed after the measurements.}
 \end{table}
 
 \section*{Server window: what the kernel tests (Section~5)}
@@ -214,7 +216,7 @@ Post hoc, \StLateInflight\ of the \StLate\ ACKs that arrive more than \RaceThr\m
 One intervention does isolate the role of the ticket. Without a ticket on resumed connections, the burst stayed within ten segments in all \NtkCells\ configurations, as predicted, including the \NtkEffect\ configurations where the ticket pushes it above ten (exact sign test on those pairs, $p=\SignNtkP$).
 
 \begin{table}[h]
-\caption{Robustness of the ticket-timing rule to its threshold $T$ (post hoc).}
+\caption{Robustness of the ticket-timing rule to its threshold $T$}
 \label{tab:thr}
 \centering\small
 \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}p{0.30\columnwidth}rrrrrr@{}}
@@ -225,6 +227,7 @@ Burst $>10$, \RaceTwoOosN\ transactions (\%) & \ThrSA & \ThrSB & \ThrSC & \ThrSD
 \texttt{tcp\_slow\_start} called, \StN\ ACKs (\%) & \ThrFA & \ThrFB & \ThrFC & \ThrFD & \ThrFE & \ThrFF\\
 \bottomrule
 \end{tabular*}
+\floatnote{Post hoc.}
 \end{table}
 
 \section*{Repeat with every event on one clock (Section~5)}
@@ -259,8 +262,9 @@ Figure~\ref{fig:k7} plots the underlying transactions. With the clock fixed, 0.0
 
 \begin{figure}[h]
 \centering\includegraphics[width=0.62\textwidth]{fig_k7_points}
-\caption{Each ML-DSA transaction at MTU below 9\,000, by the gap of its last ticket acknowledgment to the last request segment.}
+\caption{Gap of the last ticket acknowledgment to the last request segment}
 \label{fig:k7}
+\floatnote{One mark per ML-DSA transaction at MTU below 9\,000.}
 \end{figure}
 
 \emph{Run to run.} A second repeat on the X250 with the CPU clock fixed agrees with the first: K2 and K4 are met (\RqKTwoPct\%, \RqKFourRight\ of \RqKFourN), K5 is met (\RqKFiveRight\ of \RqKFiveN), K1 is not met again (\RqKOnePct\%), \RqKSixPct\% of \RqKSixN\ transactions have a ticket segment acknowledged before the write (against \RpKSixPct\%), and the rule of 0.049\ms classifies \RqKSevenRight\ of \RqKSevenN\ ML-DSA transactions (\RqKSevenPct\%, against \RpKSevenPct\%) with a best threshold of \RqKSevenBestLo\ms. The two runs satisfy the registered agreement criteria (within 5 points for the share and the accuracy, within 0.02\ms for the threshold), so we report these quantities as ranges over two runs.
@@ -281,7 +285,7 @@ If order matters, can we change it on purpose? Four rounds of experiments shift 
 \emph{Second round.} A pilot on the GX10 (\RbPilotTxN\ transactions, \RbPilotEvN\ window events) fixed the thresholds by the rules in \texttt{r3b\_design.md}: a binomial band for the shares, as in Table~\ref{tab:gtls}, and twice the largest deviation of the median shift for the instrument. We committed them before opening any X250 data. The X250 run (\RbTestTxN\ transactions, \RbTestEvN\ window events) is the test.
 
 \begin{table}[h]
-\caption{Round two: the server's window read in the kernel (pilot on the GX10, test on the X250).}
+\caption{Round two: the server's window read in the kernel}
 \label{tab:rbtwo}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}p{6.4cm}p{1.6cm}p{3.1cm}p{3.1cm}@{}}
@@ -296,6 +300,7 @@ B5: ECDSA-P256 with the accounting of B2 & 99.6\,\% & 512 of 512 & 448 of 448\\
 B6: both machines meet B1 and B2, shares within 10 points & & & met\\
 \bottomrule
 \end{tabular}
+\floatnote{Pilot on the GX10, test on the X250.}
 \end{table}
 
 \emph{What the second round shows.} (i)~In all \RbEvN\ window events on the two machines, the server's window follows the slow-start rule applied to the kernel's own counters (B1; because segments in the queue can span several MSS, the check counts acknowledged packets per MSS-sized piece). (ii)~In all \RbTxN\ of \RbTxN\ transactions, ECDSA-P256 included and with no fitted parameter, the response burst equals the smaller of the response size and the window left by the last ACK processed before the first ACK of the response can return. The thirteen-segment plateau that puzzled us in the first round turned out to be nothing but the response size. (iii)~The window after a ticket is therefore set by the number of ticket ACKs processed when the response is written, plus the late ones, each of which opens the window further while the response is being sent; a single rule covers both. (iv)~What causes the order, the round did not show. On the GX10 the delay changed it (the late share of ML-DSA transactions, pooled over the series, went from \RbPilotLateZero\,\% to \RbPilotLateMax\,\%); on the X250 it did not (B3 and B4 not met). There the 90th percentile of the shift follows $\delta$ (848, 1\,647, 3\,248, and 6\,447\,\textmu s at 0.8 to 6.4\,ms) while the 10th stays near 120\,\textmu s, so about half of the ticket ACKs are not delayed. The filter matches the same packets on both machines. Our hypothesis is that on the slower client many ticket ACKs are piggybacked on the request's data segments, which a pure-ACK filter misses. We did not test it. Fortunately, the third round does not depend on it, because it moves the other event, the write.
@@ -303,7 +308,7 @@ B6: both machines meet B1 and B2, shares within 10 points & & & met\\
 \emph{Third round: delaying the write.} The probe's server waits $D$ microseconds between the end of the request and the response (\texttt{tls\_probe --pre-write-delay-us}), and nothing else changes. A later write lets more ticket ACKs be processed before it, however they travel. The prediction uses only undelayed transactions. At delay $D$, a transaction counts as late if, at $D=0$, its last ticket ACK was processed more than the measured shift of the write after the write; the predicted late share at $D$ is the share of such transactions with the same suite and MTU. Nothing is fitted. The criteria (\texttt{results/r3c\_design.md}) were registered on November 23, 2026; their thresholds were derived from the GX10 pilot (\RcPilotTxN\ transactions, \RcPilotEvN\ window events) and committed before any X250 data were opened. Three definitions were fixed on the pilot (\texttt{r3c\_thresholds.md}): the use of the measured shift of the write instead of $D$, because the sleep timer adds about 60\,\textmu s on the GX10; the form of C2, because no pilot series had a 50\,\% late share at $D=0$; and the C1 tolerance of \RcTolerance\,\textmu s, which roughly allows for the timer overhead.
 
 \begin{table}[h]
-\caption{Third round: the write of the response delayed (test on the X250, delays 0 to \RcTestDMax\,\textmu s; the GX10 pilot for comparison).}
+\caption{Third round: the write of the response delayed}
 \label{tab:rcthree}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}p{6.0cm}p{3.6cm}p{4.0cm}@{}}
@@ -316,6 +321,7 @@ C3: the late share is predicted from the $D=0$ transactions (configurations with
 C4: the rule per window event; the burst accounting & \RcPilotEvOk\ of \RcPilotEvN; \RcPilotTxOk\ of \RcPilotTxN & \RcTestEvOk\ of \RcTestEvN; \RcTestTxOk\ of \RcTestTxN (met)\\
 \bottomrule
 \end{tabular}
+\floatnote{Test on the X250, delays 0 to \RcTestDMax\,\textmu s; the GX10 pilot for comparison.}
 \end{table}
 
 Under the registered reading, because C1 was not met on the X250, no further conclusion is drawn there. The data do show why both were missed. The sleep adds 88 to 229\,\textmu s on the X250 (at most 7\,\% of $D$), against about 60 on the GX10. The one C3 configuration outside its band (ML-DSA-87 at MTU~1\,500, $D=400$\,\textmu s: 9\,\% measured, 47\,\% predicted) lies where the distribution of undelayed ACK times is steep, so a small difference in the shift of the write changes the prediction a lot. Read as exploration rather than a test, the third round still shows on the X250 what the second could not: delaying the write moves the order in the predicted direction (the ML-DSA-87 late share falls from \RcTestLateZero\,\% to \RcTestLateMax\,\%), the undelayed transactions predict the late share in all configurations but one, and the window rule and burst accounting hold (Table~\ref{tab:rcthree}).
@@ -323,7 +329,7 @@ Under the registered reading, because C1 was not met on the X250, no further con
 \emph{Fourth round: a registered confirmation.} With the causes of the third round's two misses removed, we repeated the test on new data from both machines (\texttt{results/r3d\_design.md}, thresholds \texttt{r3d\_thresholds.md}, committed before the measurement). The server now busy-waits on the monotonic clock until the deadline (\texttt{--pre-write-spin-us}), which avoids timer slack. The prediction of the late share at delay $D$ now uses the full distribution of measured write shifts at $D$, not only their median; it still has no fitted parameter. Because it was defined after the third-round data were seen, those data are its training set (52 of 52 configurations inside the band). Thresholds were derived from them by the rules in the design: the median of $p_w$ within 25\,\textmu s of $D$ (the floor for a spin-wait, a prediction that can fail); at most four of 28 to 36 configurations outside the binomial band; a mean error of at most 5.2 points and at most 0.79 times that of ``no dependence on $D$''; and the second-round thresholds for the window rule and burst accounting.
 
 \begin{table}[h]
-\caption{Fourth round: the registered confirmation (write delayed by spinning; new data on both machines).}
+\caption{Fourth round: the registered confirmation}
 \label{tab:rdfour}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}p{6.0cm}p{3.6cm}p{4.0cm}@{}}
@@ -336,6 +342,7 @@ C3: configurations inside the band; mean error against ``no dependence on $D$'' 
 C4: the rule per window event; the burst accounting & met (\RdAEvOk\ of \RdAEvN; \RdATxOk\ of \RdATxN) & met (\RdXEvOk\ of \RdXEvN; \RdXTxOk\ of \RdXTxN)\\
 \bottomrule
 \end{tabular}
+\floatnote{Write delayed by spinning; new data on both machines.}
 \end{table}
 
 \emph{Reading.} All four criteria were met on the X250 (Table~\ref{tab:rdfour}): the write moves by $D$ to within \RdXDevWorst\,\textmu s, and the order, shifted by the intervention, is predicted from unperturbed transactions. On the GX10 C2 and C4 were met, but C1 and C3 were not. The write moves by $D$ minus 15 to 30\,\textmu s, a systematic instrument shortfall that exceeds the registered 25\,\textmu s at one level. The ML-DSA-87 late share there is low at $D=0$ (\RdALateZero\,\%), and the no-dependence model fits better than the prediction (mean error \RdANullErr\ against \RdAMeanErr\ points). At intermediate delays, the late share of ML-DSA-87 rises above its value without delay (25 to 28\,\% at $D=150$ and 300\,\textmu s against 16 to 19\,\%) where the unperturbed times predict a fall. As registered, we draw no further conclusion for the GX10. We have not established why the share rises; the spinning server thread may disturb ACK processing there, but we did not test this. In short, the fourth round confirms the explanation to the registered criteria on the machine with a large late share, and confirms only its direction on the machine with a small one.
@@ -346,7 +353,7 @@ C4: the rule per window event; the burst accounting & met (\RdAEvOk\ of \RdAEvN;
 The wrong random configurations carry a signature, and Test~31 (reported in Section~5 of the paper) measures what it suggests. We selected the configurations by a rule that reads no measurement: every configuration of the random draw in which a server window of 30 after an acknowledged ticket would change the prediction by more than half an RTT (nine of 100; \texttt{g24\_predict.py}). They contain the four wrong configurations without a known cause (10, 32, 66 and 72; Table~\ref{tab:cells}, below, shows which configurations each run got wrong) and five never wrong. Each machine measured two repetitions of 30 transactions per configuration on the shaped link, with the CPU clock fixed, \texttt{ticket\_ack2.bt} and a capture, after an unshaped base run (\texttt{results/g24\_design.md}, registered on November 25, 2026, before any of these runs; the i9 criteria in an addendum, after the GX10 and X250 results). A transaction is \emph{fast} (``shortened'' in the paper) if its excess latency is below the midpoint of the two model values; its \emph{window} is the server's \texttt{snd\_cwnd} after the last ACK processed before the first ACK of the response can return. A response that leaves in one round needs a window at least its size, so that part of the agreement follows from how TCP sends; what the test adds is that the window, read independently of the latency, differs between fast and slow transactions of the same configuration, and that the request side does not account for the saving.
 
 \begin{table}[h]
-\caption{Fast transactions, of 60 per configuration and machine.}
+\caption{Fast transactions}
 \label{tab:gtf}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}rllrrr@{}}
@@ -356,6 +363,7 @@ Configuration & In earlier runs & Suite & X250 & GX10 & i9\\
 \GtfRows
 \bottomrule
 \end{tabular}
+\floatnote{Out of 60 per configuration and machine.}
 \end{table}
 
 \emph{Outcomes.} The registered criteria were met in \GtfXMet\ of \GtfXK\ on the X250, \GtfIMet\ of \GtfIK\ on the i9 (and S1 to S3), and \GtfGxMet\ of \GtfGxK\ on the GX10. Post hoc (\texttt{analyze\_g24\_posthoc.py}; registered on the i9), ``window $\ge$ response segments'' agrees with ``fast'' in \GtfXAgree\ of \GtfXW\ (X250), \GtfGxAgree\ of \GtfGxW\ (GX10) and \GtfIAgree\ of \GtfIW\ (i9) transactions with a window reading; over the three machines, \GtfUFastFit\ of \GtfUFast\ fast transactions of the four unexplained configurations had such a window, and \GtfUSlowSmall\ of \GtfUSlow\ slow ones a smaller one. The client's first request round was never smaller than rule~(1) gives, and larger in \GtfXLarger, \GtfGxLarger\ and \GtfILarger\ of \GtfXN\ transactions each.
@@ -366,7 +374,7 @@ Configuration & In earlier runs & Suite & X250 & GX10 & i9\\
 With OpenSSL under Reno, the paper's model is off by more than half an RTT in \OsSlow\ of \OsRuns\ configuration runs, and in all \OsSlow\ of them it predicts a larger latency than measured; it is never too fast by that margin. This count was made after the measurements; for GnuTLS, the same direction was fixed beforehand (section on the third library, below). Table~\ref{tab:dir} counts the configuration runs of all tests with per-configuration predictions (client window, ticket timing, new configurations, delayed ACKs, physical link, background load, and the random draw, on up to five machines or runs). Configurations recur across runs (three OpenSSL releases, several machines): the \OsRuns\ configuration runs cover \OsCells\ configurations, counting each once per test. The one-sidedness has a likely reason: the model gives the server a window of ten after the ticket, which the ticket can only enlarge. The count excludes loss, MTU 9\,000, Go, full handshakes, and BBR, whose window does not follow rule~(1). At MTU 9\,000 the paper's model, which writes each message at once, predicts one RTT too little in \NineDefWrong\ of \NineDefN\ resumed configurations with the default receive buffer, in \NineLargeWrong\ of \NineLargeN\ with the raised one, and in \NineScanWrong\ of \NineScanN\ of the network scan; a variant that writes one TLS record per \texttt{write}, built after these measurements, removes every one of these misses (\texttt{analyze\_mtu9000\_records.py}). Under BBR, four configuration runs are too fast: on the X250 and on the i9, the two ML-DSA-87 configurations that Section~6 places between the BBR and Reno predictions. With delayed ACKs the model underestimates by up to \OsMaxDelack\,ms, the delayed-ACK timer that it omits, which is less than half an RTT; elsewhere the largest underestimate is \OsMaxElse\,ms.
 
 \begin{table}[h]
-\caption{Configuration runs by direction of the error, with errors of more than half an RTT counted.}
+\caption{Configuration runs by direction of the error}
 \label{tab:dir}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrr@{}}
@@ -376,13 +384,14 @@ Test & Runs & Configuration runs & Too fast & Too slow\\
 \OsRows
 \bottomrule
 \end{tabular}
+\floatnote{Errors of more than half an RTT are counted.}
 \end{table}
 
 \section*{The same tests on other machines (Section~6)}
 Would the random configurations fail in the same places elsewhere? On November 21, 2026, we measured the paper's random design (Test 20 of its Table~2) in three more runs with criteria fixed beforehand: on the GX10 and the OptiPlex (A1 to A4, with the first X250 run as reference) and again on the X250 (V1 to V3); the i9 followed on November 25, 2026 (A1 to A4). The ticket tests on new configurations and with delayed ACKs (Tests 16 and 18) were run on the GX10 and the OptiPlex as well (K1 to K4 and D1 to D5). Table~\ref{tab:cells} lists the configurations that the model got wrong in at least one of the five runs of the random design; a configuration is wrong when the model is off by more than half the RTT, and the measured excess is the median of the resumed transactions on the shaped link minus the median on the unshaped base.
 
 \begin{table}[h]
-\caption{Configurations the model got wrong in at least one run (measured excess in ms; bold: wrong).}
+\caption{Configurations the model got wrong in at least one run}
 \label{tab:cells}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}rllrrrrrrr@{}}
@@ -392,12 +401,14 @@ Configuration & Suite & RTT & Request / response (B) & Model & X250 run 1 & X250
 \GnineCellRows
 \bottomrule
 \end{tabular}
+\floatnote{Measured excess in ms; bold: wrong.}
 \end{table}
 
 \begin{figure}[h]
 \centering\includegraphics[width=0.62\textwidth]{fig_cells_map}
-\caption{Error of the model in round trips against the segments of the response, one mark per configuration and run.}
+\caption{Error of the model in round trips against the segments of the response}
 \label{fig:cellsmap}
+\floatnote{One mark per configuration and run.}
 \end{figure}
 
 The model is wrong on \GnineCellsWrongXOne\ configurations of the first X250 run, \GnineCellsWrongXTwo\ of its repeat, \GnineCellsWrongGx\ on the GX10, \GnineCellsWrongOp\ on the OptiPlex and \GnineCellsWrongNine\ on the i9, and \GnineCellsEvery\ configurations (56 and 72) are wrong on every run. Every wrong configuration is a round trip faster than predicted (Figure~\ref{fig:cellsmap}: all lie at $-1$~RTT, with responses of \GnineRespLo\ to \GnineRespHi\ segments). The other failing configurations fail on only some machines: criterion A2 (at least four of the five configurations wrong in the first X250 run are also wrong on the second machine) is met on the GX10 and the i9 but not on the OptiPlex, and V1 (the same test on the X250 again) is met. The registered rule therefore leads us to conclude that where the model fails depends partly on the machine. This fits a server window that differs between machines; the section on the server's window in the random configurations, above, measures it. The ticket tests of Tests 16 and 18 are met on both machines (\GtwelveRepMet\ of \GtwelveRepK\ criteria).
@@ -435,7 +446,7 @@ GX10, 7.0 & \MtuArmSevenZero\% & \ArmStateSevenZero/\ArmStateSevenZero & \ArmNoT
 \emph{Tails (Section~6).} Table~\ref{tab:tails} gives the six configurations measured with $n=1\,000$ transactions each (Test 22). Each distribution has a single narrow peak, with a maximum at most 2.5\,ms above the median and no transaction more than 20\,ms above it, so no tail hides an extra round trip. Still, six configurations are a small sample of the design space.
 
 \begin{table}[h]
-\caption{Latency of the six configurations with $n=1\,000$ (ms; the last column is the share of transactions above the median by more than 20\,ms, in \%).}
+\caption{Latency of the six configurations with $n=1\,000$}
 \label{tab:tails}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}llrrrrrr@{}}
@@ -445,6 +456,7 @@ Suite & Request / response (B) & $n$ & Median & P99 & P99.9 & Max & Above 20\,ms
 \TailRows
 \bottomrule
 \end{tabular}
+\floatnote{In ms; the last column is the share of transactions above the median by more than 20\,ms, in \%.}
 \end{table}
 
 \section*{A third library: GnuTLS (Section~6)}
@@ -453,7 +465,7 @@ We then turned to GnuTLS~3.8.14, another TLS~1.3 implementation, built with lean
 \emph{Design (fixed on November 22, 2026, commit 9fc59f9, before the measurement).} The model was unchanged and nothing was fitted; predictions depend only on the calibration and \texttt{pqc\_sim.py}. All runs used resumed TLS~1.3 with mutual authentication (depth 1, RTT 100\,ms, 100\,Mbit/s, MTU 1\,500, initial window 10, $n=30$, CPU clock fixed) on the X250 and the GX10. Stage T, the main experiment, covers 100 configurations (ML-DSA-44 and -65; 0 to 4 tickets, that is, 0 to 14 and 0 to 18 segments; responses of 4 to 22 segments; request 302\,B), each compared with two predictions: \emph{inflight}, the paper's model, in which the tickets share the server's window of ten with the response; and \emph{acked}, in which the tickets are acknowledged before the response is sent, so that the response alone uses the window given by rule~(1) for the ticket flight. The two differ by half an RTT in 57 configurations. Stage C has 32 client-window configurations (rule~(1) against the rule loosened by two segments and textbook slow start). Stage D has 85 ticket-position configurations (separate-ticket against coalesced-ticket model; the two differ in 35). Stage R has 40 randomly drawn configurations (seed 20261123; design space of the first random draw; depth 1). Stage O repeats 20 configurations of D with OpenSSL~3.5 in the same session to separate library effects from session effects. Our goal here was to understand what sets the server's window, not to pass or fail. Each count has a band, derived from the OpenSSL and Go counts in the paper, within which a library behaving like those references would fall with 95\% probability; a count above its band calls for diagnosis.
 
 \begin{table}[h]
-\caption{GnuTLS~3.8.14 on the GX10 and the X250 (\texttt{results/g23\_report.txt}).}
+\caption{GnuTLS~3.8.14 on the GX10 and the X250}
 \label{tab:gtls}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lcrr@{}}
@@ -473,6 +485,7 @@ Wrong configurations in C, D, R (all too slow, by \GtlsAMinSlow\ to \GtlsAMaxSlo
 \quad of them with a request of more than 13\,KB & & \GtlsAWrongBigReq & \GtlsXWrongBigReq\\
 \bottomrule
 \end{tabular}
+\floatnote{Source: \texttt{results/g23\_report.txt}.}
 \end{table}
 
 \emph{What the data show.} (i)~With a small request, ticket size does not set the server's window: in stage T, latency follows the model on every configuration where the two predictions differ, for 0 to 18 segments of ticket data, and no configuration follows the window grown by rule~(1). (ii)~Parts of the model hold on a third library: rule~(1) on its ClientHello and the separate-ticket position (no wrong configuration where the two ticket models differ); the OpenSSL control in the same session shows that the sessions were sound. The random configurations, however, fall outside their band. (iii)~As in the paper, the errors are one-sided, here in the direction fixed beforehand (band 0--1 for ``too fast'', Table~\ref{tab:gtls}): in none of the \GtlsFastCellRuns\ configuration runs of C, D, and R on the two machines was the model too fast. (iv)~On both machines the wrong counts on the random configurations exceed the band (\GtlsARWrong\ and \GtlsXRWrong\ against 0--3). Every wrong configuration is predicted too slow and has a request larger than 13\,KB, which needs another round trip, so the ticket is acknowledged before the response leaves; in that case the model leaves the server's window at ten. OpenSSL behaves similarly: over the five runs of the first random draw, \DomLargeWrong\ of the \DomWrongTotal\ wrong configuration runs have a request of more than 13\,KB; \DomLargePct\,\% of the \DomLargeN\ configuration runs with such a request are wrong, \DomRestPct\,\% of the \DomRestN\ with a smaller one (the wrong ones among these include the ticket-size error of Section~6 of the paper). Request size marks this case; we have not shown that it is the cause. (v)~The machine does not decide the outcome: of the \GtlsBothCells\ configurations measured on both, the excess differs by more than half an RTT on \GtlsBothDiffer, and the \GtlsSharedWrong\ wrong configurations of the GX10 are wrong on the X250 too (it has two more). At the resolution of this test, then, we find no support for the idea that machine-dependent microsecond orderings change the latency of these configurations. This does not contradict the kernel measurements in ``The server's window, acknowledgment by acknowledgment,'' which take the processing times as measured and say nothing about how they differ between machines.
@@ -490,7 +503,7 @@ One draw can mislead. So, after fixing the paper's predictions, we drew another 
 \emph{Configurations off by a few milliseconds (Section~6).} The ten configurations of the random draw that are within half an RTT but off by more than 2\,ms are all at 10\,Mbit/s, with errors of \GnineOffLo\ to \GnineOffHi\,ms (Table~\ref{tab:offcells}; positive: the model is slower than the measurement). They go both ways and stay far below an RTT; we did not investigate them. At the millisecond level, then, the model's errors are not one-sided, which is why the direction counts above include only errors larger than half an RTT.
 
 \begin{table}[h]
-\caption{The ten configurations of the random draw that are off by more than 2\,ms but by less than half an RTT (first X250 run).}
+\caption{Random-draw configurations off by more than 2\,ms but less than half an RTT}
 \label{tab:offcells}
 \centering\footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}rlrrrrr@{}}
@@ -500,6 +513,7 @@ Configuration & Suite & RTT (ms) & Rate (Mbit/s) & MTU & Request / response (B) 
 \OffRows
 \bottomrule
 \end{tabular}
+\floatnote{The ten such configurations of the first X250 run.}
 \end{table}
 
 \emph{Runs that preceded the reported ones.} The physical-link test (Test 25) began with a smoke run ($n=3$); its plain-TCP part was complete and gave the same result, but we do not use it. The first Go run (Test 14) lacked the ECDSA-P256 set, which we measured separately on the same machine; criteria H1 to H5 use the merged runs, with predictions and criteria unchanged. We repeated the ticket ACK traces on one clock only after reading the first traces, and we keep and report both sets.
