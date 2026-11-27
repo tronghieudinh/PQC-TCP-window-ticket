@@ -5,7 +5,8 @@ r"""make_assets_short.py - the figures of the paper and every number quoted in i
     python3 make_assets_short.py                     (reproduce_l1.sh runs it and compares the output with the shipped files)
     PQC_FIG_FLAT=1 python3 make_assets_short.py      lower figures, written with the suffix _v3
 Output: figures/*.pdf; numbers_short.tex, one LaTeX macro per number (num(name, value) defines \name; the text of the paper uses the
-macros, so no result is typed by hand); and table rows g19_cells_table.tex, os_table.tex, details_tables.tex, g24_table.tex.
+macros, so no result is typed by hand); and table rows g19_cells_table.tex, os_table.tex, details_tables.tex, g24_table.tex
+(and os_table_rows.tex, the same table in the terms of ../CCR_repeatable_revision, if that folder exists).
 The file is a sequence of sections, one per experiment; each reads the CSV files or the printed output of an analysis script. A section
 whose input file does not exist defines no macros.
 """
@@ -374,6 +375,11 @@ def _one_sided():
         name = _ONE_SIDED_LABELS[name]                                            # labels with the test numbers of the paper's table of tests
         rows.append(f"{name} & {runs} & {int(cr):,} & {fast} & {slow}\\\\".replace(f"{int(cr):,}", f"{int(cr):,}".replace(",", "\\,")))
     open(os.path.join(HERE_TEX, "os_table.tex"), "w").write("\\newcommand{\\OsRows}{" + "\n".join(rows) + "}\n")
+    other = os.path.join(HERE_TEX, "..", "CCR_repeatable_revision")        # second candidate version: it says "cells" and "rows"
+    if os.path.isdir(other):
+        own = [r.replace("design points", "cells").replace("(Tests ", "(rows ").replace("(Test ", "(row ") for r in rows]
+        # overwrite-ok: generated table, rebuilt from the analysis output on every run
+        open(os.path.join(other, "os_table_rows.tex"), "w").write("\\newcommand{\\OsRows}{" + "\n".join(own) + "}\n")
 _one_sided()
 
 # ---- G22, second random draw (results/g22_x250_analysis.txt, g22_gx10_analysis.txt, one_sided_errors_g22.txt)
