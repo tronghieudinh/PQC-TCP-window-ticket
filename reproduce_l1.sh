@@ -8,10 +8,12 @@ cd "$(dirname "$0")"
 PY=${PY:-python3}
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cp paper2_short/Latex/numbers_short.tex "$tmp/numbers_short.tex"; for t in g19_cells_table os_table details_tables g24_table; do cp paper2_short/Latex/$t.tex "$tmp/$t.tex"; done
+cp paper2_short/CCR_repeatable/os_table_concise.tex "$tmp/os_table_concise.tex"     # the one table kept beside the manuscript
 (cd paper2_short/Latex && $PY make_assets_short.py >/dev/null && PQC_FIG_FLAT=1 $PY make_assets_short.py >/dev/null)      # default size and the lower variant (suffix _v3) used by the paper
 if diff -q "$tmp/numbers_short.tex" paper2_short/Latex/numbers_short.tex >/dev/null; then echo "numbers check OK"
 else echo "numbers DIFF (regenerated against shipped):"; diff "$tmp/numbers_short.tex" paper2_short/Latex/numbers_short.tex || true; exit 1; fi
 for t in g19_cells_table os_table details_tables g24_table; do cmp -s "$tmp/$t.tex" paper2_short/Latex/$t.tex && echo "table $t OK" || { echo "table $t DIFF"; exit 1; }; done
+cmp -s "$tmp/os_table_concise.tex" paper2_short/CCR_repeatable/os_table_concise.tex && echo "table os_table_concise OK" || { echo "table os_table_concise DIFF"; exit 1; }
 # the scripts of new measurements load with the files of this archive (a missing module would otherwise appear only in a root run)
 $PY -B -c "import sys; sys.path[:0]=['Measurements/testbed','Measurements']; import run_testbed, trace_run, run_slack, g24_run, netem_calibrate, tbnet, tbnet_phys" && echo "measurement scripts load OK" || { echo "measurement scripts FAILED to load"; exit 1; }
 # the kernel-logic derivation of rule (1) and the model comparison (Table 1) from the shipped data

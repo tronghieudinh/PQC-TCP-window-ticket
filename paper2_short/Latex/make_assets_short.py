@@ -193,6 +193,16 @@ for _tag, _T in (("Def", "default"), ("Large", "large")):
     _S = RW.stage_a(os.path.join(RES, f"rwnd_{_T}", "slack.csv"))
     _ok, _tot = RW.share(_S["mtu9000"])
     num(f"NineRwnd{_tag}Ok", _ok); num(f"NineRwnd{_tag}Tot", _tot)
+# resumed configurations at MTU 9000 that the model (one write per message) mispredicts, in three runs (default and raised receive buffer, and
+# the network scan); the paper says that all of them are predicted too low and that writing one TLS record per write() (post hoc) removes them
+for _nm, _fn in (("Def", "resume_summary_wp6_mtu9000_default.csv"), ("Large", "resume_summary_wp6_mtu9000_large.csv"), ("Scan", "resume_summary_wp6_gen.csv")):
+    _rows = [r for r in rd(os.path.join(RES, _fn)) if int(r["mtu"]) == 9000]
+    _err = {_flag: [(M9.pred(r["suite"], int(r["req"]), int(r["resp"]), float(r["rtt_ms"]), float(r["rate_mbps"]), 9000, _flag) - float(r["resumed_excess"]),
+                     float(r["rtt_ms"])) for r in _rows] for _flag in (False, True)}
+    _wrong = [e for e, rtt in _err[False] if abs(e) > 0.5 * rtt]
+    assert all(e < 0 for e in _wrong), f"MTU 9000, {_fn}: a mispredicted configuration is predicted too high (the text says too low)"
+    assert not any(abs(e) > 0.5 * rtt for e, rtt in _err[True]), f"MTU 9000, {_fn}: the record-by-record variant leaves a misprediction (the text says it removes all)"
+    num(f"Nine{_nm}Wrong", len(_wrong)); num(f"Nine{_nm}N", len(_rows))
 # ---- the 240-cell scan (gen: RTT, rate, MTU) and the server-authentication-only test (servonly): the window after an acknowledged ticket, same computation as analyze_wp6.gen()
 def _scan(kind):
     P = {(r["suite"], int(r["req"]), int(r["resp"]), float(r["rtt_ms"]), float(r["rate_mbps"]), int(r["mtu"])): r for r in rd(os.path.join(RES, f"wp6_pred_{kind}.csv"))}
@@ -381,7 +391,9 @@ def _one_sided():
         # overwrite-ok: generated table, rebuilt from the analysis output on every run
         open(os.path.join(other, "os_table_rows.tex"), "w").write("\\newcommand{\\OsRows}{" + "\n".join(own) + "}\n")
     short = os.path.join(HERE_TEX, "..", "CCR_concise")                    # concise version: it says "configurations"
-    if os.path.isdir(short):
+    if not os.path.isdir(short):                                             # in the public archive it is published as CCR_repeatable
+        short = os.path.join(HERE_TEX, "..", "CCR_repeatable")
+    if os.path.isdir(short) and (short.endswith("CCR_concise") or os.path.exists(os.path.join(short, "os_table_concise.tex"))):
         own = [r.replace("design points", "configurations") for r in rows]
         # overwrite-ok: generated table, rebuilt from the analysis output on every run
         open(os.path.join(short, "os_table_concise.tex"), "w").write("\\newcommand{\\OsRows}{" + "\n".join(own) + "}\n")
@@ -763,6 +775,7 @@ _tk = [v["ticket_bytes"] for v in _gc.values()]
 num("GoTktLoKB", f"{min(_tk) / 1000:.1f}"); num("GoTktHiKB", f"{max(_tk) / 1000:.0f}")
 for _k, _su in _SU.items():
     num("GoCh" + _k, _m.ceil(sum(_gc[_su]["resumed_client_hello_writes"]) / 1440))
+    num("GoSrv" + _k, _m.ceil(sum(_gc[_su]["resumed_server_flight_writes"]) / 1440))      # server's first flight of a resumed connection, in segments
 _g10t = _rd_text(os.path.join(RES, "g10_analysis.txt"))
 num("GoClose", _re.search(r"allowance \((\d+) B read by the client\)", _g10t).group(1))
 num("GoK", len(_re.findall(r"H\d (?:NOT )?MET", _g10t.split("\n")[3])))
@@ -955,6 +968,7 @@ def _g24():
     num("GtfWinMax", max(int(r["cwnd"]) for m in ("gx10", "x250", "i9") for r in rd(os.path.join(RES, f"g24_{m}_posthoc_points.csv")) if r["cwnd"] != "" and r["fast"] == "1"))
     for k, v in (("N", "n"), ("W", "w"), ("Agree", "agree"), ("UFast", "ufast"), ("UFastFit", "ufastfit"), ("USlow", "uslow"), ("USlowSmall", "uslowsmall"), ("Larger", "larger"), ("Smaller", "smaller"), ("ReqSaved", "reqsaved")):
         num("Gtf" + k, tot[v])
+    num("GtfExc", tot["w"] - tot["agree"])                      # transactions with a window reading in which latency and window disagree
     cells = {int(c["cell"]): c for c in rd(os.path.join(RES, "g24_cells.csv"))}
     rows = [f"{c} & {'unexplained' if groups[c][0] == 'U' else 'never wrong'} & {cells[c]['suite'].split('|')[0]} & " + " & ".join(f"{per[c][t][0]} of {per[c][t][1]}" for t in ("X", "Gx", "I")) + "\\\\" for c in sorted(per, key=lambda c: (groups[c][0] != "U", c))]
     open(os.path.join(HERE, "g24_table.tex"), "w").write("\\newcommand{\\GtfRows}{" + "\n".join(rows) + "}\n")
@@ -970,6 +984,13 @@ def _repl_nov25():
         r = _count_met(fs, rx)
         if r: num(nm + "Met", r[0]); num(nm + "K", r[1])
 _repl_nov25()
+def _repeat_errors():
+    """Range of the mean absolute error of the random draw on the other machines (the accuracy limit of Test 20, not a criterion of the repeats)."""
+    v = [float(_re.search(r"R3 mean absolute error ([\d.]+) ms", open(os.path.join(RES, f"g19_{m}_analysis.txt")).read()).group(1)) for m in ("gx10", "i9", "optiplex")]
+    assert min(v) > 2, "a repeat of the random draw meets the 2 ms limit (the text says all missed it)"
+    num("GnineRepMaeLo", f"{min(v):.2f}"); num("GnineRepMaeHi", f"{max(v):.2f}")       # the files give two decimals; rounding them again is wrong
+_repeat_errors()
+assert int(NUMS["GoWrongSuiteN"]) == int(NUMS["GoCWrong"]) + int(NUMS["GoWrongAll"]), "the Go misses are the client-window and ticket-configuration ones (as the text says)"
 def _plain_i9():                                                     # G11 and G16 on the i9
     """Macros of the tests on plain TCP (G11, G16) on the i9."""
     t = open(os.path.join(RES, "g16_i9_analysis.txt")).read()
