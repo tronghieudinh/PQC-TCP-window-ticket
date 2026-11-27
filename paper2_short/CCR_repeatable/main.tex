@@ -42,7 +42,7 @@ Post-quantum signatures can push TLS flights beyond TCP's ten-segment initial wi
 \ccsdesc[300]{Networks~Network measurement}
 \makeatletter\g@addto@macro\@concepts{\linebreak}\makeatother % break before the second bullet of the CCS concepts
 \ccsdesc[300]{Security and privacy~Security protocols}
-\keywords{Transport protocols, public key cryptography, computer network performance, operating system kernels, prediction methods, TLS 1.3, session resumption, TCP congestion window}
+\keywords{Post-quantum cryptography, TLS 1.3, session resumption, TCP congestion window, congestion window validation, Linux kernel}
 \maketitle
 
 \section{Introduction}
@@ -55,8 +55,8 @@ Our study began with a failed prediction. A per-segment transport model (Section
 We answer them for Linux, mainly with OpenSSL~3.5--4.1 over emulated delay; TLS runs use Reno or BBR, and Cubic appears on plain TCP only. The TLS results concern resumption with mutual authentication, the one setting in which the ticket carries a certificate, the client's leaf.
 
 On the first question, we reproduce rule~(1) from a program implementing the kernel's logic, probe it under BBR, \texttt{fq} pacing, and loss, and draw its consequence for resumption: a five-segment ClientHello leaves a window of \WFive\ segments, a six-segment one raises it to \WSix, so the larger message can save an RTT (Section~\ref{sec:window}). Our preprint~\citeone\ reports the rule from the same plain-TCP scan, with its receive-window limit at MTU~9\,000, and describes the kernel's cwnd-limited test, as inputs to a model of full handshakes.
-The second concerns the prediction error: predictions fixed in advance trace it to a ticket that the library writes on its own, not to a larger client window.
-As for the third, removing the ticket removes the enlargement of the server's window, and, given the measured ACK processing times, kernel counters yield the response burst. A model that holds the window at ten errs toward too much latency: on OpenSSL under Reno at MTU~1\,280--1\,500 it was never too low by more than half an RTT (\OsRuns\ configuration runs, counted afterwards), and on GnuTLS that direction, predicted beforehand, held (\GtlsFastCellRuns\ runs; Section~\ref{sec:server}).
+The second question concerns the prediction error: predictions fixed in advance trace it to a ticket that the library writes on its own, not to a larger client window.
+As for the third, at a fixed CPU clock, removing the ticket removes the enlargement of the server's window, and, given the measured ACK processing times, kernel counters yield the response burst. A model that holds the window at ten errs toward too much latency: on OpenSSL under Reno at MTU~1\,280--1\,500 it was never too low by more than half an RTT (\OsRuns\ configuration runs, counted afterwards), and on GnuTLS that direction, predicted beforehand, held (\GtlsFastCellRuns\ runs; Section~\ref{sec:server}).
 
 Admittedly, the rule's ingredients lie in the RFCs and the kernel; new here is following the window into resumed connections and seeing what a library's writes then do with it. Behind these results stand 31 numbered tests, repeated in part on four machines and a physical link, with three OpenSSL releases, two further TLS libraries, and two congestion-control families, and under loss and load (Section~\ref{sec:repl}). Predictions or criteria were committed beforehand unless marked post hoc, and unmet registered criteria appear here or in the supplement.
 
