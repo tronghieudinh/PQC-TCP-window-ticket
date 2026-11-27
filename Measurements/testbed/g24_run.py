@@ -9,16 +9,18 @@ save a round trip (group U), plus control cells (group K). Resumed TLS 1.3 with 
 For every cell:
   DIR/base_g24<rep>_c<cell>/               base run on an unshaped link without probe (n = 10): time spent outside the network
   DIR/trace_g24<rep>_c<cell>_doff_m<mtu>/  shaped run with the kernel probe ticket_ack2.bt and a capture of the server's interface
+A run into names that exist moves the earlier directories to DIR.replaced/ (keep_old_output.py).
 Analysis: analyze_g24.py (registered criteria) and analyze_g24_posthoc.py.
 """
-import argparse, csv, os, shutil, sys
+import argparse, csv, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import trace_run as TR
 import tbnet
+from keep_old_output import keep_old_output
 
 
 def main():
-    """Run the base and the traced measurement of every selected cell, replacing earlier output of the same repetition."""
+    """Run the base and the traced measurement of every selected cell; earlier output of the same repetition is moved aside, not deleted."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True); ap.add_argument("--rep", default="a"); ap.add_argument("--n", type=int, default=30); ap.add_argument("--cells", default="")
     a = ap.parse_args()
@@ -35,7 +37,9 @@ def main():
             tag = f"{short}_req{req}_k{c['k_segments']}_rtt{rtt:g}_rate{rate:g}_mtu{mtu}"
             base = os.path.join(a.out, f"base_g24{a.rep}_c{c['cell']}"); run = os.path.join(a.out, f"trace_g24{a.rep}_c{c['cell']}_doff_m{mtu}")
             for d in (base, run):
-                shutil.rmtree(d, ignore_errors=True); os.makedirs(d)
+                moved = keep_old_output(d); os.makedirs(d)
+                if moved:
+                    print(f"earlier output kept: {moved}")
             print(f"cell {c['cell']}  {tag}", flush=True)
             os.environ.pop("PQC_BPF", None)
             tb.shape(0, 0, 0.0, mtu, 10, "reno", quickack=True)

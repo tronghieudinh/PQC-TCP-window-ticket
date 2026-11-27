@@ -153,6 +153,7 @@ predictions were made.
 | `Measurements/testbed/clock_sync.py` | clock-safe traces | Record the relation of the capture and trace clocks before and after a run | run tag | &lt;tag>.clock.json |
 | `Measurements/testbed/run_clock_repeat.sh` | clock-safe repeat | Repeat the ticket traces with all events on one clock (root) | step | results/trace_clock_\* |
 | `Measurements/testbed/run_r3.sh` | rounds 3-3d | Intervention on the order of acknowledgments and response write (root) | step | results/trace_r3\* |
+| `Measurements/testbed/keep_old_output.py` | repeat runs | Move the output of an earlier run aside instead of deleting it | paths about to be written | moved to &lt;directory>.replaced/ |
 | `Measurements/testbed/g24_run.py` | G24 | Window runs of the selected random cells | results/g24_cells.csv | run directories |
 | `Measurements/testbed/run_g24.sh` | G24 | Prepare the machine and run g24_run.py (root) | smoke or run | run directories |
 | `Measurements/testbed/run_i9_all.sh` | replications | Run all replication steps on a second x86 machine, unattended (root) | plan or run | scenario runs |

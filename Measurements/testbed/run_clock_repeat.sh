@@ -14,8 +14,8 @@
 #   sudo bash run_clock_repeat.sh ctrl         # controls: C1 (race design with capture and tcp_probe only, no bpftrace) and C2 (R2 again)
 # Every step fixes the CPU clock with host_tune.sh (PQC_NO_TUNE=1 leaves it unchanged) and switches time synchronization (NTP) off; both
 # are restored on exit.  Output OUTSIDE the repository: $CLOCK_OUT/trace_clock_*/ and $CLOCK_OUT/clock_repeat.log; CLOCK_OUT defaults to
-# ~/pqc_analysis_data/clockrun_<host> of the normal user.  A tar.gz archive is left in that user's home.  A run of the same step replaces
-# its directories.
+# ~/pqc_analysis_data/clockrun_<host> of the normal user.  A tar.gz archive is left in that user's home.  A run of the same step moves its
+# earlier directories to $CLOCK_OUT.replaced/ (keep_old_output.py).
 set -uo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; PY=${PY:-python3}
 # STEP: which part to run. TAG: suffix of the directory names of the step tuned.
@@ -58,6 +58,9 @@ if [ "${PQC_NO_TUNE:-0}" != 1 ]; then
   if [ "$STEP" = isolB ]; then g0=$(sed -n 1p /tmp/pqc_tune.state); for c in $G/cpu[0-9]*/cpufreq/scaling_governor; do echo "$g0" > "$c"; done; SFX=_isolB; fi
   case "$STEP" in isol*) log "variant $STEP: governor $(cat $G/cpu0/cpufreq/scaling_governor), no_turbo $(cat $G/intel_pstate/no_turbo 2>/dev/null || echo n/a); output directories end in $SFX";; esac
 else log "CPU clock NOT fixed (PQC_NO_TUNE=1)"; fi
+# Move the output of an earlier run of the same step aside (never delete it); the step stops if that fails.
+keep_old() { # name inside $OUT
+  $PY keep_old_output.py "${OUT:?}/$1" 2>&1 | tee -a "$LOG"; }
 # softirq probes plus the XQ/XS probes on one clock (R1)
 # Join the softirq probes of results/ticket_softirq.bt with the queue and send probes of ticket_xmit.bt, so that both use one clock.
 build_bt() { awk '/^tracepoint:net:net_dev_queue/{p=1} p' ticket_xmit.bt | awk '/^tracepoint:net:netif_rx/{exit} {print}' > "$OUT/.xmit_part.bt"
@@ -77,39 +80,39 @@ check_out() { # outdir: counts of the probe lines and the clock files
   [ "$bad" = 0 ] && [ "$ok" -gt 0 ]
 }
 if [ "$STEP" = smoke ] || [ "$STEP" = all ]; then
-  log "R0 smoke"; rm -rf "${OUT:?}/trace_clock_smoke$SFX"
+  log "R0 smoke"; keep_old trace_clock_smoke$SFX || exit 1
   run_trace trace_clock_smoke$SFX ticket_xmit.bt --suites "ECDSA-P256|X25519" --nets 30:100:1500 --ks 13 --n 3 || exit 1
   check_out trace_clock_smoke$SFX || { log "R0 FAILED: send the log and the head of $OUT/trace_clock_smoke$SFX/*.bpf.txt"; exit 1; }
   head -c 600 "$OUT/trace_clock_smoke$SFX"/*.bpf.txt | head -14 | tee -a "$LOG"
   [ "$STEP" = smoke ] && { log "R0 ok"; exit 0; }
 fi
 if [ "$STEP" = r1 ] || [ "$STEP" = all ] || [ "$STEP" = tuned ]; then
-  log "R1 part H again"; build_bt; rm -rf "${OUT:?}/trace_clock_softirq$SFX"
+  log "R1 part H again"; keep_old ticket_softirq_xmit.bt || exit 1; build_bt; keep_old trace_clock_softirq$SFX || exit 1
   run_trace trace_clock_softirq$SFX "$OUT/ticket_softirq_xmit.bt" --suites "ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768" --reqs 19460 --nets "30:100:1500,100:100:1500" --ks 16 --n 15 || exit 1
   check_out trace_clock_softirq$SFX || log "R1: probe lines missing"
 fi
 if [ "$STEP" = r2 ] || [ "$STEP" = all ] || [ "$STEP" = tuned ] || [ "$STEP" = isolA ] || [ "$STEP" = isolB ]; then
-  log "R2 race design again"; rm -rf "${OUT:?}/trace_clock_race$SFX"
+  log "R2 race design again"; keep_old trace_clock_race$SFX || exit 1
   run_trace trace_clock_race$SFX ticket_xmit.bt --n 8 || exit 1
   check_out trace_clock_race$SFX || log "R2: probe lines missing"
 fi
 if [ "$STEP" = r2x ]; then       # exploratory: a fourth suite, ML-DSA-87 (ticket of 7 segments), to see the burst and the ACK gap by ticket size; results/wp6_explore_ticketsize.md
-  log "R2x race design with the four suites (exploratory)"; rm -rf "${OUT:?}/trace_clock_race_x$SFX"
+  log "R2x race design with the four suites (exploratory)"; keep_old trace_clock_race_x$SFX || exit 1
   run_trace trace_clock_race_x$SFX ticket_xmit.bt --suites "ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768,ML-DSA-87|ML-KEM-1024" --n 8 || exit 1
   check_out trace_clock_race_x$SFX || log "R2x: probe lines missing"
 fi
 if [ "$STEP" = r2y ]; then       # exploratory: a request of 25 000 bytes, more than the client window of every suite; results/wp6_explore_ticketsize_2.md
-  log "R2y race design, request 25 000 B, four suites (exploratory)"; rm -rf "${OUT:?}/trace_clock_race_y$SFX"
+  log "R2y race design, request 25 000 B, four suites (exploratory)"; keep_old trace_clock_race_y$SFX || exit 1
   run_trace trace_clock_race_y$SFX ticket_xmit.bt --suites "ECDSA-P256|X25519,ML-DSA-44|ML-KEM-768,ML-DSA-65|ML-KEM-768,ML-DSA-87|ML-KEM-1024" --reqs 25000 --n 8 || exit 1
   check_out trace_clock_race_y$SFX || log "R2y: probe lines missing"
 fi
 if [ "$STEP" = ctrl ] || [ "$STEP" = tuned ]; then
-  log "C1 race design with the instruments of the first run (capture + tcp_probe, no bpftrace, no clock_sync)"; rm -rf "${OUT:?}/trace_clock_ctrl1$SFX"
+  log "C1 race design with the instruments of the first run (capture + tcp_probe, no bpftrace, no clock_sync)"; keep_old trace_clock_ctrl1$SFX || exit 1
   PQC_OUTDIR="$OUT/trace_clock_ctrl1$SFX" PQC_CLOCK_SYNC=0 $PY trace_run.py race --n 8 >>"$LOG" 2>&1 || { log "C1 FAILED (see the log)"; exit 1; }
-  if [ "$STEP" = ctrl ]; then log "C2 race design again with ticket_xmit.bt (run-to-run repeat of R2)"; rm -rf "${OUT:?}/trace_clock_race2$SFX"
+  if [ "$STEP" = ctrl ]; then log "C2 race design again with ticket_xmit.bt (run-to-run repeat of R2)"; keep_old trace_clock_race2$SFX || exit 1
     run_trace trace_clock_race2$SFX ticket_xmit.bt --n 8 || exit 1
     check_out trace_clock_race2$SFX || log "C2: probe lines missing"; fi
 fi
 chown -R "$U" "$OUT"
-T=$UH/clock_repeat_$(date +%Y%m%d_%H%M).tar.gz
+T=$UH/clock_repeat_$(date +%Y%m%d_%H%M%S).tar.gz
 tar -czf "$T" -C "$OUT" $(cd "$OUT" && ls -d trace_clock_*$SFX clock_repeat.log ticket_softirq_xmit.bt 2>/dev/null) && chown "$U" "$T" && log "packed: $T ($(du -h "$T" | cut -f1)); copy it to the analysis machine"

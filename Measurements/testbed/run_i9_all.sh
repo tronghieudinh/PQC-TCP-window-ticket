@@ -10,7 +10,8 @@
 #   bash run_i9_all.sh status                   # results so far
 #
 # Steps: g24, g9, g19, g12, g14delack, r3d, clock, g14bbr, g16, g11 (and g17); CODE_GUIDE.md explains the codes. Running the script again
-# skips the completed steps and retries the others. After each step the data are packed into ~/i9_queue/<step>_<ok|FAILED>_<time>.tar.gz
+# skips the completed steps and retries the others; earlier logs and run directories are moved to <directory>.replaced/, not deleted
+# (keep_old_output.py). After each step the data are packed into ~/i9_queue/<step>_<ok|FAILED>_<time>.tar.gz
 # with a .sha256 file, to be copied to the analysis machine. The preflight_*.json files (they list other users and processes) and the keys
 # stay on this machine.
 set -uo pipefail
@@ -75,6 +76,7 @@ runuser -u "$U" -- make -s -C "$HERE" PQC_OPENSSL="$PQC_OPENSSL" >>"$LOG" 2>&1 |
 # Refuse to start with less than 10 GB free; record the machine, the software versions and the commit.
 FREE=$(df -BG --output=avail "$RUNS" | tail -1 | tr -dc 0-9); [ "$FREE" -ge 10 ] || { log "ERROR: only ${FREE} GB free at $RUNS (need 10)"; exit 1; }
 COMMIT=$(git -C "$REPO" rev-parse --short HEAD); DIRTY=$(git -C "$REPO" status --porcelain --untracked-files=no -- Measurements | grep -v '\.pem$' | head -3)
+python3 keep_old_output.py "$QUEUE/machine.txt" >>"$LOG" 2>&1 || { log "ERROR: cannot keep the earlier machine.txt aside"; exit 1; }
 { echo "date $(date -u '+%FT%TZ')"; echo "kernel $(uname -r)"; "$PQC_OPENSSL/bin/openssl" version; bpftrace --version; grep -m1 'model name' /proc/cpuinfo; echo "commit $COMMIT"; echo "tracked changes: ${DIRTY:-none}"; } > "$QUEUE/machine.txt"
 log "start: steps [$ALL], commit $COMMIT, kernel $(uname -r), $("$PQC_OPENSSL/bin/openssl" version)"
 
@@ -102,6 +104,7 @@ note() { printf '%s\t%s\t%s\t%s\t%ss\t%s\n' "$(date '+%F %T')" "$1" "$2" "$3" "$
 step_run() { # step phase
   local s=$1 ph=$2 c rc t0 out=$RUNS/state/$1.$2.log; c=$(cmd "$s" "$ph"); t0=$(date +%s)
   log "$s $ph: $c"
+  python3 keep_old_output.py "$out" >>"$LOG" 2>&1 || { log "$s $ph: cannot keep the earlier step log aside; step not run"; return 1; }
   timeout -k 120 "$(limit "$s" "$ph")m" bash -c "$c" </dev/null >"$out" 2>&1 & CHILD=$!      # in the background, so that Ctrl-C reaches the trap at once
   wait "$CHILD"; rc=$?; CHILD=""
   restore_host
@@ -125,7 +128,8 @@ pack() { # step result
 # a G24 run made by hand before this script (run_g24.sh run, finished) counts
 OLD=$UH/pqc_analysis_data/g24_$(hostname -s)
 if [[ " $ALL " == *" g24 "* ]] && [ ! -e "$RUNS/state/g24.ok" ] && grep -q "packed:" "$OLD/g24_run.log" 2>/dev/null; then
-  log "g24: a finished run exists in $OLD; it is used and G24 is not run again"; rm -rf "${RUNS:?}/g24"; cp -a "$OLD" "$RUNS/g24" && { touch "$RUNS/state/g24.ok"; note g24 main "ok(earlier run)" 0; pack g24 ok; }
+  # overwrite-ok: the g24 directory of this script, if any, is moved aside first; the copy goes to a free name
+  log "g24: a finished run exists in $OLD; it is used and G24 is not run again"; python3 keep_old_output.py "${RUNS:?}/g24" >>"$LOG" 2>&1 && cp -a "$OLD" "$RUNS/g24" && { touch "$RUNS/state/g24.ok"; note g24 main "ok(earlier run)" 0; pack g24 ok; }
 fi
 # Smoke test every remaining step, then run the main phase of those that passed.
 TODO=""; for s in $ALL; do [ -e "$RUNS/state/$s.ok" ] && log "$s: already completed, skipped" || TODO="$TODO $s"; done

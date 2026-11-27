@@ -9,7 +9,7 @@
 # Certificates are taken from ~/pqc_certs_local/certs if present, else from the default directory in the code below; override with
 # sudo env PQC_CERTS=/dir bash run_g24.sh run.  The CPU clock is fixed (host_tune.sh) and time synchronization (NTP) is switched off for
 # the run; both are restored on exit.  The data go OUTSIDE the repository, to $G24_OUT (default ~/pqc_analysis_data/g24_<host> of the
-# normal user), plus a tar.gz archive in that user's home.
+# normal user), plus a tar.gz archive in that user's home.  Earlier directories of a repetition are moved to $G24_OUT.replaced/.
 set -uo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; PY=${PY:-python3}
 # STEP: smoke or run.
@@ -53,5 +53,5 @@ fi
 # Main run: two repetitions of all cells, packed into one archive.
 for rep in a b; do $PY g24_run.py --out "$OUT" --rep $rep --n 30 >>"$LOG" 2>&1 || { log "run FAILED in repetition $rep (see $LOG)"; exit 1; }; log "repetition $rep done"; done
 chown -R "$U" "$OUT"
-T=$UH/g24_$(hostname -s)_$(date +%Y%m%d_%H%M).tar.gz
+T=$UH/g24_$(hostname -s)_$(date +%Y%m%d_%H%M%S).tar.gz
 tar -czf "$T" -C "$OUT" . && chown "$U" "$T" && log "packed: $T ($(du -h "$T" | cut -f1))"

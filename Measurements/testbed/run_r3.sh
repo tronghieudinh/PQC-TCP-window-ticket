@@ -17,7 +17,7 @@
 #   R3_SDELAYS="off 0 200 ..."  round 3d: delay the write by busy-waiting to a deadline (tls_probe --pre-write-spin-us)
 # Output OUTSIDE the repository: $R3_OUT/trace_r3<TAG>_{d|w|s}<delay>_m<mtu>/ (capture of the server's link, <tag>.bpf.txt, clock files)
 # and $R3_OUT/r3_run.log; R3_OUT defaults to ~/pqc_analysis_data/r3_<host> of the normal user.  A tar.gz archive is left in that user's
-# home.  Analyze with --runs $R3_OUT.  A run with the same TAG replaces its directories.
+# home.  Analyze with --runs $R3_OUT.  A run with the same TAG moves the earlier directories to $R3_OUT.replaced/ (keep_old_output.py).
 set -uo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; PY=${PY:-python3}
 # STEP: smoke, run or repeat. TAG: suffix of the output directory names.
@@ -55,7 +55,7 @@ timedatectl set-ntp false && log "NTP switched off (was: $NTP0)"
 if [ "${PQC_NO_TUNE:-0}" != 1 ]; then ./host_tune.sh on >>"$LOG" 2>&1; TUNED=1; log "CPU clock fixed (governor $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor))"; else log "CPU clock NOT fixed (PQC_NO_TUNE=1)"; fi
 run_cell() { # ACK delay (us or off), MTU, transactions, output directory [, write delay by sleeping (us), write delay by busy-waiting (us)]; fails if probe lines are missing
   local d=$1 m=$2 n=$3 out=$4 wd=${5:-} sp=${6:-}
-  rm -rf "${OUT:?}/${out:?}"
+  $PY keep_old_output.py "${OUT:?}/${out:?}" >>"$LOG" 2>&1 || { log "cannot keep the earlier $out aside (see the log); nothing was run"; return 1; }
   R3_WRITE_DELAY_US=$wd R3_WRITE_SPIN_US=$sp PQC_ACK_DELAY_US=$d PQC_OUTDIR="$OUT/$out" PQC_BPF=${R3_PROBE:-ticket_ack.bt} PQC_NO_TCPPROBE=1 $PY trace_run.py race --suites "ECDSA-P256|X25519,ML-DSA-65|ML-KEM-768,ML-DSA-87|ML-KEM-1024" --reqs 25000 --nets "100:100:$m" --ks 13 --n "$n" >>"$LOG" 2>&1 || { log "trace_run FAILED for $out (see the log)"; return 1; }
   local ok=0 bad=0 f
   for f in "$OUT/$out"/*.bpf.txt; do [ -e "$f" ] || continue
@@ -83,5 +83,5 @@ for m in 1500 1280; do for d in ${R3_DELAYS:-off 0 50 100 200 400 800 1600}; do
 done; done
 fi
 chown -R "$U" "$OUT"
-T=$UH/r3_$(hostname -s)_$(date +%Y%m%d_%H%M)${TAG}.tar.gz
+T=$UH/r3_$(hostname -s)_$(date +%Y%m%d_%H%M%S)${TAG}.tar.gz
 tar -czf "$T" -C "$OUT" $(cd "$OUT" && ls -d trace_r3${TAG}_[dws]* r3_run.log 2>/dev/null) && chown "$U" "$T" && log "packed: $T ($(du -h "$T" | cut -f1)); push_data or copy it to the analysis machine"
