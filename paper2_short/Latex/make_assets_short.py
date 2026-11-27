@@ -724,7 +724,7 @@ num("LooseMae", f"{float(_lr.group(1)):.1f}")
 # stage B: mean error of the second flight with the kernel's own window
 _sb = [float(x) for x in _re.findall(r"MAE of second-flight time \(ms\): with the kernel's own window\s+([\d.]+)", _rd_text(os.path.join(RES, "slack_analysis.txt")))]
 num("StageBLo", f"{min(_sb):.1f}"); num("StageBHi", f"{max(_sb):.1f}")
-# companion paper: configurations of the full-handshake validation
+# preprint on full handshakes: configurations of its validation
 num("PFullA", len(rd(os.path.join(V5, "paper1", "Latex", "data", "testbed_configurations.csv"))))
 # Dubetskyy and Cano segment counts
 _db = _rd_text(os.path.join(RES, "dubetskyy_segments_20261116.txt"))

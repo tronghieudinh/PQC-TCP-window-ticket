@@ -61,7 +61,7 @@ those used during the measurements; many analysis outputs are compared byte for 
 file. They are local: the same letter and number mean different things in different experiments.
 
 **Working names.** Some comments, output texts and data files keep names used during the work: `L1` for this paper and its model, `Paper 1`
-for the companion study of full handshakes, `paper 2` and `WP5`, `WP6` for stages of this study. (`L0` to `L3` in G16 and G17 are criteria
+for the preprint on full handshakes, `paper 2` and `WP5`, `WP6` for stages of this study. (`L0` to `L3` in G16 and G17 are criteria
 or load levels, not paper names.) Files named `*_phan_tich_*` are analysis notes written in Vietnamese.
 
 **Machines.** X250: Lenovo ThinkPad X250 (Core i7-5600U); GX10: the Arm machine; OptiPlex: a desktop x86 machine; i9: a Core i9-10900
