@@ -380,6 +380,11 @@ def _one_sided():
         own = [r.replace("design points", "cells").replace("(Tests ", "(rows ").replace("(Test ", "(row ") for r in rows]
         # overwrite-ok: generated table, rebuilt from the analysis output on every run
         open(os.path.join(other, "os_table_rows.tex"), "w").write("\\newcommand{\\OsRows}{" + "\n".join(own) + "}\n")
+    short = os.path.join(HERE_TEX, "..", "CCR_concise")                    # concise version: it says "configurations"
+    if os.path.isdir(short):
+        own = [r.replace("design points", "configurations") for r in rows]
+        # overwrite-ok: generated table, rebuilt from the analysis output on every run
+        open(os.path.join(short, "os_table_concise.tex"), "w").write("\\newcommand{\\OsRows}{" + "\n".join(own) + "}\n")
 _one_sided()
 
 # ---- G22, second random draw (results/g22_x250_analysis.txt, g22_gx10_analysis.txt, one_sided_errors_g22.txt)
